@@ -1,16 +1,17 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Monitor, Route, Puzzle, Link, Shield, Palette, Rocket } from "lucide-react";
+import ResumoProjetoTab from "@/components/guia-projeto/ResumoProjetoTab";
 
 const GuiaProjeto = () => {
   const tabs = [
-    { id: "resumo", label: "Resumo do Projeto", icon: FileText, content: "" },
-    { id: "plataformas", label: "Plataformas", icon: Monitor, content: "" },
-    { id: "jornadas", label: "Jornadas", icon: Route, content: "" },
-    { id: "features", label: "Features", icon: Puzzle, content: "" },
-    { id: "integracoes", label: "Integrações", icon: Link, content: "" },
-    { id: "seguranca", label: "Segurança", icon: Shield, content: "" },
-    { id: "design", label: "Design", icon: Palette, content: "" },
-    { id: "implementacao", label: "Implementação", icon: Rocket, content: "" },
+    { id: "resumo", label: "Resumo do Projeto", icon: FileText },
+    { id: "plataformas", label: "Plataformas", icon: Monitor },
+    { id: "jornadas", label: "Jornadas", icon: Route },
+    { id: "features", label: "Features", icon: Puzzle },
+    { id: "integracoes", label: "Integrações", icon: Link },
+    { id: "seguranca", label: "Segurança", icon: Shield },
+    { id: "design", label: "Design", icon: Palette },
+    { id: "implementacao", label: "Implementação", icon: Rocket },
   ];
 
   return (
@@ -42,7 +43,13 @@ const GuiaProjeto = () => {
             })}
           </TabsList>
 
-          {tabs.map((tab) => (
+          {/* Aba Resumo do Projeto - Conteúdo completo */}
+          <TabsContent value="resumo" className="mt-0">
+            <ResumoProjetoTab />
+          </TabsContent>
+
+          {/* Demais abas - Placeholder */}
+          {tabs.slice(1).map((tab) => (
             <TabsContent key={tab.id} value={tab.id} className="mt-0">
               <div className="rounded-xl border border-border bg-card p-8">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
