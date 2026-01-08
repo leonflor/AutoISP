@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Monitor, Route, Puzzle, Link, Shield, Palette, Rocket } from "lucide-react";
 import ResumoProjetoTab from "@/components/guia-projeto/ResumoProjetoTab";
+import PlataformasTab from "@/components/guia-projeto/PlataformasTab";
 
 const GuiaProjeto = () => {
   const tabs = [
@@ -48,8 +49,13 @@ const GuiaProjeto = () => {
             <ResumoProjetoTab />
           </TabsContent>
 
+          {/* Aba Plataformas - Conteúdo completo */}
+          <TabsContent value="plataformas" className="mt-0">
+            <PlataformasTab />
+          </TabsContent>
+
           {/* Demais abas - Placeholder */}
-          {tabs.slice(1).map((tab) => (
+          {tabs.slice(2).map((tab) => (
             <TabsContent key={tab.id} value={tab.id} className="mt-0">
               <div className="rounded-xl border border-border bg-card p-8">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
