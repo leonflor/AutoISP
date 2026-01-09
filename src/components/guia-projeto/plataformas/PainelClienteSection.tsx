@@ -20,7 +20,13 @@ import {
   Bell,
   HelpCircle,
   Link,
-  Server
+  Server,
+  Plug,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  CircleDashed
 } from "lucide-react";
 
 const PainelClienteSection = () => {
@@ -72,6 +78,23 @@ const PainelClienteSection = () => {
     { categoria: "Configurações", eventos: "alteração de agentes, templates, integrações" },
     { categoria: "Comunicação", eventos: "disparos realizados, templates criados" },
     { categoria: "Monitoramento", eventos: "reinício de equipamento, testes executados" },
+    { categoria: "Integrações", eventos: "teste de conexão ERP executado, resultado do teste" },
+  ];
+
+  const estadosConexao = [
+    { estado: "Conectado", badge: "default", icone: CheckCircle2, cor: "text-green-600", descricao: "API respondeu com sucesso (HTTP 200)" },
+    { estado: "Falha", badge: "destructive", icone: XCircle, cor: "text-destructive", descricao: "Erro de conexão ou resposta inválida" },
+    { estado: "Timeout", badge: "secondary", icone: AlertTriangle, cor: "text-yellow-600", descricao: "API não respondeu no tempo limite" },
+    { estado: "Não Configurado", badge: "outline", icone: CircleDashed, cor: "text-muted-foreground", descricao: "Nenhum ERP configurado ainda" },
+  ];
+
+  const infoTesteConexao = [
+    { campo: "ERP Configurado", descricao: "Nome do ERP conectado (ex: IXC Soft)" },
+    { campo: "URL da API", descricao: "Endpoint configurado (parcialmente mascarado)" },
+    { campo: "Status", descricao: "Conectado / Falha / Timeout / Não Configurado" },
+    { campo: "Latência", descricao: "Tempo de resposta em milissegundos" },
+    { campo: "Última Verificação", descricao: "Data e hora do último teste realizado" },
+    { campo: "Detalhes do Erro", descricao: "Mensagem de erro (exibida apenas em caso de falha)" },
   ];
 
   return (
@@ -227,6 +250,72 @@ const PainelClienteSection = () => {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Teste de Conexão ERP */}
+          <div className="border-t pt-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Plug className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold">Teste de Conexão ERP</h4>
+                <p className="text-sm text-muted-foreground">Verificação manual da conectividade com a API do ERP</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/30 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Ação Manual</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                O operador pode clicar no botão "Testar Conexão" para verificar se a API do ERP está acessível 
+                e respondendo corretamente. Não é um monitoramento contínuo — é um teste sob demanda.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h5 className="text-sm font-semibold mb-2">Informações Exibidas</h5>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campo</TableHead>
+                      <TableHead>Descrição</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {infoTesteConexao.map((info) => (
+                      <TableRow key={info.campo}>
+                        <TableCell className="font-medium">{info.campo}</TableCell>
+                        <TableCell className="text-muted-foreground">{info.descricao}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div>
+                <h5 className="text-sm font-semibold mb-2">Estados Possíveis</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {estadosConexao.map((item) => (
+                    <div key={item.estado} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                      <item.icone className={`h-5 w-5 mt-0.5 ${item.cor}`} />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{item.estado}</p>
+                          <Badge variant={item.badge as "default" | "secondary" | "destructive" | "outline"}>
+                            {item.estado}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{item.descricao}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
