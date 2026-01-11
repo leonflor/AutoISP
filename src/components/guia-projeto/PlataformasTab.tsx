@@ -2,8 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Users, Globe } from "lucide-react";
 import PainelAdminSection from "./plataformas/PainelAdminSection";
 import PainelClienteSection from "./plataformas/PainelClienteSection";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import LandingPageSection from "./plataformas/LandingPageSection";
 
 const PlataformasTab = () => {
   return (
@@ -43,27 +42,7 @@ const PlataformasTab = () => {
         </TabsContent>
 
         <TabsContent value="landing">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Globe className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Landing Page</CardTitle>
-                  <CardDescription>Site institucional e captação de leads</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <div className="text-center space-y-2">
-                  <Badge variant="outline">Em breve</Badge>
-                  <p>O discovery desta plataforma será realizado em breve.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <LandingPageSection />
         </TabsContent>
       </Tabs>
     </div>
