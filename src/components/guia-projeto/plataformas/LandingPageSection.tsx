@@ -28,75 +28,77 @@ import {
 } from "lucide-react";
 
 const LandingPageSection = () => {
+  // Landing Page do SaaS AutoISP - Site para captação de ISPs (não de assinantes finais)
   const paginasHome = [
-    { secao: "Hero com CTA", descricao: "Banner principal com chamada para ação" },
-    { secao: "Planos e Preços", descricao: "Tabela comparativa dos planos disponíveis" },
-    { secao: "Sobre a Empresa", descricao: "Informações institucionais do ISP" },
-    { secao: "Área de Cobertura", descricao: "Mapa ou lista de regiões atendidas" },
-    { secao: "Prova Social", descricao: "Depoimentos, números, logos, certificações" },
+    { secao: "Hero com CTA", descricao: "Banner principal com chamada para testar o AutoISP" },
+    { secao: "Planos do SaaS", descricao: "Tabela comparativa dos planos do AutoISP (Starter/Pro/Enterprise)" },
+    { secao: "Funcionalidades", descricao: "Módulos e recursos do sistema para gestão de ISP" },
+    { secao: "Cases de Sucesso", descricao: "Depoimentos e resultados de ISPs que usam o AutoISP" },
+    { secao: "Prova Social", descricao: "Números, logos de clientes, certificações" },
   ];
 
   const paginasAdicionais = [
-    { pagina: "Planos", conteudo: "Detalhamento completo dos planos e benefícios" },
-    { pagina: "Contato", conteudo: "Formulário e informações de contato" },
-    { pagina: "FAQ", conteudo: "Perguntas frequentes" },
-    { pagina: "Blog/Novidades", conteudo: "Posts, vídeos, expansão de cobertura" },
+    { pagina: "Planos", conteudo: "Detalhamento completo dos planos do SaaS e limites" },
+    { pagina: "Funcionalidades", conteudo: "Descrição detalhada de cada módulo do sistema" },
+    { pagina: "Cases", conteudo: "Histórias de sucesso de ISPs clientes" },
+    { pagina: "Blog", conteudo: "Artigos educativos, changelog, cases de clientes" },
+    { pagina: "Contato", conteudo: "Formulário e informações de contato comercial" },
+    { pagina: "FAQ", conteudo: "Perguntas frequentes sobre o AutoISP" },
   ];
 
   const provaSocial = [
-    { elemento: "Depoimentos", descricao: "Avaliações e feedbacks de assinantes" },
-    { elemento: "Números", descricao: "Estatísticas (ex: 10.000+ clientes, 99.9% uptime)" },
-    { elemento: "Parceiros", descricao: "Logos de marcas e tecnologias utilizadas" },
-    { elemento: "Certificações", descricao: "Selos de qualidade e certificados" },
+    { elemento: "Depoimentos", descricao: "Feedbacks de donos de ISP que usam o AutoISP" },
+    { elemento: "Números", descricao: "Estatísticas (ex: 500+ ISPs, 2M+ assinantes gerenciados)" },
+    { elemento: "Logos de Clientes", descricao: "ISPs que usam a plataforma" },
+    { elemento: "Certificações", descricao: "Selos de segurança e qualidade do SaaS" },
   ];
 
   const canaisCaptacao = [
-    { canal: "Formulário de interesse", funcao: "Cadastro estruturado de novos leads" },
-    { canal: "Consulta de viabilidade", funcao: "Verificação de cobertura por endereço" },
-    { canal: "WhatsApp direto", funcao: "Botão para iniciar conversa" },
-    { canal: "Chat com IA", funcao: "Chatbot integrado para atendimento" },
+    { canal: "Formulário de contato", funcao: "Cadastro de ISPs interessados no AutoISP" },
+    { canal: "Cadastro para Trial", funcao: "Início do trial de 7 dias" },
+    { canal: "WhatsApp comercial", funcao: "Contato direto com equipe de vendas" },
+    { canal: "Chat com IA", funcao: "Chatbot para tirar dúvidas e recomendar planos" },
   ];
 
   const camposFormulario = [
-    { categoria: "Dados básicos", campos: "Nome, email, telefone" },
-    { categoria: "Endereço completo", campos: "Rua, número, bairro, CEP" },
-    { categoria: "Preferências", campos: "Plano de interesse" },
-    { categoria: "Financeiro", campos: "Melhor data de vencimento (05/10/15/20/25/30)" },
-    { categoria: "Opcional", campos: "Mensagem/comentários" },
+    { categoria: "Responsável", campos: "Nome, email, telefone, cargo" },
+    { categoria: "Empresa", campos: "Razão social, CNPJ" },
+    { categoria: "Perfil do ISP", campos: "Qtd assinantes, canais utilizados, ERP atual" },
+    { categoria: "Interesse", campos: "Plano desejado, mensagem" },
   ];
 
   const destinosLead = [
-    { destino: "Integração com ERP", descricao: "Enviado automaticamente para o ERP do ISP" },
+    { destino: "CRM AutoISP", descricao: "Lead registrado no CRM interno" },
     { destino: "Email de notificação", descricao: "Equipe comercial recebe alerta" },
-    { destino: "WhatsApp da equipe", descricao: "Notificação via WhatsApp" },
+    { destino: "WhatsApp comercial", descricao: "Notificação para time de vendas" },
   ];
 
   const funilStatus = [
-    { etapa: "Entrada", status: "Novo", cor: "bg-blue-500", icon: Clock },
-    { etapa: "Contato", status: "Em atendimento", cor: "bg-yellow-500", icon: Phone },
-    { etapa: "Qualificação", status: "Qualificado", cor: "bg-purple-500", icon: UserCheck },
-    { etapa: "Conversão", status: "Convertido", cor: "bg-green-500", icon: CheckCircle2 },
-    { etapa: "Encerramento", status: "Descartado", cor: "bg-red-500", icon: UserX },
+    { etapa: "Entrada", status: "Novo Lead", cor: "bg-blue-500", icon: Clock },
+    { etapa: "Contato", status: "Em qualificação", cor: "bg-yellow-500", icon: Phone },
+    { etapa: "Trial", status: "Em trial", cor: "bg-purple-500", icon: UserCheck },
+    { etapa: "Conversão", status: "Cliente ativo", cor: "bg-green-500", icon: CheckCircle2 },
+    { etapa: "Perdido", status: "Não converteu", cor: "bg-red-500", icon: UserX },
   ];
 
   const funcoesChatbot = [
-    { funcao: "Atendimento comercial", descricao: "Responde dúvidas sobre planos e preços" },
-    { funcao: "Consulta de cobertura", descricao: "Verifica viabilidade por endereço" },
-    { funcao: "Captação de lead", descricao: "Coleta dados e inicia processo" },
+    { funcao: "Tirar dúvidas sobre o AutoISP", descricao: "Responde perguntas sobre o produto" },
+    { funcao: "Recomendar plano ideal", descricao: "Sugere plano baseado no perfil do ISP" },
+    { funcao: "Captar lead/prospect", descricao: "Coleta dados para follow-up comercial" },
     { funcao: "Transferência", descricao: "Redireciona para atendente humano" },
   ];
 
   const tiposConteudo = [
-    { tipo: "Posts de conteúdo", descricao: "Artigos sobre internet e tecnologia" },
-    { tipo: "Vídeos", descricao: "Tutoriais e conteúdo em vídeo" },
-    { tipo: "Expansão", descricao: "Anúncios de novas áreas de cobertura" },
+    { tipo: "Artigos educativos", descricao: "Conteúdo sobre gestão de ISP" },
+    { tipo: "Cases de clientes", descricao: "Histórias de sucesso de ISPs" },
+    { tipo: "Changelog/Updates", descricao: "Novidades e atualizações do produto" },
   ];
 
-  const personalizacao = [
-    { elemento: "Cores da marca", customizavel: true },
-    { elemento: "Logo", customizavel: true },
-    { elemento: "Textos", customizavel: true },
-    { elemento: "Imagens", customizavel: true },
+  const trialInfo = [
+    { item: "Duração", valor: "7 dias" },
+    { item: "Limite de atendimentos", valor: "Funcionalidades limitadas" },
+    { item: "IA", valor: "Sem IA ou IA limitada" },
+    { item: "Upgrade incentivo", valor: "Alerta no painel, email, chatbot" },
   ];
 
   const seoAnalytics = [
@@ -450,33 +452,27 @@ const LandingPageSection = () => {
         </CardContent>
       </Card>
 
-      {/* Personalização */}
+      {/* Trial */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Palette className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Personalização pelo ISP</CardTitle>
+            <Clock className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">Trial Gratuito</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                <TableHead>Elemento</TableHead>
-                <TableHead>Customizável</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead>Valor</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {personalizacao.map((item) => (
-                <TableRow key={item.elemento}>
-                  <TableCell className="font-medium">{item.elemento}</TableCell>
-                  <TableCell>
-                    {item.customizavel ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-600" />
-                    )}
-                  </TableCell>
+              {trialInfo.map((item) => (
+                <TableRow key={item.item}>
+                  <TableCell className="font-medium">{item.item}</TableCell>
+                  <TableCell>{item.valor}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
