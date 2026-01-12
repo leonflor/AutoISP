@@ -2,12 +2,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Users, Globe } from "lucide-react";
 import JornadasAdminSection from "./jornadas/JornadasAdminSection";
 import JornadasClienteSection from "./jornadas/JornadasClienteSection";
+import JornadasLandingSection from "./jornadas/JornadasLandingSection";
 
 const JornadasTab = () => {
   const plataformas = [
     { id: "admin", label: "Painel Admin", icon: Settings, count: 57 },
     { id: "cliente", label: "Painel Cliente", icon: Users, count: 68 },
-    { id: "landing", label: "Landing Page", icon: Globe, count: 0 },
+    { id: "landing", label: "Landing Page", icon: Globe, count: 54 },
   ];
 
   return (
@@ -41,15 +42,7 @@ const JornadasTab = () => {
         </TabsContent>
 
         <TabsContent value="landing" className="mt-0">
-          <div className="rounded-xl border border-border bg-card p-8">
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Globe className="mb-4 h-12 w-12 text-muted-foreground/50" />
-              <h2 className="mb-2 text-xl font-semibold text-foreground">Landing Page</h2>
-              <p className="text-muted-foreground">
-                Jornadas serão documentadas após Discovery da Plataforma 3.
-              </p>
-            </div>
-          </div>
+          <JornadasLandingSection />
         </TabsContent>
       </Tabs>
     </div>
