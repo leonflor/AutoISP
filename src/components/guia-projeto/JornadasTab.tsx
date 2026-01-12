@@ -20,11 +20,11 @@ const JornadasTab = () => {
               <TabsTrigger
                 key={plat.id}
                 value={plat.id}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground transition-all data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="group flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground transition-all data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 <Icon className="h-4 w-4" />
                 {plat.label}
-                <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+                <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs group-data-[state=active]:bg-primary-foreground/20 group-data-[state=active]:text-primary-foreground">
                   {plat.count}
                 </span>
               </TabsTrigger>
