@@ -11,11 +11,12 @@ import {
   Activity
 } from "lucide-react";
 import PagamentosSection from "./integracoes/PagamentosSection";
+import IASection from "./integracoes/IASection";
 
 const IntegracoesTab = () => {
   const categorias = [
     { id: "pagamentos", label: "Pagamentos", icon: CreditCard, count: 1, status: "done" },
-    { id: "ia", label: "IA", icon: Brain, count: 1, status: "pending" },
+    { id: "ia", label: "IA", icon: Brain, count: 1, status: "done" },
     { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "pending" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "pending" },
     { id: "storage", label: "Storage", icon: Database, count: 1, status: "pending" },
@@ -77,11 +78,7 @@ const IntegracoesTab = () => {
           </TabsContent>
 
           <TabsContent value="ia" className="mt-0">
-            <PlaceholderSection 
-              title="Integrações de IA" 
-              description="OpenAI e outros modelos de linguagem"
-              items={["INT-02 — OpenAI"]}
-            />
+            <IASection />
           </TabsContent>
 
           <TabsContent value="comunicacao" className="mt-0">
