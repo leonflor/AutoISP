@@ -3,13 +3,14 @@ import { LayoutDashboard, Building2, CreditCard, FileText, Settings, Headphones,
 import DashboardFeatures from "./modules/DashboardFeatures";
 import ClientesFeatures from "./modules/ClientesFeatures";
 import PlanosFeatures from "./modules/PlanosFeatures";
+import FinanceiroFeatures from "./modules/FinanceiroFeatures";
 
 const FeaturesAdminSection = () => {
   const modulos = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, count: 9 },
     { id: "clientes", label: "Clientes ISP", icon: Building2, count: 14 },
     { id: "planos", label: "Planos", icon: CreditCard, count: 12 },
-    { id: "financeiro", label: "Financeiro", icon: FileText, count: 0 },
+    { id: "financeiro", label: "Financeiro", icon: FileText, count: 18 },
     { id: "suporte", label: "Suporte", icon: Headphones, count: 0 },
     { id: "relatorios", label: "Relatórios", icon: BarChart3, count: 0 },
     { id: "equipe", label: "Equipe", icon: Users, count: 0 },
@@ -59,7 +60,11 @@ const FeaturesAdminSection = () => {
             <PlanosFeatures />
           </TabsContent>
 
-          {modulos.slice(3).map((mod) => (
+          <TabsContent value="financeiro" className="mt-0">
+            <FinanceiroFeatures />
+          </TabsContent>
+
+          {modulos.slice(4).map((mod) => (
             <TabsContent key={mod.id} value={mod.id} className="mt-0">
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <mod.icon className="mb-3 h-10 w-10 text-muted-foreground/50" />
