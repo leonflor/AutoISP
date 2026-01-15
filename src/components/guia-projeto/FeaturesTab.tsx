@@ -6,8 +6,8 @@ import FeaturesLandingSection from "./features/FeaturesLandingSection";
 
 const FeaturesTab = () => {
   const plataformas = [
-    { id: "admin", label: "Painel Admin", icon: Settings, count: 9 },
-    { id: "cliente", label: "Painel Cliente", icon: Users, count: 0 },
+    { id: "admin", label: "Painel Admin", icon: Settings, count: 109 },
+    { id: "cliente", label: "Painel Cliente", icon: Users, count: 124 },
     { id: "landing", label: "Landing Page", icon: Globe, count: 24 },
   ];
 
