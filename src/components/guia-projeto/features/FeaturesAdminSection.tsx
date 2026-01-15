@@ -7,6 +7,7 @@ import FinanceiroFeatures from "./modules/FinanceiroFeatures";
 import SuporteFeatures from "./modules/SuporteFeatures";
 import RelatoriosFeatures from "./modules/RelatoriosFeatures";
 import EquipeFeatures from "./modules/EquipeFeatures";
+import ConfiguracoesFeatures from "./modules/ConfiguracoesFeatures";
 
 const FeaturesAdminSection = () => {
   const modulos = [
@@ -17,7 +18,7 @@ const FeaturesAdminSection = () => {
     { id: "suporte", label: "Suporte", icon: Headphones, count: 16 },
     { id: "relatorios", label: "Relatórios", icon: BarChart3, count: 15 },
     { id: "equipe", label: "Equipe", icon: Users, count: 11 },
-    { id: "configuracoes", label: "Configurações", icon: Settings, count: 0 },
+    { id: "configuracoes", label: "Configurações", icon: Settings, count: 14 },
   ];
 
   return (
@@ -38,8 +39,7 @@ const FeaturesAdminSection = () => {
                 <TabsTrigger
                   key={mod.id}
                   value={mod.id}
-                  disabled={mod.count === 0}
-                  className="group flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground disabled:opacity-50"
+                  className="group flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {mod.label}
@@ -79,16 +79,9 @@ const FeaturesAdminSection = () => {
             <EquipeFeatures />
           </TabsContent>
 
-          {modulos.slice(7).map((mod) => (
-            <TabsContent key={mod.id} value={mod.id} className="mt-0">
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <mod.icon className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">
-                  Features serão documentadas após o Discovery deste módulo.
-                </p>
-              </div>
-            </TabsContent>
-          ))}
+          <TabsContent value="configuracoes" className="mt-0">
+            <ConfiguracoesFeatures />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
