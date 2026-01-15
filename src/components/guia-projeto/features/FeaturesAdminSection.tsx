@@ -1,11 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Building2, CreditCard, FileText, Settings, Headphones, BarChart3, Users } from "lucide-react";
 import DashboardFeatures from "./modules/DashboardFeatures";
+import ClientesFeatures from "./modules/ClientesFeatures";
 
 const FeaturesAdminSection = () => {
   const modulos = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, count: 9 },
-    { id: "clientes", label: "Clientes ISP", icon: Building2, count: 0 },
+    { id: "clientes", label: "Clientes ISP", icon: Building2, count: 14 },
     { id: "planos", label: "Planos", icon: CreditCard, count: 0 },
     { id: "financeiro", label: "Financeiro", icon: FileText, count: 0 },
     { id: "suporte", label: "Suporte", icon: Headphones, count: 0 },
@@ -49,7 +50,11 @@ const FeaturesAdminSection = () => {
             <DashboardFeatures />
           </TabsContent>
 
-          {modulos.slice(1).map((mod) => (
+          <TabsContent value="clientes" className="mt-0">
+            <ClientesFeatures />
+          </TabsContent>
+
+          {modulos.slice(2).map((mod) => (
             <TabsContent key={mod.id} value={mod.id} className="mt-0">
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <mod.icon className="mb-3 h-10 w-10 text-muted-foreground/50" />
