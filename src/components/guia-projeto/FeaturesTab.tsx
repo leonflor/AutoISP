@@ -8,7 +8,7 @@ const FeaturesTab = () => {
   const plataformas = [
     { id: "admin", label: "Painel Admin", icon: Settings, count: 9 },
     { id: "cliente", label: "Painel Cliente", icon: Users, count: 0 },
-    { id: "landing", label: "Landing Page", icon: Globe, count: 0 },
+    { id: "landing", label: "Landing Page", icon: Globe, count: 24 },
   ];
 
   return (
