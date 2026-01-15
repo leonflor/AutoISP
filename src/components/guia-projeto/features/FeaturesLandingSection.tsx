@@ -1,4 +1,4 @@
-import { Globe } from "lucide-react";
+import LandingFeatures from "./modules/LandingFeatures";
 
 const FeaturesLandingSection = () => {
   return (
@@ -9,12 +9,8 @@ const FeaturesLandingSection = () => {
           Funcionalidades documentadas por módulo da landing page
         </p>
       </div>
-
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Globe className="mb-4 h-12 w-12 text-muted-foreground/50" />
-        <p className="text-muted-foreground">
-          Features serão documentadas após o Discovery da Landing Page.
-        </p>
+      <div className="p-6">
+        <LandingFeatures />
       </div>
     </div>
   );
