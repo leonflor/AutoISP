@@ -7,6 +7,7 @@ import FeaturesTab from "@/components/guia-projeto/FeaturesTab";
 import IntegracoesTab from "@/components/guia-projeto/IntegracoesTab";
 import SegurancaTab from "@/components/guia-projeto/SegurancaTab";
 import DesignTab from "@/components/guia-projeto/DesignTab";
+import ImplementacaoTab from "@/components/guia-projeto/ImplementacaoTab";
 
 const GuiaProjeto = () => {
   const tabs = [
@@ -84,20 +85,10 @@ const GuiaProjeto = () => {
             <DesignTab />
           </TabsContent>
 
-          {/* Demais abas - Placeholder */}
-          {tabs.slice(7).map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="mt-0">
-              <div className="rounded-xl border border-border bg-card p-8">
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <tab.icon className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                  <h2 className="mb-2 text-xl font-semibold text-foreground">{tab.label}</h2>
-                  <p className="text-muted-foreground">
-                    Conteúdo será preenchido após o Discovery desta aba.
-                  </p>
-                </div>
-              </div>
-            </TabsContent>
-          ))}
+          {/* Aba Implementação */}
+          <TabsContent value="implementacao" className="mt-0">
+            <ImplementacaoTab />
+          </TabsContent>
         </Tabs>
       </main>
     </div>
