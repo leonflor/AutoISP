@@ -6,17 +6,17 @@ import {
   Shield, 
   Database, 
   MessageSquare,
-  Smartphone,
-  Bell,
   Activity
 } from "lucide-react";
 import PagamentosSection from "./integracoes/PagamentosSection";
 import IASection from "./integracoes/IASection";
+import EmailSection from "./integracoes/EmailSection";
 
 const IntegracoesTab = () => {
   const categorias = [
     { id: "pagamentos", label: "Pagamentos", icon: CreditCard, count: 1, status: "done" },
     { id: "ia", label: "IA", icon: Brain, count: 1, status: "done" },
+    { id: "email", label: "Email", icon: Mail, count: 1, status: "done" },
     { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "pending" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "pending" },
     { id: "storage", label: "Storage", icon: Database, count: 1, status: "pending" },
@@ -79,6 +79,10 @@ const IntegracoesTab = () => {
 
           <TabsContent value="ia" className="mt-0">
             <IASection />
+          </TabsContent>
+
+          <TabsContent value="email" className="mt-0">
+            <EmailSection />
           </TabsContent>
 
           <TabsContent value="comunicacao" className="mt-0">
