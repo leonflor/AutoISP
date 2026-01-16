@@ -1,8 +1,6 @@
 import WhatsAppIntegration from "./WhatsAppIntegration";
 import SMSIntegration from "./SMSIntegration";
-import { Card, CardContent } from "@/components/ui/card";
-import { Bell } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import PushNotificationsIntegration from "./PushNotificationsIntegration";
 
 const ComunicacaoSection = () => {
   return (
@@ -18,31 +16,7 @@ const ComunicacaoSection = () => {
       {/* Integrações documentadas */}
       <WhatsAppIntegration />
       <SMSIntegration />
-
-      {/* Integrações pendentes */}
-      <div className="mt-8">
-        <h3 className="mb-4 text-lg font-medium text-foreground">Pendentes de Documentação</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="border-dashed border-border/50 bg-muted/20">
-            <CardContent className="flex items-start gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10">
-                <Bell className="h-5 w-5 text-orange-500" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-foreground">INT-08 — Push Notifications</h4>
-                  <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 text-xs">
-                    Pendente
-                  </Badge>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Firebase Cloud Messaging (FCM) / OneSignal para notificações push web e mobile
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <PushNotificationsIntegration />
     </div>
   );
 };
