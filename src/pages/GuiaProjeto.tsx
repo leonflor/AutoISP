@@ -5,6 +5,7 @@ import PlataformasTab from "@/components/guia-projeto/PlataformasTab";
 import JornadasTab from "@/components/guia-projeto/JornadasTab";
 import FeaturesTab from "@/components/guia-projeto/FeaturesTab";
 import IntegracoesTab from "@/components/guia-projeto/IntegracoesTab";
+import SegurancaTab from "@/components/guia-projeto/SegurancaTab";
 
 const GuiaProjeto = () => {
   const tabs = [
@@ -72,8 +73,13 @@ const GuiaProjeto = () => {
             <IntegracoesTab />
           </TabsContent>
 
+          {/* Aba Segurança */}
+          <TabsContent value="seguranca" className="mt-0">
+            <SegurancaTab />
+          </TabsContent>
+
           {/* Demais abas - Placeholder */}
-          {tabs.slice(5).map((tab) => (
+          {tabs.slice(6).map((tab) => (
             <TabsContent key={tab.id} value={tab.id} className="mt-0">
               <div className="rounded-xl border border-border bg-card p-8">
                 <div className="flex flex-col items-center justify-center py-16 text-center">
