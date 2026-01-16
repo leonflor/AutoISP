@@ -11,6 +11,7 @@ import {
 import PagamentosSection from "./integracoes/PagamentosSection";
 import IASection from "./integracoes/IASection";
 import EmailSection from "./integracoes/EmailSection";
+import AutenticacaoSection from "./integracoes/AutenticacaoSection";
 
 const IntegracoesTab = () => {
   const categorias = [
@@ -18,7 +19,7 @@ const IntegracoesTab = () => {
     { id: "ia", label: "IA", icon: Brain, count: 1, status: "done" },
     { id: "email", label: "Email", icon: Mail, count: 1, status: "done" },
     { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "pending" },
-    { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "pending" },
+    { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
     { id: "storage", label: "Storage", icon: Database, count: 1, status: "pending" },
     { id: "erp", label: "ERP", icon: Activity, count: 1, status: "pending" },
     { id: "monitoramento", label: "Monitoramento", icon: Activity, count: 1, status: "pending" },
@@ -98,11 +99,7 @@ const IntegracoesTab = () => {
           </TabsContent>
 
           <TabsContent value="autenticacao" className="mt-0">
-            <PlaceholderSection 
-              title="Integrações de Autenticação" 
-              description="Supabase Auth e provedores OAuth"
-              items={["INT-04 — Supabase Auth"]}
-            />
+            <AutenticacaoSection />
           </TabsContent>
 
           <TabsContent value="storage" className="mt-0">
