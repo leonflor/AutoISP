@@ -4,7 +4,7 @@ import {
   Brain, 
   Mail, 
   Shield, 
-  Database, 
+  HardDrive, 
   MessageSquare,
   Activity
 } from "lucide-react";
@@ -12,6 +12,7 @@ import PagamentosSection from "./integracoes/PagamentosSection";
 import IASection from "./integracoes/IASection";
 import EmailSection from "./integracoes/EmailSection";
 import AutenticacaoSection from "./integracoes/AutenticacaoSection";
+import ArmazenamentoSection from "./integracoes/ArmazenamentoSection";
 
 const IntegracoesTab = () => {
   const categorias = [
@@ -20,7 +21,7 @@ const IntegracoesTab = () => {
     { id: "email", label: "Email", icon: Mail, count: 1, status: "done" },
     { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "pending" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
-    { id: "storage", label: "Storage", icon: Database, count: 1, status: "pending" },
+    { id: "storage", label: "Storage", icon: HardDrive, count: 1, status: "done" },
     { id: "erp", label: "ERP", icon: Activity, count: 1, status: "pending" },
     { id: "monitoramento", label: "Monitoramento", icon: Activity, count: 1, status: "pending" },
   ];
@@ -103,11 +104,7 @@ const IntegracoesTab = () => {
           </TabsContent>
 
           <TabsContent value="storage" className="mt-0">
-            <PlaceholderSection 
-              title="Integrações de Storage" 
-              description="Armazenamento de arquivos e imagens"
-              items={["INT-05 — Supabase Storage"]}
-            />
+            <ArmazenamentoSection />
           </TabsContent>
 
           <TabsContent value="erp" className="mt-0">
