@@ -20,7 +20,7 @@ const IntegracoesTab = () => {
     { id: "pagamentos", label: "Pagamentos", icon: CreditCard, count: 1, status: "done" },
     { id: "ia", label: "IA", icon: Brain, count: 1, status: "done" },
     { id: "email", label: "Email", icon: Mail, count: 1, status: "done" },
-    { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "partial" },
+    { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "done" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
     { id: "storage", label: "Storage", icon: HardDrive, count: 1, status: "done" },
     { id: "erp", label: "ERP", icon: Activity, count: 1, status: "pending" },
