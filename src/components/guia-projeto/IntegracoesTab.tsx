@@ -25,7 +25,6 @@ const IntegracoesTab = () => {
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
     { id: "storage", label: "Storage", icon: HardDrive, count: 1, status: "done" },
     { id: "erp", label: "ERP", icon: Activity, count: 1, status: "done" },
-    { id: "monitoramento", label: "Monitoramento", icon: Activity, count: 1, status: "pending" },
   ];
 
   return (
@@ -45,7 +44,7 @@ const IntegracoesTab = () => {
             <span className="text-muted-foreground">Pendente</span>
           </div>
           <div className="ml-auto text-sm text-muted-foreground">
-            Total: <span className="font-medium text-foreground">10 integrações</span>
+            Total: <span className="font-medium text-foreground">9 integrações</span>
           </div>
         </div>
       </div>
@@ -106,47 +105,8 @@ const IntegracoesTab = () => {
           <TabsContent value="erp" className="mt-0">
             <ERPSection />
           </TabsContent>
-
-          <TabsContent value="monitoramento" className="mt-0">
-            <PlaceholderSection 
-              title="Integrações de Monitoramento" 
-              description="Sistemas de monitoramento de rede"
-              items={["INT-10 — Sistemas de Monitoramento"]}
-            />
-          </TabsContent>
         </div>
       </Tabs>
-    </div>
-  );
-};
-
-interface PlaceholderSectionProps {
-  title: string;
-  description: string;
-  items: string[];
-}
-
-const PlaceholderSection = ({ title, description, items }: PlaceholderSectionProps) => {
-  return (
-    <div className="space-y-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8">
-        <div className="text-center">
-          <p className="text-sm font-medium text-muted-foreground">
-            Discovery pendente para:
-          </p>
-          <ul className="mt-4 space-y-2">
-            {items.map((item) => (
-              <li key={item} className="text-sm text-foreground">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
     </div>
   );
 };
