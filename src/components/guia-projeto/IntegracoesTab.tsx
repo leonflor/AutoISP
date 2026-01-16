@@ -13,13 +13,14 @@ import IASection from "./integracoes/IASection";
 import EmailSection from "./integracoes/EmailSection";
 import AutenticacaoSection from "./integracoes/AutenticacaoSection";
 import ArmazenamentoSection from "./integracoes/ArmazenamentoSection";
+import ComunicacaoSection from "./integracoes/ComunicacaoSection";
 
 const IntegracoesTab = () => {
   const categorias = [
     { id: "pagamentos", label: "Pagamentos", icon: CreditCard, count: 1, status: "done" },
     { id: "ia", label: "IA", icon: Brain, count: 1, status: "done" },
     { id: "email", label: "Email", icon: Mail, count: 1, status: "done" },
-    { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "pending" },
+    { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "partial" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
     { id: "storage", label: "Storage", icon: HardDrive, count: 1, status: "done" },
     { id: "erp", label: "ERP", icon: Activity, count: 1, status: "pending" },
@@ -64,6 +65,8 @@ const IntegracoesTab = () => {
                   <span className={`ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium ${
                     cat.status === "done" 
                       ? "bg-green-500/20 text-green-600" 
+                      : cat.status === "partial"
+                      ? "bg-blue-500/20 text-blue-600"
                       : "bg-yellow-500/20 text-yellow-600"
                   }`}>
                     {cat.count}
@@ -88,15 +91,7 @@ const IntegracoesTab = () => {
           </TabsContent>
 
           <TabsContent value="comunicacao" className="mt-0">
-            <PlaceholderSection 
-              title="Integrações de Comunicação" 
-              description="WhatsApp, SMS e Push Notifications"
-              items={[
-                "INT-07 — WhatsApp Cloud API (Meta)",
-                "INT-08 — SMS (Twilio/Zenvia)",
-                "INT-09 — Push Notifications (FCM/OneSignal)"
-              ]}
-            />
+            <ComunicacaoSection />
           </TabsContent>
 
           <TabsContent value="autenticacao" className="mt-0">
