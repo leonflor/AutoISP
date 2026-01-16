@@ -14,6 +14,7 @@ import EmailSection from "./integracoes/EmailSection";
 import AutenticacaoSection from "./integracoes/AutenticacaoSection";
 import ArmazenamentoSection from "./integracoes/ArmazenamentoSection";
 import ComunicacaoSection from "./integracoes/ComunicacaoSection";
+import ERPSection from "./integracoes/ERPSection";
 
 const IntegracoesTab = () => {
   const categorias = [
@@ -23,7 +24,7 @@ const IntegracoesTab = () => {
     { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "done" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
     { id: "storage", label: "Storage", icon: HardDrive, count: 1, status: "done" },
-    { id: "erp", label: "ERP", icon: Activity, count: 1, status: "pending" },
+    { id: "erp", label: "ERP", icon: Activity, count: 1, status: "done" },
     { id: "monitoramento", label: "Monitoramento", icon: Activity, count: 1, status: "pending" },
   ];
 
@@ -103,11 +104,7 @@ const IntegracoesTab = () => {
           </TabsContent>
 
           <TabsContent value="erp" className="mt-0">
-            <PlaceholderSection 
-              title="Integrações de ERP" 
-              description="Sincronização com sistemas de gestão de ISPs"
-              items={["INT-06 — ERPs (SGP, IXC Soft, MK Solutions, Hubsoft)"]}
-            />
+            <ERPSection />
           </TabsContent>
 
           <TabsContent value="monitoramento" className="mt-0">
