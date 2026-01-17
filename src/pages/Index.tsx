@@ -1,12 +1,31 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Header } from '@/components/landing/Header';
+import { Hero } from '@/components/landing/Hero';
+import { Benefits } from '@/components/landing/Benefits';
+import { Stats } from '@/components/landing/Stats';
+import { Features } from '@/components/landing/Features';
+import { Plans } from '@/components/landing/Plans';
+import { Testimonials } from '@/components/landing/Testimonials';
+import { FAQ } from '@/components/landing/FAQ';
+import { ContactForm } from '@/components/landing/ContactForm';
+import { Footer } from '@/components/landing/Footer';
+import { ChatWidget } from '@/components/landing/ChatWidget';
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main>
+        <Hero />
+        <Benefits />
+        <Stats />
+        <Features />
+        <Plans />
+        <Testimonials />
+        <FAQ />
+        <ContactForm />
+      </main>
+      <Footer />
+      <ChatWidget />
     </div>
   );
 };
