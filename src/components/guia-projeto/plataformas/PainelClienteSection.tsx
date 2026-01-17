@@ -119,8 +119,16 @@ const PainelClienteSection = () => {
               <p className="font-medium">Web + Mobile (Responsivo)</p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Acesso</p>
-              <p className="font-medium">Login obrigatório</p>
+              <p className="text-sm text-muted-foreground">Rota de Login</p>
+              <p className="font-medium"><code className="bg-muted px-2 py-0.5 rounded">/auth</code></p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Rota Principal</p>
+              <p className="font-medium"><code className="bg-muted px-2 py-0.5 rounded">/painel</code></p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Permissão Requerida</p>
+              <p className="font-medium"><code className="bg-primary/10 text-primary px-2 py-0.5 rounded">isp_users</code> (owner/admin/member)</p>
             </div>
             <div className="space-y-1 md:col-span-2">
               <p className="text-sm text-muted-foreground">Dinâmica</p>

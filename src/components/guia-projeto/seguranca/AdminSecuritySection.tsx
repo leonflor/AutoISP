@@ -66,7 +66,13 @@ const AdminSecuritySection = () => {
             </div>
             <div className="rounded-lg bg-emerald-500/10 p-3">
               <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                <strong>Nível de Exposição:</strong> 100% interna. Apenas tela de login é acessível sem autenticação.
+                <strong>Nível de Exposição:</strong> 100% interna. Apenas <code className="bg-muted px-1 rounded">/admin/login</code> é acessível sem autenticação.
+              </p>
+            </div>
+            <div className="mt-3 rounded-lg bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">
+                <strong>Rota de Login:</strong> <code className="bg-background px-1 rounded">/admin/login</code> → 
+                Redireciona para <code className="bg-background px-1 rounded">/admin</code> após validação de <code className="bg-primary/20 text-primary px-1 rounded">super_admin</code>
               </p>
             </div>
           </CardContent>

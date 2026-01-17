@@ -27,9 +27,9 @@ const ResumoProjetoTab = () => {
   ];
 
   const plataformas = [
-    { nome: "Painel Admin", formato: "Web + Mobile", acesso: "Login", permissoes: "RBAC Granular" },
-    { nome: "Painel Cliente", formato: "Web + Mobile", acesso: "Login", permissoes: "RBAC Granular" },
-    { nome: "Landing Page", formato: "Web + Mobile", acesso: "Público", permissoes: "—" }
+    { nome: "Painel Admin", formato: "Web + Mobile", acesso: "/admin/login", rota: "/admin", permissoes: "super_admin" },
+    { nome: "Painel Cliente", formato: "Web + Mobile", acesso: "/auth", rota: "/painel", permissoes: "isp_users (owner/admin/member)" },
+    { nome: "Landing Page", formato: "Web + Mobile", acesso: "Público", rota: "/", permissoes: "—" }
   ];
 
   const tecnologias = [
@@ -160,7 +160,8 @@ const ResumoProjetoTab = () => {
               <TableRow>
                 <TableHead>Plataforma</TableHead>
                 <TableHead>Formato</TableHead>
-                <TableHead>Acesso</TableHead>
+                <TableHead>Login</TableHead>
+                <TableHead>Rota Principal</TableHead>
                 <TableHead>Permissões</TableHead>
               </TableRow>
             </TableHeader>
@@ -171,8 +172,11 @@ const ResumoProjetoTab = () => {
                   <TableCell>{plataforma.formato}</TableCell>
                   <TableCell>
                     <Badge variant={plataforma.acesso === "Público" ? "secondary" : "default"}>
-                      {plataforma.acesso}
+                      <code className="text-xs">{plataforma.acesso}</code>
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <code className="text-xs text-muted-foreground">{plataforma.rota}</code>
                   </TableCell>
                   <TableCell>{plataforma.permissoes}</TableCell>
                 </TableRow>
