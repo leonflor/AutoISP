@@ -12,6 +12,11 @@ import { AdminLayout } from "./components/admin/AdminLayout";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/Dashboard";
 import IspsPage from "./pages/admin/Isps";
+import PlansPage from "./pages/admin/Plans";
+import FinancePage from "./pages/admin/Finance";
+import InvoicesPage from "./pages/admin/Invoices";
+import SubscriptionsPage from "./pages/admin/Subscriptions";
+import UsersPage from "./pages/admin/Users";
 import { PainelLayout } from "./components/painel/PainelLayout";
 import PainelDashboard from "./pages/painel/Dashboard";
 
@@ -35,6 +40,11 @@ const App = () => (
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
               <Route path="isps" element={<IspsPage />} />
+              <Route path="planos" element={<PlansPage />} />
+              <Route path="financeiro" element={<FinancePage />} />
+              <Route path="faturas" element={<InvoicesPage />} />
+              <Route path="assinaturas" element={<SubscriptionsPage />} />
+              <Route path="usuarios" element={<UsersPage />} />
             </Route>
             
             {/* Painel Cliente ISP Routes */}

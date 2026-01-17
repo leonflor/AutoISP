@@ -1,5 +1,7 @@
-import { LayoutDashboard, Building2, Package, Users, Settings, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Sidebar,
@@ -16,11 +18,29 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
-const menuItems = [
+type MenuItem = {
+  title: string;
+  url?: string;
+  icon: React.ElementType;
+  submenu?: { title: string; url: string; icon: React.ElementType }[];
+};
+
+const menuItems: MenuItem[] = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
   { title: 'ISPs', url: '/admin/isps', icon: Building2 },
   { title: 'Planos', url: '/admin/planos', icon: Package },
+  { 
+    title: 'Financeiro', 
+    icon: DollarSign,
+    submenu: [
+      { title: 'Visão Geral', url: '/admin/financeiro', icon: DollarSign },
+      { title: 'Faturas', url: '/admin/faturas', icon: FileText },
+      { title: 'Assinaturas', url: '/admin/assinaturas', icon: CreditCard },
+    ]
+  },
   { title: 'Usuários', url: '/admin/usuarios', icon: Users },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
 ];
@@ -28,11 +48,91 @@ const menuItems = [
 export function AdminSidebar() {
   const { state } = useSidebar();
   const { profile, signOut } = useAuth();
+  const location = useLocation();
   const collapsed = state === 'collapsed';
+
+  // Check if any submenu item is active
+  const isSubmenuActive = (submenu: { url: string }[]) => {
+    return submenu.some(item => location.pathname === item.url);
+  };
+
+  // Initialize open state for submenus based on active route
+  const financeSubmenu = menuItems.find(item => item.title === 'Financeiro')?.submenu;
+  const [financeOpen, setFinanceOpen] = useState(financeSubmenu ? isSubmenuActive(financeSubmenu) : false);
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const renderMenuItem = (item: MenuItem) => {
+    if (item.submenu) {
+      const isActive = isSubmenuActive(item.submenu);
+      
+      return (
+        <Collapsible
+          key={item.title}
+          open={financeOpen || isActive}
+          onOpenChange={setFinanceOpen}
+        >
+          <SidebarMenuItem>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton
+                tooltip={item.title}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-muted w-full justify-between",
+                  isActive && "bg-primary/10 text-primary"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  {!collapsed && <span>{item.title}</span>}
+                </div>
+                {!collapsed && (
+                  <ChevronDown className={cn(
+                    "h-4 w-4 transition-transform",
+                    (financeOpen || isActive) && "rotate-180"
+                  )} />
+                )}
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              {!collapsed && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
+                  {item.submenu.map((subitem) => (
+                    <NavLink
+                      key={subitem.url}
+                      to={subitem.url}
+                      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted"
+                      activeClassName="bg-primary/10 text-primary font-medium"
+                    >
+                      <subitem.icon className="h-4 w-4 shrink-0" />
+                      <span>{subitem.title}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </CollapsibleContent>
+          </SidebarMenuItem>
+        </Collapsible>
+      );
+    }
+
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton asChild tooltip={item.title}>
+          <NavLink
+            to={item.url!}
+            end={item.url === '/admin'}
+            className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-muted"
+            activeClassName="bg-primary/10 text-primary font-medium"
+          >
+            <item.icon className="h-5 w-5 shrink-0" />
+            {!collapsed && <span>{item.title}</span>}
+          </NavLink>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
   };
 
   return (
@@ -49,21 +149,7 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === '/admin'}
-                      className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-muted"
-                      activeClassName="bg-primary/10 text-primary font-medium"
-                    >
-                      <item.icon className="h-5 w-5 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map(renderMenuItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
