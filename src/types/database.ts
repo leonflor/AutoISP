@@ -5,6 +5,8 @@ export type StatusAssinatura = 'trial' | 'ativa' | 'suspensa' | 'cancelada';
 export type TipoAgente = 'atendente' | 'cobrador' | 'vendedor' | 'analista' | 'suporte';
 export type IspMemberRole = 'owner' | 'admin' | 'operator' | 'viewer';
 
+// ==================== TABELAS EXISTENTES ====================
+
 export interface Profile {
   id: string;
   email: string;
@@ -50,6 +52,119 @@ export interface IspUser {
   updated_at: string;
 }
 
+// ==================== TABELAS F1 - NEGÓCIO ====================
+
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number;
+  price_yearly: number | null;
+  is_active: boolean;
+  features: Record<string, unknown>;
+  limits: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Subscription {
+  id: string;
+  isp_id: string;
+  plan_id: string;
+  status: StatusAssinatura;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  asaas_subscription_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  subscription_id: string;
+  isp_id: string;
+  amount: number;
+  status: StatusFatura;
+  due_date: string;
+  paid_at: string | null;
+  asaas_payment_id: string | null;
+  payment_method: string | null;
+  invoice_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ==================== TABELAS F1 - IA ====================
+
+export interface AiAgent {
+  id: string;
+  name: string;
+  slug: string;
+  type: TipoAgente;
+  description: string | null;
+  system_prompt: string;
+  model: string;
+  max_tokens: number;
+  temperature: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiUsage {
+  id: string;
+  isp_id: string;
+  agent_id: string;
+  user_id: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  created_at: string;
+}
+
+export interface AiLimit {
+  id: string;
+  plan_id: string;
+  agent_type: TipoAgente;
+  monthly_tokens: number;
+  monthly_requests: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ==================== TABELAS F1 - LOGS ====================
+
+export interface AuditLog {
+  id: string;
+  isp_id: string | null;
+  user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface WebhookLog {
+  id: string;
+  source: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  status: 'pending' | 'processed' | 'failed';
+  error_message: string | null;
+  processed_at: string | null;
+  created_at: string;
+}
+
+// ==================== DATABASE TYPE ====================
+
 export type Database = {
   public: {
     Tables: {
@@ -86,6 +201,75 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Omit<IspUser, 'id'>>;
+      };
+      plans: {
+        Row: Plan;
+        Insert: Omit<Plan, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Plan, 'id'>>;
+      };
+      subscriptions: {
+        Row: Subscription;
+        Insert: Omit<Subscription, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Subscription, 'id'>>;
+      };
+      invoices: {
+        Row: Invoice;
+        Insert: Omit<Invoice, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Invoice, 'id'>>;
+      };
+      ai_agents: {
+        Row: AiAgent;
+        Insert: Omit<AiAgent, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<AiAgent, 'id'>>;
+      };
+      ai_usage: {
+        Row: AiUsage;
+        Insert: Omit<AiUsage, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AiUsage, 'id'>>;
+      };
+      ai_limits: {
+        Row: AiLimit;
+        Insert: Omit<AiLimit, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<AiLimit, 'id'>>;
+      };
+      audit_logs: {
+        Row: AuditLog;
+        Insert: Omit<AuditLog, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AuditLog, 'id'>>;
+      };
+      webhook_logs: {
+        Row: WebhookLog;
+        Insert: Omit<WebhookLog, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<WebhookLog, 'id'>>;
       };
     };
     Enums: {
