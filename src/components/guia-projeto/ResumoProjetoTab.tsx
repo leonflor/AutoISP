@@ -38,6 +38,7 @@ const ResumoProjetoTab = () => {
     { nome: "Resend", icon: Mail, categoria: "Email" },
     { nome: "Supabase Storage", icon: Database, categoria: "Arquivos" },
     { nome: "Supabase Auth", icon: Users, categoria: "Autenticação" },
+    { nome: "Supabase (Externo)", icon: Database, categoria: "Backend" },
     { nome: "LGPD", icon: Shield, categoria: "Conformidade" }
   ];
 

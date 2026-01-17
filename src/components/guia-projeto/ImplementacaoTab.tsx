@@ -16,16 +16,26 @@ import {
   CheckCircle2,
   FileCode,
   Key,
-  Layers
+  Layers,
+  Server,
+  ExternalLink
 } from "lucide-react";
 
 const ImplementacaoTab = () => {
+  const backendConfig = {
+    projectUrl: "https://zvxcwwhsjtdliihlvvof.supabase.co",
+    projectId: "zvxcwwhsjtdliihlvvof",
+    clientFile: "src/integrations/supabase/client.ts",
+    typesFile: "src/types/database.ts",
+    deployMode: "Migrations manuais via Supabase Dashboard",
+  };
+
   const consolidacao = [
-    { aspecto: "Deploy", decisao: "Supabase externo" },
+    { aspecto: "Backend", decisao: "Supabase externo conectado" },
     { aspecto: "Rodadas por Fase", decisao: "Máximo 15" },
     { aspecto: "Seeds", decisao: "Mínimos (usuário master + dados essenciais)" },
     { aspecto: "Integrações", decisao: "Core primeiro (Asaas → OpenAI → WhatsApp)" },
-    { aspecto: "Ambiente Dev", decisao: "Supabase externo (conectar projeto existente)" },
+    { aspecto: "Ambiente Dev", decisao: "Supabase externo (projeto conectado)" },
     { aspecto: "Ordem Plataformas", decisao: "Admin primeiro → Cliente → Landing" },
     { aspecto: "Complexidade IA", decisao: "Estrutura + 1 agente (Atendente)" },
     { aspecto: "Teste Pagamentos", decisao: "Sandbox Asaas" },
@@ -88,6 +98,80 @@ const ImplementacaoTab = () => {
                 <p className="mt-1 text-sm font-semibold text-foreground">{item.decisao}</p>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Configuração Backend */}
+      <Card className="border-primary/50">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Server className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle>Configuração Backend — Supabase Externo</CardTitle>
+              <CardDescription>Projeto Supabase conectado e configurado</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground">Conexão</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <span className="text-sm text-muted-foreground">Project ID</span>
+                  <code className="text-xs font-mono text-primary">{backendConfig.projectId}</code>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <span className="text-sm text-muted-foreground">URL</span>
+                  <a 
+                    href={backendConfig.projectUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs font-mono text-primary hover:underline"
+                  >
+                    {backendConfig.projectId}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground">Arquivos de Configuração</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <span className="text-sm text-muted-foreground">Cliente Supabase</span>
+                  <code className="text-xs font-mono text-muted-foreground">{backendConfig.clientFile}</code>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <span className="text-sm text-muted-foreground">Types Database</span>
+                  <code className="text-xs font-mono text-muted-foreground">{backendConfig.typesFile}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="mb-3 font-semibold text-foreground">Processo de Migrations</h4>
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
+                <li>Acessar <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Supabase Dashboard</a> → Projeto <code className="font-mono text-xs">{backendConfig.projectId}</code></li>
+                <li>Navegar até <strong>SQL Editor</strong></li>
+                <li>Executar scripts SQL na ordem definida nas fases (F1, F2, etc.)</li>
+                <li>Verificar tabelas criadas em <strong>Table Editor</strong></li>
+                <li>Atualizar <code className="font-mono text-xs">{backendConfig.typesFile}</code> com novas interfaces</li>
+              </ol>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              <strong>Importante:</strong> Todas as migrations devem ser executadas manualmente no Supabase Dashboard. 
+              O CLI local não está disponível neste ambiente.
+            </p>
           </div>
         </CardContent>
       </Card>
