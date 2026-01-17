@@ -5,7 +5,9 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Wifi
+  Wifi,
+  Send,
+  UserCog
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,6 +32,8 @@ const menuItems = [
   { title: 'Dashboard', url: '/painel', icon: LayoutDashboard },
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
+  { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
+  { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
   { title: 'Relatórios', url: '/painel/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/painel/configuracoes', icon: Settings },
 ];
