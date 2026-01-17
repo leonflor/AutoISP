@@ -14,7 +14,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (user && !loading) {
-      navigate('/');
+      navigate('/painel');
     }
   }, [user, loading, navigate]);
 

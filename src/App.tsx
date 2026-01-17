@@ -8,8 +8,11 @@ import NotFound from "./pages/NotFound";
 import GuiaProjeto from "./pages/GuiaProjeto";
 import Auth from "./pages/Auth";
 import { AdminLayout } from "./components/admin/AdminLayout";
+import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/Dashboard";
 import IspsPage from "./pages/admin/Isps";
+import { PainelLayout } from "./components/painel/PainelLayout";
+import PainelDashboard from "./pages/painel/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -25,10 +28,16 @@ const App = () => (
             <Route path="/guia" element={<GuiaProjeto />} />
             <Route path="/auth" element={<Auth />} />
             
-            {/* Admin Routes */}
+            {/* Admin SaaS Routes */}
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
               <Route path="isps" element={<IspsPage />} />
+            </Route>
+            
+            {/* Painel Cliente ISP Routes */}
+            <Route path="/painel" element={<PainelLayout />}>
+              <Route index element={<PainelDashboard />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
