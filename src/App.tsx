@@ -19,6 +19,12 @@ import SubscriptionsPage from "./pages/admin/Subscriptions";
 import UsersPage from "./pages/admin/Users";
 import { PainelLayout } from "./components/painel/PainelLayout";
 import PainelDashboard from "./pages/painel/Dashboard";
+import PainelSubscribers from "./pages/painel/Subscribers";
+import PainelTickets from "./pages/painel/Tickets";
+import PainelCommunication from "./pages/painel/Communication";
+import PainelUsers from "./pages/painel/Users";
+import PainelReports from "./pages/painel/Reports";
+import PainelSettings from "./pages/painel/Settings";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +56,12 @@ const App = () => (
             {/* Painel Cliente ISP Routes */}
             <Route path="/painel" element={<PainelLayout />}>
               <Route index element={<PainelDashboard />} />
+              <Route path="assinantes" element={<PainelSubscribers />} />
+              <Route path="atendimentos" element={<PainelTickets />} />
+              <Route path="comunicacao" element={<PainelCommunication />} />
+              <Route path="usuarios" element={<PainelUsers />} />
+              <Route path="relatorios" element={<PainelReports />} />
+              <Route path="configuracoes" element={<PainelSettings />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
