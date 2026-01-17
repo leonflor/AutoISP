@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import NotFound from "./pages/NotFound";
 import GuiaProjeto from "./pages/GuiaProjeto";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<GuiaProjeto />} />
             <Route path="/guia" element={<GuiaProjeto />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Admin SaaS Routes */}
             <Route path="/admin/login" element={<AdminLogin />} />

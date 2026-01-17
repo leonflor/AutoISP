@@ -4,11 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { SignupForm } from '@/components/auth/SignupForm';
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, Wifi } from 'lucide-react';
 
 const Auth = () => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -26,6 +28,13 @@ const Auth = () => {
     );
   }
 
+  const getDescription = () => {
+    if (showForgotPassword) return 'Recupere o acesso à sua conta';
+    return activeTab === 'login' 
+      ? 'Entre na sua conta para continuar'
+      : 'Crie sua conta para começar';
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -35,25 +44,26 @@ const Auth = () => {
             <CardTitle className="text-2xl font-bold text-foreground">AutoISP</CardTitle>
           </div>
           <CardDescription>
-            {activeTab === 'login' 
-              ? 'Entre na sua conta para continuar'
-              : 'Crie sua conta para começar'
-            }
+            {getDescription()}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}>
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
-            </TabsList>
-            <TabsContent value="login">
-              <LoginForm />
-            </TabsContent>
-            <TabsContent value="signup">
-              <SignupForm />
-            </TabsContent>
-          </Tabs>
+          {showForgotPassword ? (
+            <ForgotPasswordForm onBack={() => setShowForgotPassword(false)} />
+          ) : (
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="login">Entrar</TabsTrigger>
+                <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+              </TabsList>
+              <TabsContent value="login">
+                <LoginForm onForgotPassword={() => setShowForgotPassword(true)} />
+              </TabsContent>
+              <TabsContent value="signup">
+                <SignupForm />
+              </TabsContent>
+            </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>
