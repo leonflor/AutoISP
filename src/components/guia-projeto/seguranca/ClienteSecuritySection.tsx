@@ -69,6 +69,13 @@ const ClienteSecuritySection = () => {
                 <strong>Multi-tenant:</strong> Isolamento total por <code className="bg-muted px-1 rounded">isp_id</code> em todas as tabelas.
               </p>
             </div>
+            <div className="mt-3 rounded-lg bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">
+                <strong>Rota de Login:</strong> <code className="bg-background px-1 rounded">/auth</code> → 
+                Verifica <code className="bg-background px-1 rounded">isp_users</code> → 
+                Redireciona <code className="bg-background px-1 rounded">/painel</code>
+              </p>
+            </div>
           </CardContent>
         </Card>
 

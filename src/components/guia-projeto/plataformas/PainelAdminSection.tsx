@@ -78,8 +78,16 @@ const PainelAdminSection = () => {
               <p className="font-medium">Web Responsivo</p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Acesso</p>
-              <p className="font-medium">Login obrigatório (interno)</p>
+              <p className="text-sm text-muted-foreground">Rota de Login</p>
+              <p className="font-medium"><code className="bg-muted px-2 py-0.5 rounded">/admin/login</code></p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Rota Principal</p>
+              <p className="font-medium"><code className="bg-muted px-2 py-0.5 rounded">/admin</code></p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Permissão Requerida</p>
+              <p className="font-medium"><code className="bg-primary/10 text-primary px-2 py-0.5 rounded">super_admin</code></p>
             </div>
             <div className="space-y-1 md:col-span-2">
               <p className="text-sm text-muted-foreground">Dinâmica</p>

@@ -61,20 +61,22 @@ const categoriasJornadas: CategoriaJornadas[] = [
     jornadas: [
       {
         id: "JC-01",
-        titulo: "Login com Email/Senha",
+        titulo: "Login com Email/Senha (Cliente ISP)",
         modulo: "Autenticação",
-        resumo: "Operador do ISP realiza login na plataforma usando email e senha.",
-        fluxo: `1. Operador acessa /login
-2. Preenche email e senha
-3. Sistema valida credenciais no tenant do ISP
-4. Se válido e sem 2FA → Redireciona ao Dashboard
-5. Se válido e com 2FA → Solicita código 2FA
-6. Se inválido → Exibe mensagem de erro`,
+        resumo: "Operador do ISP realiza login na plataforma via rota /auth.",
+        fluxo: `1. Operador acessa /auth
+2. Preenche email e senha (ou cria conta via signup)
+3. Sistema valida credenciais
+4. Verifica membership na tabela isp_users
+5. Se válido e membro de ISP → Redireciona /painel
+6. Se válido mas sem ISP → Exibe mensagem "Sem Provedor Associado"
+7. Se inválido → Exibe mensagem de erro`,
         regras: [
-          { id: "RNC-01-01", descricao: "Email deve pertencer ao tenant do ISP", criticidade: "Alta" },
-          { id: "RNC-01-02", descricao: "2FA configurável por perfil definido pelo Admin", criticidade: "Alta" },
-          { id: "RNC-01-03", descricao: "Sessão isolada por tenant_id", criticidade: "Alta" },
+          { id: "RNC-01-01", descricao: "Usuário deve estar vinculado a um ISP via tabela isp_users", criticidade: "Alta" },
+          { id: "RNC-01-02", descricao: "2FA configurável por perfil definido pelo Admin do ISP", criticidade: "Alta" },
+          { id: "RNC-01-03", descricao: "Sessão isolada por isp_id (tenant)", criticidade: "Alta" },
           { id: "RNC-01-04", descricao: "Máximo de 5 tentativas antes de bloqueio temporário", criticidade: "Média" },
+          { id: "RNC-01-05", descricao: "Se não for membro de ISP, exibir tela informativa com opção de voltar", criticidade: "Alta" },
         ],
       },
       {

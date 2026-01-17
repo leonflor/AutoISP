@@ -53,16 +53,17 @@ const categoriasJornadas: CategoriaJornadas[] = [
     jornadas: [
       {
         id: "JA-01",
-        titulo: "Login com Email/Senha",
+        titulo: "Login com Email/Senha (Super Admin)",
         modulo: "Auth",
-        resumo: "Usuário acessa o sistema com credenciais de email e senha.",
-        fluxo: `Acessa /login → Preenche email + senha → Valida credenciais → Verifica 2FA → Redireciona Dashboard`,
+        resumo: "Administrador SaaS acessa o sistema via rota exclusiva /admin/login.",
+        fluxo: `Acessa /admin/login → Preenche email + senha → Valida credenciais → Verifica role super_admin → Redireciona /admin`,
         regras: [
           { id: "RNA-01-01", descricao: "Email deve ser válido e existir no sistema", criticidade: "Alta" },
-          { id: "RNA-01-02", descricao: "Senha mínimo 8 caracteres com complexidade", criticidade: "Alta" },
-          { id: "RNA-01-03", descricao: "Bloquear após 3 tentativas falhas por 5 minutos", criticidade: "Alta" },
-          { id: "RNA-01-04", descricao: "Sessão expira em 30 minutos de inatividade", criticidade: "Média" },
-          { id: "RNA-01-05", descricao: "Uma sessão por vez (nova encerra anterior)", criticidade: "Média" },
+          { id: "RNA-01-02", descricao: "Usuário deve possuir role super_admin na tabela user_roles", criticidade: "Alta" },
+          { id: "RNA-01-03", descricao: "Senha mínimo 8 caracteres com complexidade", criticidade: "Alta" },
+          { id: "RNA-01-04", descricao: "Bloquear após 3 tentativas falhas por 5 minutos", criticidade: "Alta" },
+          { id: "RNA-01-05", descricao: "Sessão expira em 30 minutos de inatividade", criticidade: "Média" },
+          { id: "RNA-01-06", descricao: "Se não for super_admin, exibir erro 'Acesso restrito a administradores'", criticidade: "Alta" },
         ],
       },
       {
