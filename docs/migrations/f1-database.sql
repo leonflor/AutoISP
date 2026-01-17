@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SAISP - Fase 1: Database e Schema
--- Versão: 1.0.0
+-- Versão: 1.0.1 (Corrigido)
 -- Data: Janeiro 2026
 -- ============================================================================
 -- INSTRUÇÕES:
@@ -33,7 +33,70 @@ create type public.status_assinatura as enum ('trial', 'ativa', 'suspensa', 'can
 create type public.tipo_agente as enum ('atendente', 'cobrador', 'vendedor', 'analista', 'suporte');
 
 -- ============================================================================
--- SEÇÃO 2: HELPER FUNCTIONS (SECURITY DEFINER)
+-- SEÇÃO 2: TABELAS CORE
+-- ============================================================================
+-- IMPORTANTE: As tabelas devem ser criadas ANTES das helper functions
+-- para evitar erros de referência a colunas inexistentes.
+-- ============================================================================
+
+-- Profiles: Dados públicos do usuário (extensão do auth.users)
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  full_name text,
+  avatar_url text,
+  phone text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.profiles enable row level security;
+
+-- User Roles: Roles globais (super_admin, admin, support)
+create table public.user_roles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  role app_role not null,
+  created_at timestamptz default now(),
+  unique (user_id, role)
+);
+
+alter table public.user_roles enable row level security;
+
+-- ISPs: Provedores de internet cadastrados
+create table public.isps (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text unique not null,
+  document text unique not null, -- CNPJ
+  email text,
+  phone text,
+  logo_url text,
+  address jsonb default '{}',
+  settings jsonb default '{}',
+  status status_cliente default 'pendente',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.isps enable row level security;
+
+-- ISP Users: Membros de cada ISP (multi-tenant)
+create table public.isp_users (
+  id uuid primary key default gen_random_uuid(),
+  isp_id uuid references public.isps(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  role isp_member_role not null default 'viewer',
+  invited_by uuid references auth.users(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (isp_id, user_id)
+);
+
+alter table public.isp_users enable row level security;
+
+-- ============================================================================
+-- SEÇÃO 3: HELPER FUNCTIONS (SECURITY DEFINER)
 -- ============================================================================
 -- IMPORTANTE: Estas funções usam SECURITY DEFINER para evitar recursão infinita
 -- nas policies RLS. Elas executam com privilégios do owner.
@@ -133,66 +196,6 @@ end;
 $$;
 
 -- ============================================================================
--- SEÇÃO 3: TABELAS CORE
--- ============================================================================
-
--- Profiles: Dados públicos do usuário (extensão do auth.users)
-create table public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  email text not null,
-  full_name text,
-  avatar_url text,
-  phone text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-alter table public.profiles enable row level security;
-
--- User Roles: Roles globais (super_admin, admin, support)
-create table public.user_roles (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade not null,
-  role app_role not null,
-  created_at timestamptz default now(),
-  unique (user_id, role)
-);
-
-alter table public.user_roles enable row level security;
-
--- ISPs: Provedores de internet cadastrados
-create table public.isps (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  slug text unique not null,
-  document text unique not null, -- CNPJ
-  email text,
-  phone text,
-  logo_url text,
-  address jsonb default '{}',
-  settings jsonb default '{}',
-  status status_cliente default 'pendente',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-alter table public.isps enable row level security;
-
--- ISP Users: Membros de cada ISP (multi-tenant)
-create table public.isp_users (
-  id uuid primary key default gen_random_uuid(),
-  isp_id uuid references public.isps(id) on delete cascade not null,
-  user_id uuid references auth.users(id) on delete cascade not null,
-  role isp_member_role not null default 'viewer',
-  invited_by uuid references auth.users(id),
-  created_at timestamptz default now(),
-  updated_at timestamptz default now(),
-  unique (isp_id, user_id)
-);
-
-alter table public.isp_users enable row level security;
-
--- ============================================================================
 -- SEÇÃO 4: TABELAS DE NEGÓCIO
 -- ============================================================================
 
@@ -254,7 +257,7 @@ create table public.invoices (
   updated_at timestamptz default now()
 );
 
-alter table public.invops enable row level security;
+alter table public.invoices enable row level security;
 
 -- ============================================================================
 -- SEÇÃO 5: TABELAS DE IA
