@@ -3,6 +3,7 @@ export type StatusCliente = 'trial' | 'ativo' | 'suspenso' | 'cancelado' | 'inad
 export type StatusFatura = 'pendente' | 'pago' | 'vencido' | 'cancelado' | 'estornado';
 export type StatusAssinatura = 'trial' | 'ativa' | 'suspensa' | 'cancelada';
 export type TipoAgente = 'atendente' | 'cobrador' | 'vendedor' | 'analista' | 'suporte';
+export type IspMemberRole = 'owner' | 'admin' | 'operator' | 'viewer';
 
 export interface Profile {
   id: string;
@@ -19,6 +20,34 @@ export interface UserRole {
   user_id: string;
   role: AppRole;
   created_at: string;
+}
+
+export interface Isp {
+  id: string;
+  name: string;
+  slug: string;
+  document: string;
+  email: string;
+  phone: string | null;
+  status: StatusCliente;
+  trial_ends_at: string | null;
+  logo_url: string | null;
+  settings: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IspUser {
+  id: string;
+  isp_id: string;
+  user_id: string;
+  role: IspMemberRole;
+  is_active: boolean;
+  invited_by: string | null;
+  invited_at: string | null;
+  joined_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type Database = {
@@ -40,6 +69,24 @@ export type Database = {
         };
         Update: Partial<Omit<UserRole, 'id' | 'user_id'>>;
       };
+      isps: {
+        Row: Isp;
+        Insert: Omit<Isp, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Isp, 'id'>>;
+      };
+      isp_users: {
+        Row: IspUser;
+        Insert: Omit<IspUser, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<IspUser, 'id'>>;
+      };
     };
     Enums: {
       app_role: AppRole;
@@ -47,6 +94,7 @@ export type Database = {
       status_fatura: StatusFatura;
       status_assinatura: StatusAssinatura;
       tipo_agente: TipoAgente;
+      isp_member_role: IspMemberRole;
     };
   };
 };
