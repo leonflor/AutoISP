@@ -13,7 +13,7 @@ const AdminLogin = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user, loading, signIn, hasRole } = useAuth();
+  const { user, loading, signIn, signOut, hasRole } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -65,9 +65,36 @@ const AdminLogin = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Se você é um cliente ISP, acesse o painel através de{' '}
-              <a href="/auth" className="text-primary hover:underline">/auth</a>
+              Você está logado como <strong>{user.email}</strong>, mas esta conta não tem permissões de administrador.
             </p>
+            
+            <div className="flex flex-col gap-2">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/painel')}
+              >
+                Ir para Painel ISP
+              </Button>
+              
+              <Button 
+                variant="destructive" 
+                className="w-full"
+                onClick={async () => {
+                  await signOut();
+                }}
+              >
+                Fazer Logout
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                className="w-full"
+                onClick={() => navigate('/')}
+              >
+                Voltar para Início
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
