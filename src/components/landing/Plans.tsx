@@ -71,11 +71,18 @@ export const Plans = () => {
   const [isYearly, setIsYearly] = useState(false);
 
   return (
-    <section id="plans" className="py-16 md:py-24 bg-secondary/30">
+    <section 
+      id="plans" 
+      className="py-16 md:py-24 bg-secondary/30"
+      aria-labelledby="plans-heading"
+    >
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <h2 
+            id="plans-heading"
+            className="text-3xl md:text-4xl font-bold text-foreground mb-4"
+          >
             Planos que crescem com seu ISP
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
@@ -84,18 +91,24 @@ export const Plans = () => {
           </p>
 
           {/* Billing Toggle */}
-          <div className="flex items-center justify-center gap-4">
-            <span className={cn(
-              'text-sm font-medium transition-colors',
-              !isYearly ? 'text-foreground' : 'text-muted-foreground'
-            )}>
+          <div className="flex items-center justify-center gap-4" role="group" aria-label="Período de cobrança">
+            <span 
+              id="billing-monthly"
+              className={cn(
+                'text-sm font-medium transition-colors',
+                !isYearly ? 'text-foreground' : 'text-muted-foreground'
+              )}
+            >
               Mensal
             </span>
             <Switch
               checked={isYearly}
               onCheckedChange={setIsYearly}
+              aria-labelledby={isYearly ? "billing-yearly" : "billing-monthly"}
             />
-            <span className={cn(
+            <span 
+              id="billing-yearly"
+              className={cn(
               'text-sm font-medium transition-colors',
               isYearly ? 'text-foreground' : 'text-muted-foreground'
             )}>

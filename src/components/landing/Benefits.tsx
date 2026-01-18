@@ -48,11 +48,18 @@ const benefits = [
 
 export const Benefits = () => {
   return (
-    <section id="benefits" className="py-16 md:py-24 bg-secondary/30">
+    <section 
+      id="benefits" 
+      className="py-16 md:py-24 bg-secondary/30"
+      aria-labelledby="benefits-heading"
+    >
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <h2 
+            id="benefits-heading"
+            className="text-3xl md:text-4xl font-bold text-foreground mb-4"
+          >
             Por que escolher o AutoISP?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
