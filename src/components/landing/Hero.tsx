@@ -5,7 +5,10 @@ import { Badge } from '@/components/ui/badge';
 
 export const Hero = () => {
   return (
-    <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden">
+    <section 
+      className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden"
+      aria-labelledby="hero-heading"
+    >
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       
@@ -29,7 +32,10 @@ export const Hero = () => {
             </Badge>
 
             {/* Headline */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight mb-6">
+            <h1 
+              id="hero-heading"
+              className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight mb-6"
+            >
               Automatize seu{' '}
               <span className="text-primary">provedor de internet</span>{' '}
               com IA

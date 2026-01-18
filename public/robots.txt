@@ -1,8 +1,19 @@
+# AutoISP Robots.txt
+# https://autoisp.com.br
+
 User-agent: Googlebot
 Allow: /
+Disallow: /admin/
+Disallow: /painel/
+Disallow: /auth
+Disallow: /reset-password
 
 User-agent: Bingbot
 Allow: /
+Disallow: /admin/
+Disallow: /painel/
+Disallow: /auth
+Disallow: /reset-password
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +23,10 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /painel/
+Disallow: /auth
+Disallow: /reset-password
+
+# Sitemap
+Sitemap: https://autoisp.com.br/sitemap.xml

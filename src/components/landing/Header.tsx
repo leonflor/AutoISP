@@ -76,18 +76,24 @@ export const Header = () => {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 text-foreground"
+            className="md:hidden p-2 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
+            aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-menu"
           >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {isMobileMenuOpen ? <X className="h-6 w-6" aria-hidden="true" /> : <Menu className="h-6 w-6" aria-hidden="true" />}
           </button>
         </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-border bg-background">
-            <nav className="flex flex-col gap-2">
+          <nav 
+            id="mobile-menu"
+            className="md:hidden py-4 border-t border-border bg-background"
+            aria-label="Menu de navegação mobile"
+          >
+            <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
                 <button
                   key={link.href}
@@ -105,8 +111,8 @@ export const Header = () => {
                   <Link to="/auth?mode=signup">Testar Grátis</Link>
                 </Button>
               </div>
-            </nav>
-          </div>
+            </div>
+          </nav>
         )}
       </div>
     </header>

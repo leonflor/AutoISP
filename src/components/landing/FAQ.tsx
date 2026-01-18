@@ -42,11 +42,18 @@ const faqItems = [
 
 export const FAQ = () => {
   return (
-    <section id="faq" className="py-16 md:py-24 bg-secondary/30">
+    <section 
+      id="faq" 
+      className="py-16 md:py-24 bg-secondary/30"
+      aria-labelledby="faq-heading"
+    >
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <h2 
+            id="faq-heading"
+            className="text-3xl md:text-4xl font-bold text-foreground mb-4"
+          >
             Perguntas Frequentes
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

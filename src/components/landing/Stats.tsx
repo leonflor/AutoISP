@@ -29,14 +29,14 @@ const stats = [
 
 export const Stats = () => {
   return (
-    <section className="py-12 md:py-16 bg-primary">
+    <section className="py-12 md:py-16 bg-primary" aria-label="Estatísticas do AutoISP">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8" role="list">
           {stats.map((stat, index) => (
-            <div key={index} className="text-center">
+            <div key={index} className="text-center" role="listitem">
               <div className="flex justify-center mb-3">
                 <div className="w-12 h-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                  <stat.icon className="h-6 w-6 text-primary-foreground" />
+                  <stat.icon className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
                 </div>
               </div>
               <div className="text-3xl md:text-4xl font-bold text-primary-foreground mb-1">

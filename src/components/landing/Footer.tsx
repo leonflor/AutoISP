@@ -45,7 +45,7 @@ export const Footer = () => {
   };
 
   return (
-    <footer className="bg-foreground text-background">
+    <footer className="bg-foreground text-background" role="contentinfo">
       <div className="container mx-auto px-4 py-12">
         {/* Main Footer Content */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
@@ -67,22 +67,24 @@ export const Footer = () => {
               <a 
                 href="mailto:contato@autoisp.com.br" 
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-background transition-colors"
+                aria-label="Enviar email para contato@autoisp.com.br"
               >
-                <Mail className="h-4 w-4" />
+                <Mail className="h-4 w-4" aria-hidden="true" />
                 contato@autoisp.com.br
               </a>
               <a 
                 href="tel:+5511999999999" 
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-background transition-colors"
+                aria-label="Ligar para (11) 99999-9999"
               >
-                <Phone className="h-4 w-4" />
+                <Phone className="h-4 w-4" aria-hidden="true" />
                 (11) 99999-9999
               </a>
             </div>
           </div>
 
           {/* Produto */}
-          <div>
+          <nav aria-label="Produto">
             <h4 className="font-semibold mb-4">Produto</h4>
             <ul className="space-y-2">
               {footerLinks.produto.map((link) => (
@@ -96,10 +98,10 @@ export const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
 
           {/* Recursos */}
-          <div>
+          <nav aria-label="Recursos">
             <h4 className="font-semibold mb-4">Recursos</h4>
             <ul className="space-y-2">
               {footerLinks.recursos.map((link) => (
@@ -113,10 +115,10 @@ export const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
 
           {/* Empresa */}
-          <div>
+          <nav aria-label="Empresa">
             <h4 className="font-semibold mb-4">Empresa</h4>
             <ul className="space-y-2">
               {footerLinks.empresa.map((link) => (
@@ -130,10 +132,10 @@ export const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
 
           {/* Legal */}
-          <div>
+          <nav aria-label="Legal">
             <h4 className="font-semibold mb-4">Legal</h4>
             <ul className="space-y-2">
               {footerLinks.legal.map((link) => (
@@ -147,7 +149,7 @@ export const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
         </div>
 
         {/* Bottom Bar */}
@@ -158,17 +160,18 @@ export const Footer = () => {
           </div>
           
           {/* Social Links */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4" role="list" aria-label="Redes sociais">
             {socialLinks.map((social) => (
               <a
                 key={social.label}
                 href={social.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-full bg-muted-foreground/10 hover:bg-muted-foreground/20 transition-colors"
-                aria-label={social.label}
+                className="p-2 rounded-full bg-muted-foreground/10 hover:bg-muted-foreground/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label={`Siga-nos no ${social.label}`}
+                role="listitem"
               >
-                <social.icon className="h-4 w-4" />
+                <social.icon className="h-4 w-4" aria-hidden="true" />
               </a>
             ))}
           </div>

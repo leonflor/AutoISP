@@ -79,11 +79,18 @@ export const Features = () => {
   const active = features.find(f => f.id === activeFeature) || features[0];
 
   return (
-    <section id="features" className="py-16 md:py-24">
+    <section 
+      id="features" 
+      className="py-16 md:py-24"
+      aria-labelledby="features-heading"
+    >
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <h2 
+            id="features-heading"
+            className="text-3xl md:text-4xl font-bold text-foreground mb-4"
+          >
             Tudo que seu ISP precisa
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
