@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Search, UserPlus } from 'lucide-react';
-import { AppRole, Profile } from '@/types/database';
+import { UserPlus, Mail, User } from 'lucide-react';
+import { AppRole } from '@/types/database';
 import {
   Dialog,
   DialogContent,
@@ -19,15 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface AddUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSearch: (email: string) => Promise<Profile | null>;
-  onAddUser: (userId: string, role: AppRole) => Promise<void>;
-  isSearching?: boolean;
-  isAdding?: boolean;
+  onInviteUser: (email: string, fullName: string, role: AppRole) => Promise<void>;
+  isInviting?: boolean;
 }
 
 const roleLabels: Record<AppRole, string> = {
@@ -37,125 +34,145 @@ const roleLabels: Record<AppRole, string> = {
   viewer: 'Visualizador',
 };
 
+const roleDescriptions: Record<AppRole, string> = {
+  super_admin: 'Acesso total ao sistema, incluindo gerenciamento de outros admins',
+  admin: 'Gerenciamento de ISPs, planos e configurações',
+  support: 'Suporte a clientes e visualização de dados',
+  viewer: 'Apenas visualização de dados e relatórios',
+};
+
 export function AddUserDialog({
   open,
   onOpenChange,
-  onSearch,
-  onAddUser,
-  isSearching,
-  isAdding,
+  onInviteUser,
+  isInviting,
 }: AddUserDialogProps) {
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [selectedRole, setSelectedRole] = useState<AppRole>('admin');
-  const [foundUser, setFoundUser] = useState<Profile | null>(null);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async () => {
-    if (!email.trim()) return;
-    
-    setSearchError(null);
-    setFoundUser(null);
-    setHasSearched(true);
-    
-    const user = await onSearch(email.trim());
-    
-    if (user) {
-      setFoundUser(user);
-    } else {
-      setSearchError('Usuário não encontrado. Certifique-se de que ele já tenha se cadastrado no sistema.');
+  const handleInvite = async () => {
+    setError(null);
+
+    // Validate fields
+    if (!email.trim()) {
+      setError('Informe o email do usuário');
+      return;
     }
-  };
 
-  const handleAdd = async () => {
-    if (!foundUser) return;
-    
-    await onAddUser(foundUser.id, selectedRole);
-    handleClose();
+    if (!fullName.trim()) {
+      setError('Informe o nome completo');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Email inválido');
+      return;
+    }
+
+    try {
+      await onInviteUser(email.trim(), fullName.trim(), selectedRole);
+      handleClose();
+    } catch (err) {
+      // Error is already handled by the hook with toast
+    }
   };
 
   const handleClose = () => {
     setEmail('');
-    setFoundUser(null);
-    setSearchError(null);
-    setHasSearched(false);
+    setFullName('');
+    setError(null);
     setSelectedRole('admin');
     onOpenChange(false);
-  };
-
-  const getInitials = (name: string | null, email: string) => {
-    if (name) {
-      return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-    }
-    return email.slice(0, 2).toUpperCase();
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Adicionar Administrador</DialogTitle>
+          <DialogTitle>Convidar Administrador</DialogTitle>
           <DialogDescription>
-            Busque um usuário pelo email para conceder permissões administrativas.
+            Envie um convite por email para adicionar um novo administrador ao sistema.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email do usuário</Label>
-            <div className="flex gap-2">
+            <Label htmlFor="fullName">Nome completo</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="João da Silva"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="email"
                 type="email"
                 placeholder="usuario@exemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="pl-10"
               />
-              <Button 
-                type="button" 
-                variant="secondary" 
-                onClick={handleSearch}
-                disabled={isSearching || !email.trim()}
-              >
-                <Search className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
-          {searchError && hasSearched && (
-            <p className="text-sm text-destructive">{searchError}</p>
+          <div className="space-y-2">
+            <Label>Perfil de acesso</Label>
+            <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="super_admin">
+                  <div className="flex flex-col items-start">
+                    <span>{roleLabels.super_admin}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="admin">
+                  <div className="flex flex-col items-start">
+                    <span>{roleLabels.admin}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="support">
+                  <div className="flex flex-col items-start">
+                    <span>{roleLabels.support}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="viewer">
+                  <div className="flex flex-col items-start">
+                    <span>{roleLabels.viewer}</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {roleDescriptions[selectedRole]}
+            </p>
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
           )}
 
-          {foundUser && (
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={foundUser.avatar_url || undefined} />
-                  <AvatarFallback>{getInitials(foundUser.full_name, foundUser.email)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">{foundUser.full_name || 'Sem nome'}</p>
-                  <p className="text-sm text-muted-foreground">{foundUser.email}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Permissão inicial</Label>
-                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="super_admin">{roleLabels.super_admin}</SelectItem>
-                    <SelectItem value="admin">{roleLabels.admin}</SelectItem>
-                    <SelectItem value="support">{roleLabels.support}</SelectItem>
-                    <SelectItem value="viewer">{roleLabels.viewer}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <p className="text-sm text-muted-foreground">
+              O usuário receberá um email com um link para definir sua senha e acessar o sistema.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
@@ -163,11 +180,17 @@ export function AddUserDialog({
             Cancelar
           </Button>
           <Button 
-            onClick={handleAdd} 
-            disabled={!foundUser || isAdding}
+            onClick={handleInvite} 
+            disabled={isInviting || !email.trim() || !fullName.trim()}
           >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Adicionar Admin
+            {isInviting ? (
+              <>Enviando...</>
+            ) : (
+              <>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Enviar Convite
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

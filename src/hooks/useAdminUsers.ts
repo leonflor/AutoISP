@@ -13,10 +13,17 @@ interface UpdateUserRoleData {
   role: AppRole;
 }
 
+interface InviteUserData {
+  email: string;
+  full_name: string;
+  role: AppRole;
+}
+
 export const useAdminUsers = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isSearching, setIsSearching] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
 
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
@@ -152,6 +159,38 @@ export const useAdminUsers = () => {
     },
   });
 
+  const inviteUser = async ({ email, full_name, role }: InviteUserData) => {
+    setIsInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-admin', {
+        body: { email, full_name, role }
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.message || data.error);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: 'Convite enviado',
+        description: data.message || 'O usuário receberá um email para definir sua senha.',
+      });
+
+      return data;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao convidar usuário',
+        description: error.message || 'Ocorreu um erro ao enviar o convite.',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   return {
     users: usersQuery.data ?? [],
     superAdmins: (usersQuery.data ?? []).filter(u => u.roles.includes('super_admin')),
@@ -162,6 +201,8 @@ export const useAdminUsers = () => {
     removeAllRoles: removeAllRolesMutation.mutateAsync,
     searchUserByEmail,
     isSearching,
+    inviteUser,
+    isInviting,
     isUpdating: addRoleMutation.isPending || removeRoleMutation.isPending || removeAllRolesMutation.isPending,
   };
 };

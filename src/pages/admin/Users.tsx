@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
 export default function UsersPage() {
-  const { users, isLoading, addRole, removeRole, removeAllRoles, searchUserByEmail, isSearching } = useAdminUsers();
+  const { users, isLoading, addRole, removeRole, removeAllRoles, inviteUser, isInviting } = useAdminUsers();
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -36,9 +36,8 @@ export default function UsersPage() {
       <AddUserDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSearch={searchUserByEmail}
-        onAddUser={(userId, role) => addRole({ user_id: userId, role })}
-        isSearching={isSearching}
+        onInviteUser={(email, fullName, role) => inviteUser({ email, full_name: fullName, role })}
+        isInviting={isInviting}
       />
     </div>
   );
