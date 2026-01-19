@@ -123,6 +123,29 @@ const templates: Record<string, (data: Record<string, any>) => { subject: string
         <p>Atenciosamente,<br>${data.isp_name || "Equipe"}</p>
       </div>
     `
+  }),
+
+  "admin-invite": (data) => ({
+    subject: `Você foi convidado como ${data.role_label} - ${data.platform_name || "Sistema de Gestão"}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #2563eb;">Bem-vindo, ${data.full_name}!</h1>
+        <p>Você foi convidado para fazer parte da equipe administrativa como <strong>${data.role_label}</strong>.</p>
+        <p>Clique no botão abaixo para definir sua senha e acessar o sistema:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${data.invite_url}" style="display: inline-block; padding: 14px 28px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+            Definir Senha e Acessar
+          </a>
+        </div>
+        <div style="margin: 20px 0; padding: 15px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+          <p style="margin: 0; color: #92400e; font-size: 14px;">
+            <strong>⚠️ Importante:</strong> Este link expira em 24 horas.
+          </p>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">Se você não esperava este convite, pode ignorar este email.</p>
+        <p>Atenciosamente,<br>${data.platform_name || "Equipe de Gestão"}</p>
+      </div>
+    `
   })
 };
 
