@@ -52,7 +52,7 @@ create policy "Super admins can delete platform config"
 
 create trigger update_platform_config_updated_at
   before update on public.platform_config
-  for each row execute function update_updated_at_column();
+  for each row execute function public.handle_updated_at();
 
 -- ==================== DADOS INICIAIS ====================
 
