@@ -175,6 +175,150 @@ export interface PlatformConfig {
   updated_at: string;
 }
 
+// ==================== TABELAS F3 - LANDING PAGE ====================
+
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+  source: string;
+  status: LeadStatus;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject: string | null;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  is_active: boolean;
+  subscribed_at: string;
+  unsubscribed_at: string | null;
+}
+
+export interface ViabilityCheck {
+  id: string;
+  cep: string;
+  address: string | null;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  is_viable: boolean | null;
+  notes: string | null;
+  created_at: string;
+}
+
+// ==================== TABELAS F3 - PAINEL CLIENTE ====================
+
+export interface Subscriber {
+  id: string;
+  isp_id: string;
+  external_id: string | null;
+  name: string;
+  document: string | null;
+  email: string | null;
+  phone: string | null;
+  address: Record<string, unknown>;
+  plan_name: string | null;
+  status: StatusCliente;
+  monthly_value: number | null;
+  due_day: number | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ConversationChannel = 'whatsapp' | 'chat' | 'email' | 'phone';
+export type ConversationStatus = 'open' | 'closed' | 'pending';
+
+export interface Conversation {
+  id: string;
+  isp_id: string;
+  subscriber_id: string | null;
+  channel: ConversationChannel;
+  agent_id: string | null;
+  user_id: string | null;
+  status: ConversationStatus;
+  subject: string | null;
+  messages: unknown[];
+  started_at: string;
+  closed_at: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export type BroadcastChannel = 'whatsapp' | 'sms' | 'email' | 'push';
+export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled';
+
+export interface Broadcast {
+  id: string;
+  isp_id: string;
+  created_by: string;
+  name: string;
+  channel: BroadcastChannel;
+  template: string | null;
+  content: string | null;
+  filters: Record<string, unknown>;
+  status: BroadcastStatus;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  total_recipients: number;
+  delivered_count: number;
+  failed_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ErpProvider = 'mk_solutions' | 'ixc' | 'sgp' | 'hubsoft' | 'other';
+
+export interface ErpConfig {
+  id: string;
+  isp_id: string;
+  provider: ErpProvider;
+  api_url: string | null;
+  api_key_encrypted: string | null;
+  username: string | null;
+  password_encrypted: string | null;
+  sync_enabled: boolean;
+  last_sync_at: string | null;
+  sync_config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type WhatsAppProvider = 'evolution' | 'z_api' | 'wppconnect' | 'baileys';
+
+export interface WhatsAppConfig {
+  id: string;
+  isp_id: string;
+  provider: WhatsAppProvider;
+  instance_name: string | null;
+  api_url: string | null;
+  api_key_encrypted: string | null;
+  webhook_url: string | null;
+  phone_number: string | null;
+  is_connected: boolean;
+  connected_at: string | null;
+  qr_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ==================== DATABASE TYPE ====================
 
 export type Database = {
@@ -292,6 +436,92 @@ export type Database = {
         };
         Update: Partial<Omit<PlatformConfig, 'id' | 'key'>>;
       };
+      // F3 - Landing Page Tables
+      leads: {
+        Row: Lead;
+        Insert: Omit<Lead, 'id' | 'created_at' | 'updated_at' | 'status' | 'source'> & {
+          id?: string;
+          status?: LeadStatus;
+          source?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Lead, 'id'>>;
+      };
+      contact_messages: {
+        Row: ContactMessage;
+        Insert: Omit<ContactMessage, 'id' | 'created_at' | 'is_read'> & {
+          id?: string;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ContactMessage, 'id'>>;
+      };
+      newsletter_subscribers: {
+        Row: NewsletterSubscriber;
+        Insert: Omit<NewsletterSubscriber, 'id' | 'subscribed_at' | 'is_active'> & {
+          id?: string;
+          is_active?: boolean;
+          subscribed_at?: string;
+        };
+        Update: Partial<Omit<NewsletterSubscriber, 'id'>>;
+      };
+      viability_checks: {
+        Row: ViabilityCheck;
+        Insert: Omit<ViabilityCheck, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ViabilityCheck, 'id'>>;
+      };
+      // F3 - Client Panel Tables
+      subscribers: {
+        Row: Subscriber;
+        Insert: Omit<Subscriber, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Subscriber, 'id'>>;
+      };
+      conversations: {
+        Row: Conversation;
+        Insert: Omit<Conversation, 'id' | 'started_at'> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<Omit<Conversation, 'id'>>;
+      };
+      broadcasts: {
+        Row: Broadcast;
+        Insert: Omit<Broadcast, 'id' | 'created_at' | 'updated_at' | 'total_recipients' | 'delivered_count' | 'failed_count'> & {
+          id?: string;
+          total_recipients?: number;
+          delivered_count?: number;
+          failed_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Broadcast, 'id'>>;
+      };
+      erp_configs: {
+        Row: ErpConfig;
+        Insert: Omit<ErpConfig, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<ErpConfig, 'id'>>;
+      };
+      whatsapp_configs: {
+        Row: WhatsAppConfig;
+        Insert: Omit<WhatsAppConfig, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<WhatsAppConfig, 'id'>>;
+      };
     };
     Enums: {
       app_role: AppRole;
@@ -301,6 +531,13 @@ export type Database = {
       tipo_agente: TipoAgente;
       isp_member_role: IspMemberRole;
       platform_config_category: PlatformConfigCategory;
+      lead_status: LeadStatus;
+      conversation_channel: ConversationChannel;
+      conversation_status: ConversationStatus;
+      broadcast_channel: BroadcastChannel;
+      broadcast_status: BroadcastStatus;
+      erp_provider: ErpProvider;
+      whatsapp_provider: WhatsAppProvider;
     };
   };
 };

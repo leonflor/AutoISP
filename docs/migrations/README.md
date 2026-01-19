@@ -7,6 +7,8 @@ Este diretório contém os scripts SQL para configuração do banco de dados no 
 | Arquivo | Fase | Descrição |
 |---------|------|-----------|
 | `f1-database.sql` | F1 | Schema completo: enums, tabelas, funções, triggers, RLS e seeds |
+| `f2-platform-config.sql` | F2 | Tabela de configurações da plataforma |
+| `f3-rls-fixes-and-new-tables.sql` | F3 | Correções de RLS + tabelas landing/painel cliente |
 
 ## 🚀 Como Executar
 
@@ -37,6 +39,24 @@ Este diretório contém os scripts SQL para configuração do banco de dados no 
      - `user_roles`
      - `isps`
      - `isp_users`
+     - `plans`
+     - `subscriptions`
+     - `invoices`
+     - `ai_agents`
+     - `ai_usage`
+     - `ai_limits`
+     - `audit_logs`
+     - `webhook_logs`
+     - `platform_config`
+     - `leads` (F3)
+     - `contact_messages` (F3)
+     - `newsletter_subscribers` (F3)
+     - `viability_checks` (F3)
+     - `subscribers` (F3)
+     - `conversations` (F3)
+     - `broadcasts` (F3)
+     - `erp_configs` (F3)
+     - `whatsapp_configs` (F3)
      - `plans`
      - `subscriptions`
      - `invoices`
