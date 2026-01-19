@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlatformConfig } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
@@ -18,10 +18,10 @@ export function usePlatformConfig() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // All hooks must be called first, in consistent order
   const { data: configs, isLoading, error } = useQuery({
     queryKey: ["platform-config"],
     queryFn: async () => {
-      // Using type assertion because table might not be in generated types yet
       const { data, error } = await (supabase as any)
         .from("platform_config")
         .select("*")
@@ -31,21 +31,6 @@ export function usePlatformConfig() {
       return data as PlatformConfig[];
     },
   });
-
-  // Transform configs array to a key-value map for easier access
-  const configMap: ConfigMap = configs?.reduce((acc, config) => {
-    acc[config.key] = config.value as ConfigValue;
-    return acc;
-  }, {} as ConfigMap) ?? {};
-
-  // Get a specific config value with type safety - memoized to prevent re-renders
-  const getValue = useCallback(<T,>(key: string, defaultValue: T): T => {
-    const config = configMap[key];
-    if (!config || config.value === undefined || config.value === null) {
-      return defaultValue;
-    }
-    return config.value as T;
-  }, [configMap]);
 
   // Update a single config
   const updateConfigMutation = useMutation({
@@ -107,6 +92,23 @@ export function usePlatformConfig() {
       });
     },
   });
+
+  // Transform configs array to a key-value map - memoized for stability
+  const configMap: ConfigMap = useMemo(() => {
+    return configs?.reduce((acc, config) => {
+      acc[config.key] = config.value as ConfigValue;
+      return acc;
+    }, {} as ConfigMap) ?? {};
+  }, [configs]);
+
+  // Get a specific config value with type safety - regular function, not a hook
+  const getValue = <T,>(key: string, defaultValue: T): T => {
+    const config = configMap[key];
+    if (!config || config.value === undefined || config.value === null) {
+      return defaultValue;
+    }
+    return config.value as T;
+  };
 
   return {
     configs,
