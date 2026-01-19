@@ -515,6 +515,7 @@ export type Database = {
           created_at: string | null
           id: string
           invited_by: string | null
+          is_active: boolean
           isp_id: string
           role: Database["public"]["Enums"]["isp_member_role"]
           updated_at: string | null
@@ -524,6 +525,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invited_by?: string | null
+          is_active?: boolean
           isp_id: string
           role?: Database["public"]["Enums"]["isp_member_role"]
           updated_at?: string | null
@@ -533,6 +535,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invited_by?: string | null
+          is_active?: boolean
           isp_id?: string
           role?: Database["public"]["Enums"]["isp_member_role"]
           updated_at?: string | null

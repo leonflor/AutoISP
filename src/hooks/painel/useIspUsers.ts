@@ -10,6 +10,7 @@ interface IspUserWithProfile {
   user_id: string;
   role: IspMemberRole;
   invited_by: string | null;
+  is_active: boolean;
   created_at: string | null;
   updated_at: string | null;
   profile: Profile | null;
@@ -159,11 +160,26 @@ export function useIspUsers(): UseIspUsersReturn {
     }
   };
 
-  const toggleUserActive = async (_userId: string, _isActive: boolean): Promise<boolean> => {
-    // Note: is_active column doesn't exist in current schema
-    // This function is kept for API compatibility but does nothing
-    toast.info('Função não disponível no momento');
-    return false;
+  const toggleUserActive = async (userId: string, isActive: boolean): Promise<boolean> => {
+    if (!membership?.ispId) return false;
+
+    try {
+      const { error } = await supabase
+        .from('isp_users')
+        .update({ is_active: isActive, updated_at: new Date().toISOString() })
+        .eq('isp_id', membership.ispId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      toast.success(isActive ? 'Usuário ativado!' : 'Usuário desativado!');
+      fetchUsers();
+      return true;
+    } catch (err) {
+      console.error('Error toggling user active:', err);
+      toast.error('Erro ao alterar status do usuário');
+      return false;
+    }
   };
 
   const removeUser = async (userId: string): Promise<boolean> => {

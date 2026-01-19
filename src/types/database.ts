@@ -41,13 +41,14 @@ export interface Isp {
   updated_at: string | null;
 }
 
-// IspUser matches actual DB schema (no is_active, invited_at, joined_at columns)
+// IspUser matches actual DB schema
 export interface IspUser {
   id: string;
   isp_id: string;
   user_id: string;
   role: IspMemberRole;
   invited_by: string | null;
+  is_active: boolean;
   created_at: string | null;
   updated_at: string | null;
 }

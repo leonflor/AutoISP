@@ -7,10 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useIspUsers } from '@/hooks/painel/useIspUsers';
 import { useIspMembership } from '@/hooks/useIspMembership';
 import { IspMemberRole } from '@/types/database';
-import { UserPlus, Users, Shield, Loader2 } from 'lucide-react';
+import { UserPlus, Users, Shield, Loader2, UserCheck, UserX } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const roleLabels: Record<IspMemberRole, string> = {
@@ -129,11 +130,15 @@ export default function UsersPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Ativos</CardTitle>
+            <UserCheck className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {users.length}
+              {users.filter((u) => u.is_active).length}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {users.filter((u) => !u.is_active).length} inativos
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -156,7 +161,9 @@ export default function UsersPage() {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg"
+                  className={`flex items-center gap-4 p-4 border rounded-lg transition-opacity ${
+                    !user.is_active ? 'opacity-50 bg-muted/30' : ''
+                  }`}
                 >
                   <Avatar>
                     <AvatarFallback>
@@ -164,12 +171,27 @@ export default function UsersPage() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{user.profile?.full_name || 'Sem nome'}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{user.profile?.full_name || 'Sem nome'}</p>
+                      {!user.is_active && (
+                        <Badge variant="secondary" className="text-xs">
+                          <UserX className="h-3 w-3 mr-1" />
+                          Inativo
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">{user.profile?.email}</p>
                   </div>
                   <Badge variant="outline" className={roleColors[user.role]}>
                     {roleLabels[user.role]}
                   </Badge>
+                  {canManageUsers && user.role !== 'owner' && (
+                    <Switch
+                      checked={user.is_active}
+                      onCheckedChange={(checked) => toggleUserActive(user.user_id, checked)}
+                      aria-label={user.is_active ? 'Desativar usuário' : 'Ativar usuário'}
+                    />
+                  )}
                 </div>
               ))}
             </div>
