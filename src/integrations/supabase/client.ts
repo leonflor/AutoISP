@@ -1,14 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Supabase public credentials (anon key is safe for frontend - security comes from RLS)
+// For external deployments, set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY env vars
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://placeholder.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "placeholder-anon-key";
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error(
-    "Supabase credentials not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables. See .env.example for reference."
-  );
-}
+// Check if we're using placeholder values (Lovable Cloud not connected)
+const isPlaceholder = SUPABASE_URL.includes("placeholder");
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -17,3 +16,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     autoRefreshToken: true,
   },
 });
+
+// Export flag for components to check if Supabase is properly configured
+export const isSupabaseConfigured = !isPlaceholder;
