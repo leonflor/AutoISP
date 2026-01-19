@@ -2,8 +2,10 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Play, Users, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useActiveIspsCount } from '@/hooks/useActiveIspsCount';
 
 export const Hero = () => {
+  const { data: activeIspsCount = 0 } = useActiveIspsCount();
   return (
     <section 
       className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden"
@@ -28,7 +30,7 @@ export const Hero = () => {
             {/* Badge */}
             <Badge variant="secondary" className="mb-6 px-4 py-1.5">
               <Zap className="h-3.5 w-3.5 mr-1.5 text-accent" />
-              500+ ISPs já automatizados
+              {activeIspsCount}+ ISPs já automatizados
             </Badge>
 
             {/* Headline */}
