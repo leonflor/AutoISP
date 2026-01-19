@@ -35,8 +35,8 @@ export const useAdminUsers = () => {
 
       if (rolesError) throw rolesError;
 
-      // Get unique user IDs with admin roles
-      const adminRoles: AppRole[] = ['super_admin', 'admin', 'support', 'viewer'];
+      // Get unique user IDs with admin roles (viewer is not an AppRole in DB)
+      const adminRoles: AppRole[] = ['super_admin', 'admin', 'support'];
       const adminUserIds = [...new Set(
         (rolesData ?? [])
           .filter(r => adminRoles.includes(r.role as AppRole))

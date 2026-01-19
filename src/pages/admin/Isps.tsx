@@ -40,7 +40,7 @@ export default function IspsPage() {
     document: string;
     email: string;
     phone?: string;
-    status: 'trial' | 'ativo' | 'suspenso' | 'cancelado' | 'inadimplente';
+    status: 'ativo' | 'suspenso' | 'cancelado' | 'pendente';
   }) => {
     if (editingIsp) {
       await updateIsp({ id: editingIsp.id, ...data });

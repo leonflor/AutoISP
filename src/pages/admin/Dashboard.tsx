@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const ispStats = {
     total: isps.length,
     active: isps.filter(i => i.status === 'ativo').length,
-    trial: isps.filter(i => i.status === 'trial').length,
+    trial: 0, // trial is now tracked via subscriptions, not ISP status
   };
 
   // Mock data for charts and panels (in production, fetch real data)
@@ -40,8 +40,8 @@ export default function AdminDashboard() {
     id: isp.id,
     type: 'isp_created' as const,
     title: `ISP cadastrado: ${isp.name}`,
-    description: isp.email,
-    createdAt: isp.created_at,
+    description: isp.email || '',
+    createdAt: isp.created_at || new Date().toISOString(),
   }));
 
   return (

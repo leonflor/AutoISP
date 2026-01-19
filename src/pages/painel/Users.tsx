@@ -132,7 +132,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {users.filter((u) => u.is_active).length}
+              {users.length}
             </div>
           </CardContent>
         </Card>
@@ -170,9 +170,6 @@ export default function UsersPage() {
                   <Badge variant="outline" className={roleColors[user.role]}>
                     {roleLabels[user.role]}
                   </Badge>
-                  {!user.is_active && (
-                    <Badge variant="secondary">Inativo</Badge>
-                  )}
                 </div>
               ))}
             </div>

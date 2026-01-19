@@ -38,7 +38,6 @@ const statusConfig: Record<StatusFatura, { label: string; variant: 'default' | '
   pago: { label: 'Pago', variant: 'default' },
   vencido: { label: 'Vencido', variant: 'destructive' },
   cancelado: { label: 'Cancelado', variant: 'outline' },
-  estornado: { label: 'Estornado', variant: 'outline' },
 };
 
 export function InvoiceTable({ invoices, isLoading, onMarkAsPaid, onCancel, onView }: InvoiceTableProps) {
@@ -78,7 +77,7 @@ export function InvoiceTable({ invoices, isLoading, onMarkAsPaid, onCancel, onVi
             </TableRow>
           ) : (
             invoices.map((invoice) => {
-              const status = statusConfig[invoice.status];
+              const status = invoice.status ? statusConfig[invoice.status] : { label: 'Desconhecido', variant: 'outline' as const };
               return (
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">

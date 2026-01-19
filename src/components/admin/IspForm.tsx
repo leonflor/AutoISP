@@ -34,7 +34,7 @@ const ispFormSchema = z.object({
   document: z.string().min(14, 'CNPJ inválido').max(18),
   email: z.string().email('Email inválido'),
   phone: z.string().optional(),
-  status: z.enum(['trial', 'ativo', 'suspenso', 'cancelado', 'inadimplente']),
+  status: z.enum(['ativo', 'suspenso', 'cancelado', 'pendente']),
 });
 
 type IspFormData = z.infer<typeof ispFormSchema>;
@@ -48,11 +48,10 @@ interface IspFormProps {
 }
 
 const statusOptions: { value: StatusCliente; label: string }[] = [
-  { value: 'trial', label: 'Trial' },
   { value: 'ativo', label: 'Ativo' },
+  { value: 'pendente', label: 'Pendente' },
   { value: 'suspenso', label: 'Suspenso' },
   { value: 'cancelado', label: 'Cancelado' },
-  { value: 'inadimplente', label: 'Inadimplente' },
 ];
 
 export function IspForm({ open, onOpenChange, isp, onSubmit, isSubmitting }: IspFormProps) {
@@ -66,7 +65,7 @@ export function IspForm({ open, onOpenChange, isp, onSubmit, isSubmitting }: Isp
       document: isp?.document || '',
       email: isp?.email || '',
       phone: isp?.phone || '',
-      status: isp?.status || 'trial',
+      status: isp?.status || 'pendente',
     },
   });
 

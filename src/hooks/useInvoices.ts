@@ -3,8 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Invoice, StatusFatura } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
-interface InvoiceWithDetails extends Invoice {
-  isp?: { id: string; name: string; email: string };
+interface InvoiceWithDetails {
+  id: string;
+  subscription_id: string;
+  isp_id: string;
+  amount: number;
+  status: StatusFatura | null;
+  due_date: string;
+  paid_at: string | null;
+  external_id: string | null;
+  payment_method: string | null;
+  invoice_url: string | null;
+  pdf_url: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
+  isp?: { id: string; name: string; email: string | null };
   subscription?: { id: string; plan_id: string };
 }
 
