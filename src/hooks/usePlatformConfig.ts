@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlatformConfig } from "@/types/database";
 import { useToast } from "@/hooks/use-toast";
@@ -37,14 +38,14 @@ export function usePlatformConfig() {
     return acc;
   }, {} as ConfigMap) ?? {};
 
-  // Get a specific config value with type safety
-  function getValue<T>(key: string, defaultValue: T): T {
+  // Get a specific config value with type safety - memoized to prevent re-renders
+  const getValue = useCallback(<T,>(key: string, defaultValue: T): T => {
     const config = configMap[key];
     if (!config || config.value === undefined || config.value === null) {
       return defaultValue;
     }
     return config.value as T;
-  }
+  }, [configMap]);
 
   // Update a single config
   const updateConfigMutation = useMutation({
