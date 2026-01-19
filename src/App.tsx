@@ -26,6 +26,7 @@ const FinancePage = lazy(() => import("./pages/admin/Finance"));
 const InvoicesPage = lazy(() => import("./pages/admin/Invoices"));
 const SubscriptionsPage = lazy(() => import("./pages/admin/Subscriptions"));
 const UsersPage = lazy(() => import("./pages/admin/Users"));
+const AdminConfig = lazy(() => import("./pages/admin/Config"));
 
 // Lazy load - Painel ISP pages
 const PainelLayout = lazy(() => import("./components/painel/PainelLayout").then(m => ({ default: m.PainelLayout })));
@@ -77,6 +78,7 @@ const App = () => (
                 <Route path="faturas" element={<InvoicesPage />} />
                 <Route path="assinaturas" element={<SubscriptionsPage />} />
                 <Route path="usuarios" element={<UsersPage />} />
+                <Route path="config" element={<AdminConfig />} />
               </Route>
               
               {/* Painel Cliente ISP Routes */}
