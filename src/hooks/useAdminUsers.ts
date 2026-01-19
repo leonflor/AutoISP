@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Profile, UserRole, AppRole } from '@/types/database';
+import type { Profile, AppRole } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
 interface AdminUser extends Profile {
@@ -10,12 +11,12 @@ interface AdminUser extends Profile {
 interface UpdateUserRoleData {
   user_id: string;
   role: AppRole;
-  action: 'add' | 'remove';
 }
 
 export const useAdminUsers = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [isSearching, setIsSearching] = useState(false);
 
   const usersQuery = useQuery({
     queryKey: ['admin-users'],
@@ -57,8 +58,27 @@ export const useAdminUsers = () => {
     },
   });
 
+  const searchUserByEmail = async (email: string): Promise<Profile | null> => {
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', email)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error searching user:', error);
+      return null;
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const addRoleMutation = useMutation({
-    mutationFn: async ({ user_id, role }: Omit<UpdateUserRoleData, 'action'>) => {
+    mutationFn: async ({ user_id, role }: UpdateUserRoleData) => {
       const { error } = await supabase
         .from('user_roles')
         .insert({ user_id, role } as any);
@@ -82,7 +102,7 @@ export const useAdminUsers = () => {
   });
 
   const removeRoleMutation = useMutation({
-    mutationFn: async ({ user_id, role }: Omit<UpdateUserRoleData, 'action'>) => {
+    mutationFn: async ({ user_id, role }: UpdateUserRoleData) => {
       const { error } = await supabase
         .from('user_roles')
         .delete()
@@ -107,6 +127,31 @@ export const useAdminUsers = () => {
     },
   });
 
+  const removeAllRolesMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: 'Administrador removido',
+        description: 'Todas as permissões foram removidas do usuário.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao remover administrador',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     users: usersQuery.data ?? [],
     superAdmins: (usersQuery.data ?? []).filter(u => u.roles.includes('super_admin')),
@@ -114,6 +159,9 @@ export const useAdminUsers = () => {
     error: usersQuery.error,
     addRole: addRoleMutation.mutateAsync,
     removeRole: removeRoleMutation.mutateAsync,
-    isUpdating: addRoleMutation.isPending || removeRoleMutation.isPending,
+    removeAllRoles: removeAllRolesMutation.mutateAsync,
+    searchUserByEmail,
+    isSearching,
+    isUpdating: addRoleMutation.isPending || removeRoleMutation.isPending || removeAllRolesMutation.isPending,
   };
 };
