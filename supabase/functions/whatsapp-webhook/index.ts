@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
 });
 
 async function processWithAI(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   whatsappConfig: any,
   conversation: any,
   messages: ConversationMessage[],
@@ -305,7 +305,7 @@ async function processWithAI(
       .select("plan_id")
       .eq("isp_id", ispId)
       .eq("status", "ativa")
-      .single();
+      .single() as { data: { plan_id: string } | null };
 
     if (!ispSubscription) {
       console.log("No active subscription for ISP");
@@ -319,7 +319,7 @@ async function processWithAI(
       .eq("plan_id", ispSubscription.plan_id)
       .eq("is_enabled", true)
       .eq("ai_agents.type", "atendente")
-      .single();
+      .single() as { data: any };
 
     if (!aiLimit || !aiLimit.ai_agents) {
       console.log("No AI agent available for this ISP");
@@ -335,7 +335,7 @@ async function processWithAI(
     const agent = aiLimit.ai_agents;
 
     // Update conversation with agent
-    await supabase
+    await (supabase as any)
       .from("conversations")
       .update({ agent_id: agent.id })
       .eq("id", conversation.id);
@@ -389,7 +389,7 @@ async function processWithAI(
       timestamp: new Date().toISOString(),
     };
 
-    await supabase
+    await (supabase as any)
       .from("conversations")
       .update({ 
         messages: [...messages, aiConversationMessage],
