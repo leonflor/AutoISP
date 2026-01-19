@@ -32,8 +32,10 @@ const menuItems = [
   { title: 'Dashboard', url: '/painel', icon: LayoutDashboard },
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
+  { title: 'Agentes IA', url: '/painel/agentes', icon: Wifi },
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
+  { title: 'Faturas', url: '/painel/faturas', icon: BarChart3 },
   { title: 'Relatórios', url: '/painel/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/painel/configuracoes', icon: Settings },
 ];
