@@ -37,6 +37,13 @@ const PainelCommunication = lazy(() => import("./pages/painel/Communication"));
 const PainelUsers = lazy(() => import("./pages/painel/Users"));
 const PainelReports = lazy(() => import("./pages/painel/Reports"));
 const PainelSettings = lazy(() => import("./pages/painel/Settings"));
+const PainelAiAgents = lazy(() => import("./pages/painel/AiAgents"));
+const PainelAiChat = lazy(() => import("./pages/painel/AiChat"));
+const PainelInvoices = lazy(() => import("./pages/painel/Invoices"));
+
+// Lazy load - Admin extra pages
+const AdminSupport = lazy(() => import("./pages/admin/Support"));
+const AdminReports = lazy(() => import("./pages/admin/Reports"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,6 +85,8 @@ const App = () => (
                 <Route path="faturas" element={<InvoicesPage />} />
                 <Route path="assinaturas" element={<SubscriptionsPage />} />
                 <Route path="usuarios" element={<UsersPage />} />
+                <Route path="suporte" element={<AdminSupport />} />
+                <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
               </Route>
               
@@ -88,11 +97,12 @@ const App = () => (
                 <Route path="atendimentos" element={<PainelTickets />} />
                 <Route path="comunicacao" element={<PainelCommunication />} />
                 <Route path="usuarios" element={<PainelUsers />} />
+                <Route path="agentes" element={<PainelAiAgents />} />
+                <Route path="chat" element={<PainelAiChat />} />
+                <Route path="faturas" element={<PainelInvoices />} />
                 <Route path="relatorios" element={<PainelReports />} />
                 <Route path="configuracoes" element={<PainelSettings />} />
               </Route>
-              
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
