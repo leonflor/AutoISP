@@ -20,7 +20,7 @@ export default function UsersPage() {
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <UserPlus className="h-4 w-4 mr-2" />
-          Novo Administrador
+          Novo
         </Button>
       </div>
 
