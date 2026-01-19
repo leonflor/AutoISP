@@ -31,14 +31,12 @@ const roleLabels: Record<AppRole, string> = {
   super_admin: 'Super Admin',
   admin: 'Admin',
   support: 'Suporte',
-  viewer: 'Visualizador',
 };
 
 const roleDescriptions: Record<AppRole, string> = {
   super_admin: 'Acesso total ao sistema, incluindo gerenciamento de outros admins',
   admin: 'Gerenciamento de ISPs, planos e configurações',
   support: 'Suporte a clientes e visualização de dados',
-  viewer: 'Apenas visualização de dados e relatórios',
 };
 
 export function AddUserDialog({
@@ -150,11 +148,6 @@ export function AddUserDialog({
                 <SelectItem value="support">
                   <div className="flex flex-col items-start">
                     <span>{roleLabels.support}</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="viewer">
-                  <div className="flex flex-col items-start">
-                    <span>{roleLabels.viewer}</span>
                   </div>
                 </SelectItem>
               </SelectContent>

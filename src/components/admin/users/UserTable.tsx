@@ -50,14 +50,12 @@ const roleLabels: Record<AppRole, string> = {
   super_admin: 'Super Admin',
   admin: 'Admin',
   support: 'Suporte',
-  viewer: 'Visualizador',
 };
 
 const roleColors: Record<AppRole, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   super_admin: 'destructive',
   admin: 'default',
   support: 'secondary',
-  viewer: 'outline',
 };
 
 export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveAllRoles, currentUserId }: UserTableProps) {
@@ -80,7 +78,7 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
     return email.slice(0, 2).toUpperCase();
   };
 
-  const allRoles: AppRole[] = ['super_admin', 'admin', 'support', 'viewer'];
+  const allRoles: AppRole[] = ['super_admin', 'admin', 'support'];
 
   const handleRemoveUser = async () => {
     if (!userToRemove) return;
@@ -131,7 +129,7 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
                     </div>
                   </TableCell>
                   <TableCell>
-                    {format(new Date(user.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                    {user.created_at ? format(new Date(user.created_at), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>

@@ -37,6 +37,7 @@ const statusConfig: Record<StatusAssinatura, { label: string; variant: 'default'
   ativa: { label: 'Ativa', variant: 'default' },
   suspensa: { label: 'Suspensa', variant: 'destructive' },
   cancelada: { label: 'Cancelada', variant: 'outline' },
+  expirada: { label: 'Expirada', variant: 'outline' },
 };
 
 export function SubscriptionTable({ subscriptions, isLoading, onCancel, onView }: SubscriptionTableProps) {
@@ -76,7 +77,7 @@ export function SubscriptionTable({ subscriptions, isLoading, onCancel, onView }
             </TableRow>
           ) : (
             subscriptions.map((subscription) => {
-              const status = statusConfig[subscription.status];
+              const status = subscription.status ? statusConfig[subscription.status] : { label: 'Desconhecido', variant: 'outline' as const };
               return (
                 <TableRow key={subscription.id}>
                   <TableCell className="font-medium">

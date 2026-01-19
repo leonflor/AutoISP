@@ -4,7 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { IspMemberRole, IspUser, Profile } from '@/types/database';
 import { toast } from 'sonner';
 
-interface IspUserWithProfile extends IspUser {
+interface IspUserWithProfile {
+  id: string;
+  isp_id: string;
+  user_id: string;
+  role: IspMemberRole;
+  invited_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
   profile: Profile | null;
 }
 
@@ -107,13 +114,11 @@ export function useIspUsers(): UseIspUsersReturn {
         return false;
       }
 
-      // Add user - using any to bypass strict typing
+      // Add user - only include columns that exist in DB
       const insertData = {
         isp_id: membership.ispId,
         user_id: profileId,
         role,
-        is_active: true,
-        invited_at: new Date().toISOString(),
       };
       const { error: insertError } = await (supabase
         .from('isp_users') as any)
@@ -154,27 +159,11 @@ export function useIspUsers(): UseIspUsersReturn {
     }
   };
 
-  const toggleUserActive = async (userId: string, isActive: boolean): Promise<boolean> => {
-    if (!membership?.ispId) return false;
-
-    try {
-      const updateData = { is_active: isActive, updated_at: new Date().toISOString() };
-      const { error: updateError } = await (supabase
-        .from('isp_users') as any)
-        .update(updateData)
-        .eq('isp_id', membership.ispId)
-        .eq('user_id', userId);
-
-      if (updateError) throw updateError;
-
-      toast.success(isActive ? 'Usuário ativado!' : 'Usuário desativado!');
-      fetchUsers();
-      return true;
-    } catch (err) {
-      console.error('Error toggling user active:', err);
-      toast.error('Erro ao alterar status');
-      return false;
-    }
+  const toggleUserActive = async (_userId: string, _isActive: boolean): Promise<boolean> => {
+    // Note: is_active column doesn't exist in current schema
+    // This function is kept for API compatibility but does nothing
+    toast.info('Função não disponível no momento');
+    return false;
   };
 
   const removeUser = async (userId: string): Promise<boolean> => {

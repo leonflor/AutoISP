@@ -1,7 +1,8 @@
-export type AppRole = 'super_admin' | 'admin' | 'support' | 'viewer';
-export type StatusCliente = 'trial' | 'ativo' | 'suspenso' | 'cancelado' | 'inadimplente';
-export type StatusFatura = 'pendente' | 'pago' | 'vencido' | 'cancelado' | 'estornado';
-export type StatusAssinatura = 'trial' | 'ativa' | 'suspensa' | 'cancelada';
+// Types aligned with actual Supabase schema (src/integrations/supabase/types.ts)
+export type AppRole = 'super_admin' | 'admin' | 'support';
+export type StatusCliente = 'ativo' | 'suspenso' | 'cancelado' | 'pendente';
+export type StatusFatura = 'pendente' | 'pago' | 'vencido' | 'cancelado';
+export type StatusAssinatura = 'trial' | 'ativa' | 'suspensa' | 'cancelada' | 'expirada';
 export type TipoAgente = 'atendente' | 'cobrador' | 'vendedor' | 'analista' | 'suporte';
 export type IspMemberRole = 'owner' | 'admin' | 'operator' | 'viewer';
 
@@ -13,43 +14,42 @@ export interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   phone: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface UserRole {
   id: string;
   user_id: string;
   role: AppRole;
-  created_at: string;
+  created_at: string | null;
 }
 
+// Isp matches actual DB schema (no trial_ends_at column)
 export interface Isp {
   id: string;
   name: string;
   slug: string;
   document: string;
-  email: string;
+  email: string | null;
   phone: string | null;
-  status: StatusCliente;
-  trial_ends_at: string | null;
+  status: StatusCliente | null;
   logo_url: string | null;
-  settings: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  address: Record<string, unknown> | null;
+  settings: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
+// IspUser matches actual DB schema (no is_active, invited_at, joined_at columns)
 export interface IspUser {
   id: string;
   isp_id: string;
   user_id: string;
   role: IspMemberRole;
-  is_active: boolean;
   invited_by: string | null;
-  invited_at: string | null;
-  joined_at: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 // ==================== TABELAS F1 - NEGÓCIO ====================
@@ -68,33 +68,39 @@ export interface Plan {
   updated_at: string;
 }
 
+// Subscription matches actual DB schema
 export interface Subscription {
   id: string;
   isp_id: string;
   plan_id: string;
-  status: StatusAssinatura;
+  status: StatusAssinatura | null;
   current_period_start: string;
   current_period_end: string;
-  cancel_at_period_end: boolean;
+  trial_ends_at: string | null;
+  cancel_reason: string | null;
   canceled_at: string | null;
-  asaas_subscription_id: string | null;
-  created_at: string;
-  updated_at: string;
+  external_id: string | null;
+  payment_method: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
+// Invoice matches actual DB schema
 export interface Invoice {
   id: string;
   subscription_id: string;
   isp_id: string;
   amount: number;
-  status: StatusFatura;
+  status: StatusFatura | null;
   due_date: string;
   paid_at: string | null;
-  asaas_payment_id: string | null;
+  external_id: string | null;
   payment_method: string | null;
   invoice_url: string | null;
-  created_at: string;
-  updated_at: string;
+  pdf_url: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 // ==================== TABELAS F1 - IA ====================

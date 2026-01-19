@@ -3,8 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Subscription, StatusAssinatura } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
-interface SubscriptionWithDetails extends Subscription {
-  isp?: { id: string; name: string; email: string };
+interface SubscriptionWithDetails {
+  id: string;
+  isp_id: string;
+  plan_id: string;
+  status: StatusAssinatura | null;
+  current_period_start: string;
+  current_period_end: string;
+  trial_ends_at: string | null;
+  cancel_reason: string | null;
+  canceled_at: string | null;
+  external_id: string | null;
+  payment_method: Record<string, unknown> | null;
+  created_at: string | null;
+  updated_at: string | null;
+  isp?: { id: string; name: string; email: string | null };
   plan?: { id: string; name: string; price_monthly: number };
 }
 

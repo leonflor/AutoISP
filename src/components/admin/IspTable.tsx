@@ -38,11 +38,10 @@ interface IspTableProps {
 }
 
 const statusConfig: Record<StatusCliente, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  trial: { label: 'Trial', variant: 'secondary' },
   ativo: { label: 'Ativo', variant: 'default' },
+  pendente: { label: 'Pendente', variant: 'secondary' },
   suspenso: { label: 'Suspenso', variant: 'outline' },
   cancelado: { label: 'Cancelado', variant: 'destructive' },
-  inadimplente: { label: 'Inadimplente', variant: 'destructive' },
 };
 
 export function IspTable({ isps, onEdit, onDelete, isDeleting }: IspTableProps) {
@@ -83,7 +82,7 @@ export function IspTable({ isps, onEdit, onDelete, isDeleting }: IspTableProps) 
           </TableHeader>
           <TableBody>
             {isps.map((isp) => {
-              const status = statusConfig[isp.status];
+              const status = isp.status ? statusConfig[isp.status] : { label: 'Desconhecido', variant: 'outline' as const };
               return (
                 <TableRow key={isp.id}>
                   <TableCell className="font-medium">{isp.name}</TableCell>
@@ -93,7 +92,7 @@ export function IspTable({ isps, onEdit, onDelete, isDeleting }: IspTableProps) 
                     <Badge variant={status.variant}>{status.label}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {format(new Date(isp.created_at), 'dd MMM yyyy', { locale: ptBR })}
+                    {isp.created_at ? format(new Date(isp.created_at), 'dd MMM yyyy', { locale: ptBR }) : '-'}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
