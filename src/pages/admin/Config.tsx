@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 import { 
   Palette, 
   Building2, 
@@ -22,13 +24,17 @@ import {
   Download,
   AlertTriangle,
   CheckCircle2,
-  Settings2
+  Settings2,
+  Loader2
 } from "lucide-react";
 
 const Config = () => {
-  const [platformName, setPlatformName] = useState("AutoISP");
-  const [supportEmail, setSupportEmail] = useState("suporte@autoisp.com.br");
-  const [siteUrl, setSiteUrl] = useState("https://autoisp.com.br");
+  const { configMap, isLoading, getValue, batchUpdate, isUpdating } = usePlatformConfig();
+
+  // Local states for form fields
+  const [platformName, setPlatformName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [siteUrl, setSiteUrl] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#3b82f6");
   const [secondaryColor, setSecondaryColor] = useState("#10b981");
   
@@ -40,12 +46,95 @@ const Config = () => {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [logRetention, setLogRetention] = useState("90");
 
+  // Sync local state with config when loaded
+  useEffect(() => {
+    if (!isLoading && configMap) {
+      setPlatformName(getValue("platform_name", "AutoISP"));
+      setSupportEmail(getValue("support_email", "suporte@autoisp.com.br"));
+      setSiteUrl(getValue("site_url", "https://autoisp.com.br"));
+      setPrimaryColor(getValue("primary_color", "#3b82f6"));
+      setSecondaryColor(getValue("secondary_color", "#10b981"));
+      setRequire2FA(getValue("require_2fa", true));
+      setSessionTimeout(String(getValue("session_timeout", 30)));
+      setMaxSessions(String(getValue("max_sessions", 3)));
+      setMinPasswordLength(String(getValue("min_password_length", 8)));
+      setMaintenanceMode(getValue("maintenance_mode", false));
+      setLogRetention(String(getValue("log_retention_days", 90)));
+    }
+  }, [isLoading, configMap, getValue]);
+
   const integrations = [
-    { name: "OpenAI", icon: Brain, configured: true, description: "IA para atendimento automático" },
-    { name: "Resend", icon: Mail, configured: false, description: "Envio de emails transacionais" },
-    { name: "Asaas", icon: CreditCard, configured: true, description: "Gateway de pagamentos" },
-    { name: "Push Notifications", icon: Bell, configured: false, description: "Notificações push" },
+    { 
+      name: "OpenAI", 
+      key: "integration_openai",
+      icon: Brain, 
+      configured: configMap?.integration_openai?.configured ?? false, 
+      description: "IA para atendimento automático" 
+    },
+    { 
+      name: "Resend", 
+      key: "integration_resend",
+      icon: Mail, 
+      configured: configMap?.integration_resend?.configured ?? false, 
+      description: "Envio de emails transacionais" 
+    },
+    { 
+      name: "Asaas", 
+      key: "integration_asaas",
+      icon: CreditCard, 
+      configured: configMap?.integration_asaas?.configured ?? false, 
+      description: "Gateway de pagamentos" 
+    },
+    { 
+      name: "Push Notifications", 
+      key: "integration_push",
+      icon: Bell, 
+      configured: configMap?.integration_push?.configured ?? false, 
+      description: "Notificações push" 
+    },
   ];
+
+  const handleSavePlatform = () => {
+    batchUpdate([
+      { key: "platform_name", value: { value: platformName } },
+      { key: "support_email", value: { value: supportEmail } },
+      { key: "site_url", value: { value: siteUrl } },
+      { key: "primary_color", value: { value: primaryColor } },
+      { key: "secondary_color", value: { value: secondaryColor } },
+    ]);
+  };
+
+  const handleSaveSecurity = () => {
+    batchUpdate([
+      { key: "require_2fa", value: { value: require2FA } },
+      { key: "session_timeout", value: { value: parseInt(sessionTimeout) } },
+      { key: "max_sessions", value: { value: parseInt(maxSessions) } },
+      { key: "min_password_length", value: { value: parseInt(minPasswordLength) } },
+    ]);
+  };
+
+  const handleSaveSystem = () => {
+    batchUpdate([
+      { key: "maintenance_mode", value: { value: maintenanceMode } },
+      { key: "log_retention_days", value: { value: parseInt(logRetention) } },
+    ]);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-9 w-48 mb-2" />
+          <Skeleton className="h-5 w-64" />
+        </div>
+        <Skeleton className="h-10 w-96" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -178,7 +267,10 @@ const Config = () => {
           </div>
 
           <div className="flex justify-end">
-            <Button>Salvar Alterações</Button>
+            <Button onClick={handleSavePlatform} disabled={isUpdating}>
+              {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar Alterações
+            </Button>
           </div>
         </TabsContent>
 
@@ -348,7 +440,10 @@ const Config = () => {
           </div>
 
           <div className="flex justify-end">
-            <Button>Salvar Alterações</Button>
+            <Button onClick={handleSaveSecurity} disabled={isUpdating}>
+              {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar Alterações
+            </Button>
           </div>
         </TabsContent>
 
@@ -442,8 +537,9 @@ const Config = () => {
                 </div>
                 {maintenanceMode && (
                   <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                    <p className="text-sm text-destructive font-medium">
-                      ⚠️ O sistema está em modo de manutenção
+                    <p className="text-sm text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      O modo manutenção está ativo. Usuários não conseguirão acessar a plataforma.
                     </p>
                   </div>
                 )}
@@ -452,7 +548,10 @@ const Config = () => {
           </div>
 
           <div className="flex justify-end">
-            <Button>Salvar Alterações</Button>
+            <Button onClick={handleSaveSystem} disabled={isUpdating}>
+              {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar Alterações
+            </Button>
           </div>
         </TabsContent>
       </Tabs>

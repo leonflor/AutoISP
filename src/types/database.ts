@@ -163,6 +163,18 @@ export interface WebhookLog {
   created_at: string;
 }
 
+export type PlatformConfigCategory = 'platform' | 'security' | 'system' | 'integrations';
+
+export interface PlatformConfig {
+  id: string;
+  key: string;
+  value: Record<string, unknown>;
+  category: PlatformConfigCategory;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ==================== DATABASE TYPE ====================
 
 export type Database = {
@@ -271,6 +283,15 @@ export type Database = {
         };
         Update: Partial<Omit<WebhookLog, 'id'>>;
       };
+      platform_config: {
+        Row: PlatformConfig;
+        Insert: Omit<PlatformConfig, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PlatformConfig, 'id' | 'key'>>;
+      };
     };
     Enums: {
       app_role: AppRole;
@@ -279,6 +300,7 @@ export type Database = {
       status_assinatura: StatusAssinatura;
       tipo_agente: TipoAgente;
       isp_member_role: IspMemberRole;
+      platform_config_category: PlatformConfigCategory;
     };
   };
 };
