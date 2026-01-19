@@ -46,22 +46,22 @@ const Config = () => {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [logRetention, setLogRetention] = useState("90");
 
-  // Sync local state with config when loaded
+  // Sync local state with config when loaded - access configMap directly to avoid getValue reference issues
   useEffect(() => {
-    if (!isLoading && configMap) {
-      setPlatformName(getValue("platform_name", "AutoISP"));
-      setSupportEmail(getValue("support_email", "suporte@autoisp.com.br"));
-      setSiteUrl(getValue("site_url", "https://autoisp.com.br"));
-      setPrimaryColor(getValue("primary_color", "#3b82f6"));
-      setSecondaryColor(getValue("secondary_color", "#10b981"));
-      setRequire2FA(getValue("require_2fa", true));
-      setSessionTimeout(String(getValue("session_timeout", 30)));
-      setMaxSessions(String(getValue("max_sessions", 3)));
-      setMinPasswordLength(String(getValue("min_password_length", 8)));
-      setMaintenanceMode(getValue("maintenance_mode", false));
-      setLogRetention(String(getValue("log_retention_days", 90)));
+    if (!isLoading && configMap && Object.keys(configMap).length > 0) {
+      setPlatformName((configMap.platform_name?.value as string) ?? "AutoISP");
+      setSupportEmail((configMap.support_email?.value as string) ?? "suporte@autoisp.com.br");
+      setSiteUrl((configMap.site_url?.value as string) ?? "https://autoisp.com.br");
+      setPrimaryColor((configMap.primary_color?.value as string) ?? "#3b82f6");
+      setSecondaryColor((configMap.secondary_color?.value as string) ?? "#10b981");
+      setRequire2FA((configMap.require_2fa?.value as boolean) ?? true);
+      setSessionTimeout(String(configMap.session_timeout?.value ?? 30));
+      setMaxSessions(String(configMap.max_sessions?.value ?? 3));
+      setMinPasswordLength(String(configMap.min_password_length?.value ?? 8));
+      setMaintenanceMode((configMap.maintenance_mode?.value as boolean) ?? false);
+      setLogRetention(String(configMap.log_retention_days?.value ?? 90));
     }
-  }, [isLoading, configMap, getValue]);
+  }, [isLoading, configMap]);
 
   const integrations = [
     { 
