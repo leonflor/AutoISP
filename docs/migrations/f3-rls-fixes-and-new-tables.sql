@@ -55,7 +55,6 @@ AS $$
     SELECT 1 FROM public.isp_users iu
     WHERE iu.user_id = _user_id
       AND iu.isp_id = _isp_id
-      AND iu.is_active = true
       AND iu.role IN ('owner', 'admin')
   )
 $$;
