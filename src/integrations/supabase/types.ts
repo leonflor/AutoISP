@@ -1,0 +1,1254 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
+  public: {
+    Tables: {
+      ai_agents: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          description: string | null
+          features: Json | null
+          id: string
+          is_active: boolean | null
+          is_premium: boolean | null
+          max_tokens: number | null
+          model: string | null
+          name: string
+          slug: string
+          system_prompt: string | null
+          temperature: number | null
+          type: Database["public"]["Enums"]["tipo_agente"]
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          id?: string
+          is_active?: boolean | null
+          is_premium?: boolean | null
+          max_tokens?: number | null
+          model?: string | null
+          name: string
+          slug: string
+          system_prompt?: string | null
+          temperature?: number | null
+          type: Database["public"]["Enums"]["tipo_agente"]
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          id?: string
+          is_active?: boolean | null
+          is_premium?: boolean | null
+          max_tokens?: number | null
+          model?: string | null
+          name?: string
+          slug?: string
+          system_prompt?: string | null
+          temperature?: number | null
+          type?: Database["public"]["Enums"]["tipo_agente"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_limits: {
+        Row: {
+          agent_id: string
+          created_at: string | null
+          daily_limit: number | null
+          id: string
+          is_enabled: boolean | null
+          monthly_limit: number | null
+          plan_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string | null
+          daily_limit?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          monthly_limit?: number | null
+          plan_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string | null
+          daily_limit?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          monthly_limit?: number | null
+          plan_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_limits_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_limits_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage: {
+        Row: {
+          agent_id: string
+          cost_usd: number | null
+          created_at: string | null
+          duration_ms: number | null
+          id: string
+          isp_id: string
+          metadata: Json | null
+          request_type: string | null
+          tokens_input: number | null
+          tokens_output: number | null
+          tokens_total: number | null
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          cost_usd?: number | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          isp_id: string
+          metadata?: Json | null
+          request_type?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          tokens_total?: number | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          cost_usd?: number | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          isp_id?: string
+          metadata?: Json | null
+          request_type?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          tokens_total?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: unknown
+          isp_id: string | null
+          metadata: Json | null
+          new_data: Json | null
+          old_data: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: unknown
+          isp_id?: string | null
+          metadata?: Json | null
+          new_data?: Json | null
+          old_data?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: unknown
+          isp_id?: string | null
+          metadata?: Json | null
+          new_data?: Json | null
+          old_data?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broadcasts: {
+        Row: {
+          channel: string
+          content: string | null
+          created_at: string | null
+          created_by: string
+          delivered_count: number | null
+          failed_count: number | null
+          filters: Json | null
+          id: string
+          isp_id: string
+          name: string
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string | null
+          template: string | null
+          total_recipients: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          channel: string
+          content?: string | null
+          created_at?: string | null
+          created_by: string
+          delivered_count?: number | null
+          failed_count?: number | null
+          filters?: Json | null
+          id?: string
+          isp_id: string
+          name: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          template?: string | null
+          total_recipients?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          channel?: string
+          content?: string | null
+          created_at?: string | null
+          created_by?: string
+          delivered_count?: number | null
+          failed_count?: number | null
+          filters?: Json | null
+          id?: string
+          isp_id?: string
+          name?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          template?: string | null
+          total_recipients?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broadcasts_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_messages: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_read: boolean | null
+          message: string
+          name: string
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          name: string
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          name?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          agent_id: string | null
+          channel: string
+          closed_at: string | null
+          id: string
+          isp_id: string
+          messages: Json | null
+          metadata: Json | null
+          started_at: string | null
+          status: string | null
+          subject: string | null
+          subscriber_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          channel: string
+          closed_at?: string | null
+          id?: string
+          isp_id: string
+          messages?: Json | null
+          metadata?: Json | null
+          started_at?: string | null
+          status?: string | null
+          subject?: string | null
+          subscriber_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          channel?: string
+          closed_at?: string | null
+          id?: string
+          isp_id?: string
+          messages?: Json | null
+          metadata?: Json | null
+          started_at?: string | null
+          status?: string | null
+          subject?: string | null
+          subscriber_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      erp_configs: {
+        Row: {
+          api_key_encrypted: string | null
+          api_url: string | null
+          created_at: string | null
+          id: string
+          isp_id: string
+          last_sync_at: string | null
+          password_encrypted: string | null
+          provider: string
+          sync_config: Json | null
+          sync_enabled: boolean | null
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          created_at?: string | null
+          id?: string
+          isp_id: string
+          last_sync_at?: string | null
+          password_encrypted?: string | null
+          provider: string
+          sync_config?: Json | null
+          sync_enabled?: boolean | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          created_at?: string | null
+          id?: string
+          isp_id?: string
+          last_sync_at?: string | null
+          password_encrypted?: string | null
+          provider?: string
+          sync_config?: Json | null
+          sync_enabled?: boolean | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_configs_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: true
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          created_at: string | null
+          due_date: string
+          external_id: string | null
+          id: string
+          invoice_url: string | null
+          isp_id: string
+          metadata: Json | null
+          paid_at: string | null
+          payment_method: string | null
+          pdf_url: string | null
+          status: Database["public"]["Enums"]["status_fatura"] | null
+          subscription_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          due_date: string
+          external_id?: string | null
+          id?: string
+          invoice_url?: string | null
+          isp_id: string
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          status?: Database["public"]["Enums"]["status_fatura"] | null
+          subscription_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          due_date?: string
+          external_id?: string | null
+          id?: string
+          invoice_url?: string | null
+          isp_id?: string
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          status?: Database["public"]["Enums"]["status_fatura"] | null
+          subscription_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      isp_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          invited_by: string | null
+          isp_id: string
+          role: Database["public"]["Enums"]["isp_member_role"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invited_by?: string | null
+          isp_id: string
+          role?: Database["public"]["Enums"]["isp_member_role"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invited_by?: string | null
+          isp_id?: string
+          role?: Database["public"]["Enums"]["isp_member_role"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "isp_users_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      isps: {
+        Row: {
+          address: Json | null
+          created_at: string | null
+          document: string
+          email: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          phone: string | null
+          settings: Json | null
+          slug: string
+          status: Database["public"]["Enums"]["status_cliente"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: Json | null
+          created_at?: string | null
+          document: string
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          settings?: Json | null
+          slug: string
+          status?: Database["public"]["Enums"]["status_cliente"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: Json | null
+          created_at?: string | null
+          document?: string
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          settings?: Json | null
+          slug?: string
+          status?: Database["public"]["Enums"]["status_cliente"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          email: string
+          id: string
+          metadata: Json | null
+          name: string
+          notes: string | null
+          phone: string | null
+          source: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      newsletter_subscribers: {
+        Row: {
+          email: string
+          id: string
+          is_active: boolean | null
+          subscribed_at: string | null
+          unsubscribed_at: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          is_active?: boolean | null
+          subscribed_at?: string | null
+          unsubscribed_at?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          subscribed_at?: string | null
+          unsubscribed_at?: string | null
+        }
+        Relationships: []
+      }
+      plans: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          features: Json | null
+          id: string
+          is_active: boolean | null
+          is_featured: boolean | null
+          limits: Json | null
+          name: string
+          price_monthly: number
+          price_yearly: number | null
+          slug: string
+          sort_order: number | null
+          trial_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          id?: string
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          limits?: Json | null
+          name: string
+          price_monthly: number
+          price_yearly?: number | null
+          slug: string
+          sort_order?: number | null
+          trial_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          id?: string
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          limits?: Json | null
+          name?: string
+          price_monthly?: number
+          price_yearly?: number | null
+          slug?: string
+          sort_order?: number | null
+          trial_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      platform_config: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscribers: {
+        Row: {
+          address: Json | null
+          created_at: string | null
+          document: string | null
+          due_day: number | null
+          email: string | null
+          external_id: string | null
+          id: string
+          isp_id: string
+          metadata: Json | null
+          monthly_value: number | null
+          name: string
+          notes: string | null
+          phone: string | null
+          plan_name: string | null
+          status: Database["public"]["Enums"]["status_cliente"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: Json | null
+          created_at?: string | null
+          document?: string | null
+          due_day?: number | null
+          email?: string | null
+          external_id?: string | null
+          id?: string
+          isp_id: string
+          metadata?: Json | null
+          monthly_value?: number | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          plan_name?: string | null
+          status?: Database["public"]["Enums"]["status_cliente"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: Json | null
+          created_at?: string | null
+          document?: string | null
+          due_day?: number | null
+          email?: string | null
+          external_id?: string | null
+          id?: string
+          isp_id?: string
+          metadata?: Json | null
+          monthly_value?: number | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          plan_name?: string | null
+          status?: Database["public"]["Enums"]["status_cliente"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscribers_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          cancel_reason: string | null
+          canceled_at: string | null
+          created_at: string | null
+          current_period_end: string
+          current_period_start: string
+          external_id: string | null
+          id: string
+          isp_id: string
+          payment_method: Json | null
+          plan_id: string
+          status: Database["public"]["Enums"]["status_assinatura"] | null
+          trial_ends_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end: string
+          current_period_start?: string
+          external_id?: string | null
+          id?: string
+          isp_id: string
+          payment_method?: Json | null
+          plan_id: string
+          status?: Database["public"]["Enums"]["status_assinatura"] | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          external_id?: string | null
+          id?: string
+          isp_id?: string
+          payment_method?: Json | null
+          plan_id?: string
+          status?: Database["public"]["Enums"]["status_assinatura"] | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: true
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      viability_checks: {
+        Row: {
+          address: string | null
+          cep: string
+          created_at: string | null
+          email: string | null
+          id: string
+          is_viable: boolean | null
+          name: string | null
+          notes: string | null
+          phone: string | null
+        }
+        Insert: {
+          address?: string | null
+          cep: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_viable?: boolean | null
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+        }
+        Update: {
+          address?: string | null
+          cep?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_viable?: boolean | null
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      webhook_logs: {
+        Row: {
+          created_at: string | null
+          direction: string
+          error_message: string | null
+          event_type: string
+          id: string
+          isp_id: string | null
+          payload: Json
+          processed_at: string | null
+          processing_time_ms: number | null
+          provider: string
+          response: Json | null
+          retries: number | null
+          status_code: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          direction: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          isp_id?: string | null
+          payload: Json
+          processed_at?: string | null
+          processing_time_ms?: number | null
+          provider: string
+          response?: Json | null
+          retries?: number | null
+          status_code?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          isp_id?: string | null
+          payload?: Json
+          processed_at?: string | null
+          processing_time_ms?: number | null
+          provider?: string
+          response?: Json | null
+          retries?: number | null
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_configs: {
+        Row: {
+          api_key_encrypted: string | null
+          api_url: string | null
+          connected_at: string | null
+          created_at: string | null
+          id: string
+          instance_name: string | null
+          is_connected: boolean | null
+          isp_id: string
+          phone_number: string | null
+          provider: string
+          qr_code: string | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          instance_name?: string | null
+          is_connected?: boolean | null
+          isp_id: string
+          phone_number?: string | null
+          provider: string
+          qr_code?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          instance_name?: string | null
+          is_connected?: boolean | null
+          isp_id?: string
+          phone_number?: string | null
+          provider?: string
+          qr_code?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_configs_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: true
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      get_user_isp_id: { Args: { _user_id: string }; Returns: string }
+      has_isp_permission: {
+        Args: { _isp_id: string; _permission: string; _user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_isp_admin: {
+        Args: { _isp_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_isp_member: {
+        Args: { _isp_id: string; _user_id: string }
+        Returns: boolean
+      }
+    }
+    Enums: {
+      app_role: "super_admin" | "admin" | "support"
+      isp_member_role: "owner" | "admin" | "operator" | "viewer"
+      status_assinatura:
+        | "trial"
+        | "ativa"
+        | "suspensa"
+        | "cancelada"
+        | "expirada"
+      status_cliente: "ativo" | "suspenso" | "cancelado" | "pendente"
+      status_fatura: "pendente" | "pago" | "vencido" | "cancelado"
+      tipo_agente:
+        | "atendente"
+        | "cobrador"
+        | "vendedor"
+        | "analista"
+        | "suporte"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["super_admin", "admin", "support"],
+      isp_member_role: ["owner", "admin", "operator", "viewer"],
+      status_assinatura: [
+        "trial",
+        "ativa",
+        "suspensa",
+        "cancelada",
+        "expirada",
+      ],
+      status_cliente: ["ativo", "suspenso", "cancelado", "pendente"],
+      status_fatura: ["pendente", "pago", "vencido", "cancelado"],
+      tipo_agente: ["atendente", "cobrador", "vendedor", "analista", "suporte"],
+    },
+  },
+} as const
