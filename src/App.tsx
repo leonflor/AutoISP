@@ -40,6 +40,7 @@ const PainelSettings = lazy(() => import("./pages/painel/Settings"));
 const PainelAiAgents = lazy(() => import("./pages/painel/AiAgents"));
 const PainelAiChat = lazy(() => import("./pages/painel/AiChat"));
 const PainelInvoices = lazy(() => import("./pages/painel/Invoices"));
+const PainelWhatsApp = lazy(() => import("./pages/painel/WhatsAppConfig"));
 
 // Lazy load - Admin extra pages
 const AdminSupport = lazy(() => import("./pages/admin/Support"));
@@ -95,6 +96,7 @@ const App = () => (
                 <Route index element={<PainelDashboard />} />
                 <Route path="assinantes" element={<PainelSubscribers />} />
                 <Route path="atendimentos" element={<PainelTickets />} />
+                <Route path="whatsapp" element={<PainelWhatsApp />} />
                 <Route path="comunicacao" element={<PainelCommunication />} />
                 <Route path="usuarios" element={<PainelUsers />} />
                 <Route path="agentes" element={<PainelAiAgents />} />
