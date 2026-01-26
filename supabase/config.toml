@@ -4,4 +4,4 @@ project_id = "zvxcwwhsjtdliihlvvof"
 verify_jwt = false
 
 [functions.test-integration]
-verify_jwt = true
+verify_jwt = false
