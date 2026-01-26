@@ -1,238 +1,365 @@
 
 
-## Plano: Correcao de Warnings de Seguranca do Linter
+## Plano: Formularios Funcionais para Configuracao de APIs
 
 ### Objetivo
-Analisar e corrigir os 6 warnings identificados pelo linter de seguranca do Supabase, garantindo conformidade com boas praticas de seguranca.
+Implementar dialogs funcionais para configurar as integracoes OpenAI, Resend e Asaas com validacao de campos, teste de conexao e feedback visual, mantendo as chaves seguras via Supabase Secrets.
 
 ---
 
-## 1. Analise dos Warnings Encontrados
+## 1. Arquitetura da Solucao
 
-### 1.1 Function Search Path Mutable (1 funcao)
+### Fluxo de Seguranca
 
-| Funcao | Status Atual | Risco |
-|--------|--------------|-------|
-| `handle_updated_at()` | Sem search_path | Baixo |
-
-**Detalhes**: Esta funcao e um trigger simples que atualiza `updated_at`. Nao usa SECURITY DEFINER, entao o risco e minimo, mas devemos corrigir para boas praticas.
-
-### 1.2 RLS Policy Always True (7 politicas)
-
-| Tabela | Politica | Comando | Risco | Acao |
-|--------|----------|---------|-------|------|
-| `ai_limits` | Anyone can view limits | SELECT | **Aceitavel** | Manter - dados publicos de limites de planos |
-| `help_categories` | Authenticated users can view categories | SELECT | **Aceitavel** | Manter - categorias de ajuda sao publicas |
-| `sla_configs` | Anyone can view SLA configs | SELECT | **Aceitavel** | Manter - SLAs sao informacao publica dos planos |
-| `contact_messages` | Anyone can submit contact messages | INSERT | **Risco** | Adicionar rate limiting e validacao |
-| `leads` | Anyone can submit leads | INSERT | **Risco** | Adicionar rate limiting e validacao |
-| `newsletter_subscribers` | Anyone can subscribe to newsletter | INSERT | **Risco** | Adicionar rate limiting e validacao |
-| `viability_checks` | Anyone can check viability | INSERT | **Risco** | Adicionar rate limiting e validacao |
-
-### 1.3 Leaked Password Protection Disabled
-
-**Acao**: Esta configuracao e feita no dashboard do Supabase, nao via SQL. Informar usuario.
-
----
-
-## 2. Decisao Arquitetural
-
-### Politicas SELECT com `true`
-As politicas de SELECT com `true` para `ai_limits`, `help_categories` e `sla_configs` sao **intencionais** e **aceitaveis** porque:
-- Sao dados de configuracao publica (limites de planos, categorias de ajuda, SLAs)
-- Nao contem informacoes sensiveis
-- Sao necessarios para exibir na landing page e areas publicas
-
-### Politicas INSERT com `true`
-As politicas de INSERT com `true` para `contact_messages`, `leads`, `newsletter_subscribers` e `viability_checks` precisam de **validacao adicional** para prevenir spam e abuso.
-
----
-
-## 3. Correcoes Propostas
-
-### 3.1 Corrigir handle_updated_at() - Adicionar search_path
-
-```sql
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = public
-AS $function$
-begin
-  new.updated_at = timezone('utc'::text, now());
-  return new;
-end;
-$function$;
+```text
++-------------------+     +------------------+     +-------------------+
+|   Admin Config    | --> |   Edge Function  | --> |  Supabase Secrets |
+|   (Frontend)      |     | (test-integration)|    |  (armazenamento)  |
++-------------------+     +------------------+     +-------------------+
+         |                        |
+         v                        v
+  Formulario Dialog          Valida + Testa
+  (sem exibir secrets)        conexao real
 ```
 
-### 3.2 Politicas INSERT - Adicionar validacoes basicas
-
-Em vez de `WITH CHECK (true)`, adicionar validacoes minimas:
-
-**contact_messages:**
-```sql
-DROP POLICY "Anyone can submit contact messages" ON public.contact_messages;
-CREATE POLICY "Anyone can submit contact messages with validation"
-  ON public.contact_messages FOR INSERT
-  WITH CHECK (
-    length(name) >= 2 AND 
-    length(email) >= 5 AND 
-    position('@' in email) > 1 AND
-    length(message) >= 10
-  );
-```
-
-**leads:**
-```sql
-DROP POLICY "Anyone can submit leads" ON public.leads;
-CREATE POLICY "Anyone can submit leads with validation"
-  ON public.leads FOR INSERT
-  WITH CHECK (
-    length(name) >= 2 AND 
-    length(email) >= 5 AND 
-    position('@' in email) > 1
-  );
-```
-
-**newsletter_subscribers:**
-```sql
-DROP POLICY "Anyone can subscribe to newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe with validation"
-  ON public.newsletter_subscribers FOR INSERT
-  WITH CHECK (
-    length(email) >= 5 AND 
-    position('@' in email) > 1
-  );
-```
-
-**viability_checks:**
-```sql
-DROP POLICY "Anyone can check viability" ON public.viability_checks;
-CREATE POLICY "Anyone can check viability with validation"
-  ON public.viability_checks FOR INSERT
-  WITH CHECK (
-    length(cep) >= 8
-  );
-```
+**Principio**: Chaves de API nunca sao exibidas no frontend apos salvas. O formulario permite apenas inserir novas chaves ou substituir existentes.
 
 ---
 
-## 4. Politicas SELECT - Manter como Intencionais
+## 2. Integracoes a Configurar
 
-As seguintes politicas serao **mantidas** pois sao dados publicos intencionais:
-
-| Tabela | Justificativa |
-|--------|---------------|
-| `ai_limits` | Limites de IA por plano - necessarios para exibir features |
-| `help_categories` | Categorias do centro de ajuda - conteudo publico |
-| `sla_configs` | SLAs por plano - necessarios para comparacao de planos |
-
-Para documentar que sao intencionais, adicionaremos comentario nas politicas.
+| Integracao | Endpoint de Teste | Campos |
+|------------|-------------------|--------|
+| OpenAI | `GET https://api.openai.com/v1/models` | API Key |
+| Resend | `GET https://api.resend.com/domains` | API Key, From Email |
+| Asaas | `GET https://api.asaas.com/v3/myAccount` | API Key, Ambiente |
 
 ---
 
-## 5. Leaked Password Protection
+## 3. Componentes a Criar
 
-Esta configuracao e feita no **Dashboard do Supabase**:
+### 3.1 Edge Function: test-integration
 
-1. Acessar: Authentication > Providers > Email
-2. Ativar: "Enable leaked password protection"
+Endpoint que recebe credenciais temporarias e testa conexao com cada servico.
 
-**Nota**: Isso nao e configuravel via SQL/migracao.
+### 3.2 Dialogs de Configuracao (Frontend)
+
+| Componente | Campos | Acoes |
+|------------|--------|-------|
+| `IntegrationConfigDialog` | Container generico | Renderiza dialog apropriado |
+| `OpenAIConfigForm` | API Key, Modelo Padrao | Testar, Salvar |
+| `ResendConfigForm` | API Key, From Email | Testar, Salvar |
+| `AsaasConfigForm` | API Key, Ambiente (sandbox/prod) | Testar, Salvar |
 
 ---
 
-## 6. Resumo das Alteracoes
+## 4. Interface dos Dialogs
 
-### Migracao SQL
+### 4.1 OpenAI
 
-```sql
--- 1. Corrigir funcao handle_updated_at com search_path
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = public
-AS $function$
-begin
-  new.updated_at = timezone('utc'::text, now());
-  return new;
-end;
-$function$;
+```text
++-----------------------------------------------+
+|  Configurar OpenAI                         [X]|
++-----------------------------------------------+
+|                                               |
+|  API Key                                      |
+|  [sk-xxxxxxxxxxxxxxxxxxxxxxxx]                |
+|                                               |
+|  Modelo Padrao                                |
+|  [v] gpt-4o-mini                              |
+|      gpt-4o                                   |
+|      gpt-4-turbo                              |
+|                                               |
+|  Status: ○ Nao testado                        |
+|                                               |
+|  [Testar Conexao]                             |
+|                                               |
++-----------------------------------------------+
+|              [Cancelar]  [Salvar Configuracao]|
++-----------------------------------------------+
+```
 
--- 2. Melhorar politica INSERT contact_messages
-DROP POLICY IF EXISTS "Anyone can submit contact messages" ON public.contact_messages;
-CREATE POLICY "Anyone can submit contact messages with validation"
-  ON public.contact_messages FOR INSERT
-  WITH CHECK (
-    length(name) >= 2 AND 
-    length(email) >= 5 AND 
-    position('@' in email) > 1 AND
-    length(message) >= 10
-  );
+### 4.2 Resend
 
--- 3. Melhorar politica INSERT leads
-DROP POLICY IF EXISTS "Anyone can submit leads" ON public.leads;
-CREATE POLICY "Anyone can submit leads with validation"
-  ON public.leads FOR INSERT
-  WITH CHECK (
-    length(name) >= 2 AND 
-    length(email) >= 5 AND 
-    position('@' in email) > 1
-  );
+```text
++-----------------------------------------------+
+|  Configurar Resend                         [X]|
++-----------------------------------------------+
+|                                               |
+|  API Key                                      |
+|  [re_xxxxxxxxxxxxxxxxxxxxxxxx]                |
+|                                               |
+|  From Email (remetente padrao)                |
+|  [noreply@seudominio.com]                     |
+|                                               |
+|  Status: ○ Nao testado                        |
+|                                               |
+|  [Testar Conexao]                             |
+|                                               |
++-----------------------------------------------+
+|              [Cancelar]  [Salvar Configuracao]|
++-----------------------------------------------+
+```
 
--- 4. Melhorar politica INSERT newsletter_subscribers
-DROP POLICY IF EXISTS "Anyone can subscribe to newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe with validation"
-  ON public.newsletter_subscribers FOR INSERT
-  WITH CHECK (
-    length(email) >= 5 AND 
-    position('@' in email) > 1
-  );
+### 4.3 Asaas
 
--- 5. Melhorar politica INSERT viability_checks
-DROP POLICY IF EXISTS "Anyone can check viability" ON public.viability_checks;
-CREATE POLICY "Anyone can check viability with validation"
-  ON public.viability_checks FOR INSERT
-  WITH CHECK (
-    length(cep) >= 8
-  );
-
--- 6. Comentarios documentando politicas SELECT intencionais
-COMMENT ON POLICY "Anyone can view limits" ON public.ai_limits 
-  IS 'Intencional: limites de IA sao informacao publica dos planos';
-
-COMMENT ON POLICY "Authenticated users can view categories" ON public.help_categories 
-  IS 'Intencional: categorias do centro de ajuda sao conteudo publico';
-
-COMMENT ON POLICY "Anyone can view SLA configs" ON public.sla_configs 
-  IS 'Intencional: SLAs sao informacao publica para comparacao de planos';
+```text
++-----------------------------------------------+
+|  Configurar Asaas                          [X]|
++-----------------------------------------------+
+|                                               |
+|  API Key                                      |
+|  [$aact_xxxxxxxxxxxxxxxxxxxxxxxx]             |
+|                                               |
+|  Ambiente                                     |
+|  ( ) Sandbox (testes)                         |
+|  (o) Producao                                 |
+|                                               |
+|  Webhook Token (opcional)                     |
+|  [token_para_validar_webhooks]                |
+|                                               |
+|  Status: ● Conectado                          |
+|                                               |
+|  [Testar Conexao]                             |
+|                                               |
++-----------------------------------------------+
+|              [Cancelar]  [Salvar Configuracao]|
++-----------------------------------------------+
 ```
 
 ---
 
-## 7. Resultado Esperado
+## 5. Estrutura dos Arquivos
 
-### Antes
-| Warning | Quantidade |
-|---------|------------|
-| Function search_path mutable | 1 |
-| RLS Policy always true (INSERT) | 4 |
-| RLS Policy always true (SELECT) | 3 |
-| Leaked password protection | 1 |
+### Arquivos a Criar
 
-### Depois
-| Warning | Quantidade | Status |
-|---------|------------|--------|
-| Function search_path mutable | 0 | **Corrigido** |
-| RLS Policy always true (INSERT) | 0 | **Corrigido** |
-| RLS Policy always true (SELECT) | 3 | **Mantido (intencional)** |
-| Leaked password protection | 1 | **Manual no Dashboard** |
+| Arquivo | Descricao |
+|---------|-----------|
+| `src/components/admin/integrations/IntegrationConfigDialog.tsx` | Dialog principal |
+| `src/components/admin/integrations/OpenAIConfigForm.tsx` | Formulario OpenAI |
+| `src/components/admin/integrations/ResendConfigForm.tsx` | Formulario Resend |
+| `src/components/admin/integrations/AsaasConfigForm.tsx` | Formulario Asaas |
+| `src/components/admin/integrations/index.ts` | Exports |
+| `src/hooks/admin/useIntegrationTest.ts` | Hook para testar integracoes |
+| `supabase/functions/test-integration/index.ts` | Edge function de teste |
+
+### Arquivos a Modificar
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/admin/Config.tsx` | Adicionar estado para dialog, handlers |
+| `supabase/config.toml` | Registrar nova edge function |
 
 ---
 
-## 8. Proximos Passos Pos-Implementacao
+## 6. Edge Function: test-integration
 
-1. **Dashboard Supabase**: Ativar "Leaked password protection"
-2. **Rate Limiting**: Considerar implementar rate limiting via Edge Functions para formularios publicos
-3. **CAPTCHA**: Avaliar adicionar reCAPTCHA nos formularios de contato e leads
+### Estrutura da Requisicao
+
+```typescript
+interface TestRequest {
+  integration: "openai" | "resend" | "asaas";
+  credentials: {
+    api_key: string;
+    environment?: "sandbox" | "production";
+    default_model?: string;
+    from_email?: string;
+  };
+  save?: boolean;
+}
+```
+
+### Logica de Teste
+
+**OpenAI:**
+```typescript
+async function testOpenAI(apiKey: string): Promise<TestResult> {
+  const response = await fetch("https://api.openai.com/v1/models", {
+    headers: { "Authorization": `Bearer ${apiKey}` }
+  });
+  
+  if (!response.ok) {
+    return { success: false, message: "Chave API invalida" };
+  }
+  
+  const data = await response.json();
+  const models = data.data?.filter(m => m.id.includes("gpt"));
+  return { 
+    success: true, 
+    message: "Conexao estabelecida",
+    details: { available_models: models.length }
+  };
+}
+```
+
+**Resend:**
+```typescript
+async function testResend(apiKey: string): Promise<TestResult> {
+  const response = await fetch("https://api.resend.com/domains", {
+    headers: { "Authorization": `Bearer ${apiKey}` }
+  });
+  
+  if (!response.ok) {
+    return { success: false, message: "Chave invalida" };
+  }
+  
+  const domains = await response.json();
+  return { 
+    success: true, 
+    message: "Conexao estabelecida",
+    details: { domains_count: domains.data?.length || 0 }
+  };
+}
+```
+
+**Asaas:**
+```typescript
+async function testAsaas(apiKey: string, env: string): Promise<TestResult> {
+  const baseUrl = env === "production" 
+    ? "https://api.asaas.com/v3"
+    : "https://sandbox.asaas.com/api/v3";
+    
+  const response = await fetch(`${baseUrl}/myAccount`, {
+    headers: { "access_token": apiKey }
+  });
+  
+  if (!response.ok) {
+    return { success: false, message: "Chave invalida" };
+  }
+  
+  const account = await response.json();
+  return { 
+    success: true, 
+    message: "Conexao estabelecida",
+    details: { account_name: account.name }
+  };
+}
+```
+
+---
+
+## 7. Armazenamento de Secrets
+
+### Estrategia com platform_config
+
+Apos teste bem-sucedido, as configuracoes sao armazenadas em `platform_config`:
+
+```typescript
+// Estrutura no platform_config
+{
+  key: "integration_openai",
+  value: {
+    configured: true,
+    default_model: "gpt-4o-mini",
+    tested_at: "2026-01-26T21:00:00Z"
+  }
+}
+```
+
+**Nota**: As chaves de API em si devem ser configuradas como Supabase Secrets via Dashboard. O sistema apenas valida e registra o status.
+
+---
+
+## 8. Hook useIntegrationTest
+
+```typescript
+export function useIntegrationTest() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<TestResult | null>(null);
+  
+  const testIntegration = async (
+    integration: "openai" | "resend" | "asaas",
+    credentials: Credentials
+  ) => {
+    setIsLoading(true);
+    try {
+      const response = await supabase.functions.invoke("test-integration", {
+        body: { integration, credentials }
+      });
+      
+      if (response.error) throw response.error;
+      setResult(response.data);
+      return response.data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro desconhecido";
+      setResult({ success: false, message });
+      return { success: false, message };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return { testIntegration, isLoading, result, resetResult: () => setResult(null) };
+}
+```
+
+---
+
+## 9. Fluxo de Estados
+
+```text
+           +-------------+
+           |   Pendente  |
+           +------+------+
+                  |
+         [Inserir credenciais]
+                  v
+           +-------------+
+           |  Testando   |
+           +------+------+
+                  |
+         +--------+--------+
+         |                 |
+    [Sucesso]          [Falha]
+         v                 v
+   +----------+      +----------+
+   | Validado |      |   Erro   |
+   +----+-----+      +----------+
+        |                  |
+   [Salvar]          [Corrigir]
+        v                  |
+   +----------+            |
+   |Configurado| <---------+
+   +----------+
+```
+
+---
+
+## 10. Atualizacao da Pagina Config.tsx
+
+### Adicionar Estado
+
+```typescript
+const [configDialog, setConfigDialog] = useState<{
+  open: boolean;
+  integration: "openai" | "resend" | "asaas" | null;
+}>({ open: false, integration: null });
+```
+
+### Modificar Cards de Integracao
+
+Cada card tera:
+- Badge de status (Pendente/Configurado/Erro)
+- Botao "Configurar" ou "Editar"
+- Data do ultimo teste
+
+---
+
+## 11. Resultado Esperado
+
+### Interface
+
+| Estado | Visualizacao |
+|--------|--------------|
+| Nao configurado | Badge "Pendente" amarelo + Botao "Configurar" |
+| Configurado | Badge "Configurado" verde + Botoes "Testar" e "Editar" |
+| Testando | Badge "Testando..." com spinner |
+| Erro | Badge "Erro" vermelho + mensagem |
+
+### Seguranca
+
+- Chaves nunca exibidas apos salvas (placeholder com asteriscos)
+- Teste de conexao obrigatorio antes de salvar
+- RLS restrito a super_admins
+- Logs de auditoria em alteracoes de configuracao
 
