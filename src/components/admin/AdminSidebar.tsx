@@ -42,7 +42,14 @@ const menuItems: MenuItem[] = [
     ]
   },
   { title: 'Usuários', url: '/admin/usuarios', icon: Users },
-  { title: 'Suporte', url: '/admin/suporte', icon: MessageSquare },
+  { 
+    title: 'Suporte', 
+    icon: MessageSquare,
+    submenu: [
+      { title: 'Tickets ISPs', url: '/admin/tickets', icon: MessageSquare },
+      { title: 'Conversas', url: '/admin/suporte', icon: MessageSquare },
+    ]
+  },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
 ];
@@ -58,9 +65,20 @@ export function AdminSidebar() {
     return submenu.some(item => location.pathname === item.url);
   };
 
-  // Initialize open state for submenus based on active route
-  const financeSubmenu = menuItems.find(item => item.title === 'Financeiro')?.submenu;
-  const [financeOpen, setFinanceOpen] = useState(financeSubmenu ? isSubmenuActive(financeSubmenu) : false);
+  // State for each submenu
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    menuItems.forEach(item => {
+      if (item.submenu) {
+        initial[item.title] = isSubmenuActive(item.submenu);
+      }
+    });
+    return initial;
+  });
+
+  const toggleSubmenu = (title: string) => {
+    setOpenSubmenus(prev => ({ ...prev, [title]: !prev[title] }));
+  };
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -70,12 +88,13 @@ export function AdminSidebar() {
   const renderMenuItem = (item: MenuItem) => {
     if (item.submenu) {
       const isActive = isSubmenuActive(item.submenu);
+      const isOpen = openSubmenus[item.title] || isActive;
       
       return (
         <Collapsible
           key={item.title}
-          open={financeOpen || isActive}
-          onOpenChange={setFinanceOpen}
+          open={isOpen}
+          onOpenChange={() => toggleSubmenu(item.title)}
         >
           <SidebarMenuItem>
             <CollapsibleTrigger asChild>
@@ -93,7 +112,7 @@ export function AdminSidebar() {
                 {!collapsed && (
                   <ChevronDown className={cn(
                     "h-4 w-4 transition-transform",
-                    (financeOpen || isActive) && "rotate-180"
+                    isOpen && "rotate-180"
                   )} />
                 )}
               </SidebarMenuButton>
