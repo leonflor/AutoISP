@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useIntegrationTest } from "@/hooks/admin/useIntegrationTest";
-import { Loader2, CheckCircle2, XCircle, CircleDot } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, CircleDot, AlertTriangle } from "lucide-react";
 
 interface AsaasConfigFormProps {
   isConfigured: boolean;
@@ -24,6 +24,16 @@ export function AsaasConfigForm({
   const [environment, setEnvironment] = useState<"sandbox" | "production">("production");
   const [webhookToken, setWebhookToken] = useState("");
   const { testIntegration, isLoading, result, resetResult } = useIntegrationTest();
+
+  // Detectar ambiente baseado no prefixo da chave
+  const detectedEnvironment = useMemo(() => {
+    if (!apiKey || apiKey.length < 10) return null;
+    if (apiKey.includes("_prod_")) return "production";
+    if (apiKey.includes("_hmlg_") || apiKey.includes("_sandbox_")) return "sandbox";
+    return null;
+  }, [apiKey]);
+
+  const hasEnvironmentMismatch = detectedEnvironment && detectedEnvironment !== environment;
 
   useEffect(() => {
     resetResult();
@@ -126,6 +136,19 @@ export function AsaasConfigForm({
         </RadioGroup>
       </div>
 
+      {/* Alerta de incompatibilidade de ambiente */}
+      {hasEnvironmentMismatch && (
+        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
+          <p className="text-sm text-amber-700 dark:text-amber-400 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>
+              A chave parece ser de <strong>{detectedEnvironment === "production" ? "Produção" : "Sandbox"}</strong>, 
+              mas você selecionou <strong>{environment === "production" ? "Produção" : "Sandbox"}</strong>.
+            </span>
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="asaas-webhook-token">Webhook Token (opcional)</Label>
         <Input
@@ -145,9 +168,28 @@ export function AsaasConfigForm({
         {getStatusBadge()}
       </div>
 
+      {/* Mensagem de erro expandida */}
       {result && !result.success && (
-        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-          <p className="text-sm text-destructive">{result.message}</p>
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
+          <p className="text-sm font-medium text-destructive">{result.message}</p>
+          
+          {result.details?.http_status && (
+            <p className="text-xs text-muted-foreground">
+              Status HTTP: {result.details.http_status}
+            </p>
+          )}
+          
+          {result.details?.error_code && result.details.error_code !== "UNKNOWN" && (
+            <p className="text-xs text-muted-foreground">
+              Código: {result.details.error_code}
+            </p>
+          )}
+          
+          {result.details?.suggestion && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              💡 Sugestão: {result.details.suggestion}
+            </p>
+          )}
         </div>
       )}
 

@@ -14,7 +14,25 @@ export interface IntegrationCredentials {
 export interface TestResult {
   success: boolean;
   message: string;
-  details?: Record<string, unknown>;
+  details?: {
+    http_status?: number;
+    error_code?: string;
+    raw_response?: string;
+    suggestion?: string;
+    error_type?: string;
+    account_name?: string;
+    account_type?: string;
+    environment?: string;
+    detected_key_type?: string;
+    selected_environment?: string;
+    available_models?: number;
+    models?: string[];
+    domains_count?: number;
+    domains?: string[];
+    supported_integrations?: string[];
+    missing?: string;
+    [key: string]: unknown;
+  };
 }
 
 export function useIntegrationTest() {
@@ -34,9 +52,23 @@ export function useIntegrationTest() {
       });
 
       if (error) {
+        console.error("[useIntegrationTest] Erro Supabase:", error);
+        
+        // Tentar extrair mais detalhes do erro
+        let errorMessage = error.message || "Erro ao testar integração";
+        let errorDetails: TestResult["details"] = {
+          error_type: "supabase_function_error"
+        };
+        
+        // Se o erro contiver contexto adicional
+        if (error.context) {
+          errorDetails.raw_response = JSON.stringify(error.context).substring(0, 200);
+        }
+        
         const errorResult: TestResult = { 
           success: false, 
-          message: error.message || "Erro ao testar integração" 
+          message: errorMessage,
+          details: errorDetails
         };
         setResult(errorResult);
         return errorResult;
@@ -46,8 +78,17 @@ export function useIntegrationTest() {
       setResult(testResult);
       return testResult;
     } catch (error) {
+      console.error("[useIntegrationTest] Erro inesperado:", error);
+      
       const message = error instanceof Error ? error.message : "Erro desconhecido";
-      const errorResult: TestResult = { success: false, message };
+      const errorResult: TestResult = { 
+        success: false, 
+        message,
+        details: {
+          error_type: "unexpected_error",
+          suggestion: "Verifique sua conexão de internet e tente novamente"
+        }
+      };
       setResult(errorResult);
       return errorResult;
     } finally {
