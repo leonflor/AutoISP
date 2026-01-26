@@ -22,7 +22,22 @@ interface TestResult {
   details?: Record<string, unknown>;
 }
 
+function getHttpErrorMessage(status: number): string {
+  switch (status) {
+    case 401: return "Chave API não autorizada";
+    case 403: return "Acesso negado - verifique permissões";
+    case 404: return "Endpoint não encontrado - verifique ambiente";
+    case 429: return "Limite de requisições excedido";
+    case 500: return "Erro interno do servidor";
+    case 502: return "Bad Gateway - serviço indisponível";
+    case 503: return "Serviço temporariamente indisponível";
+    default: return `Erro HTTP ${status}`;
+  }
+}
+
 async function testOpenAI(apiKey: string): Promise<TestResult> {
+  console.log("[OpenAI] Testando integração...");
+  
   try {
     const response = await fetch("https://api.openai.com/v1/models", {
       headers: { 
@@ -31,11 +46,30 @@ async function testOpenAI(apiKey: string): Promise<TestResult> {
       }
     });
     
+    console.log(`[OpenAI] Resposta HTTP: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+      const status = response.status;
+      const errorBody = await response.text();
+      
+      console.log(`[OpenAI] Erro: ${errorBody}`);
+      
+      let errorData: { error?: { message?: string; code?: string; type?: string } } = {};
+      try {
+        errorData = JSON.parse(errorBody);
+      } catch {}
+      
+      const errorCode = errorData.error?.code || errorData.error?.type || "UNKNOWN";
+      const errorMessage = errorData.error?.message || getHttpErrorMessage(status);
+      
       return { 
         success: false, 
-        message: error.error?.message || "Chave API inválida ou sem permissão" 
+        message: `${errorMessage}`,
+        details: {
+          http_status: status,
+          error_code: errorCode,
+          raw_response: errorBody.substring(0, 200)
+        }
       };
     }
     
@@ -43,6 +77,8 @@ async function testOpenAI(apiKey: string): Promise<TestResult> {
     const gptModels = data.data?.filter((m: { id: string }) => 
       m.id.includes("gpt-4") || m.id.includes("gpt-3.5")
     ) || [];
+    
+    console.log(`[OpenAI] Sucesso - ${gptModels.length} modelos GPT disponíveis`);
     
     return { 
       success: true, 
@@ -53,14 +89,20 @@ async function testOpenAI(apiKey: string): Promise<TestResult> {
       }
     };
   } catch (error) {
+    console.error("[OpenAI] Erro de conexão:", error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : "Erro ao conectar com OpenAI" 
+      message: error instanceof Error ? error.message : "Erro ao conectar com OpenAI",
+      details: {
+        error_type: "connection_error"
+      }
     };
   }
 }
 
 async function testResend(apiKey: string): Promise<TestResult> {
+  console.log("[Resend] Testando integração...");
+  
   try {
     const response = await fetch("https://api.resend.com/domains", {
       headers: { 
@@ -69,15 +111,37 @@ async function testResend(apiKey: string): Promise<TestResult> {
       }
     });
     
+    console.log(`[Resend] Resposta HTTP: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+      const status = response.status;
+      const errorBody = await response.text();
+      
+      console.log(`[Resend] Erro: ${errorBody}`);
+      
+      let errorData: { message?: string; name?: string; statusCode?: number } = {};
+      try {
+        errorData = JSON.parse(errorBody);
+      } catch {}
+      
+      const errorCode = errorData.name || "UNKNOWN";
+      const errorMessage = errorData.message || getHttpErrorMessage(status);
+      
       return { 
         success: false, 
-        message: error.message || "Chave API inválida" 
+        message: errorMessage,
+        details: {
+          http_status: status,
+          error_code: errorCode,
+          raw_response: errorBody.substring(0, 200)
+        }
       };
     }
     
     const domains = await response.json();
+    
+    console.log(`[Resend] Sucesso - ${domains.data?.length || 0} domínios configurados`);
+    
     return { 
       success: true, 
       message: "Conexão estabelecida com Resend",
@@ -87,18 +151,57 @@ async function testResend(apiKey: string): Promise<TestResult> {
       }
     };
   } catch (error) {
+    console.error("[Resend] Erro de conexão:", error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : "Erro ao conectar com Resend" 
+      message: error instanceof Error ? error.message : "Erro ao conectar com Resend",
+      details: {
+        error_type: "connection_error"
+      }
     };
   }
 }
 
 async function testAsaas(apiKey: string, environment: string = "production"): Promise<TestResult> {
+  console.log(`[Asaas] Testando integração - Ambiente: ${environment}`);
+  console.log(`[Asaas] Prefixo da chave: ${apiKey.substring(0, 15)}...`);
+  
+  // Validar prefixo da chave vs ambiente selecionado
+  const isProductionKey = apiKey.includes("_prod_");
+  const isSandboxKey = apiKey.includes("_hmlg_") || apiKey.includes("_sandbox_");
+  
+  if (environment === "production" && isSandboxKey) {
+    console.log("[Asaas] AVISO: Chave de Sandbox detectada para ambiente Production");
+    return {
+      success: false,
+      message: "Chave de Sandbox detectada, mas ambiente Produção selecionado",
+      details: {
+        suggestion: "Selecione 'Sandbox (testes)' ou use uma chave de produção ($aact_prod_...)",
+        detected_key_type: "sandbox",
+        selected_environment: environment
+      }
+    };
+  }
+  
+  if (environment === "sandbox" && isProductionKey) {
+    console.log("[Asaas] AVISO: Chave de Produção detectada para ambiente Sandbox");
+    return {
+      success: false,
+      message: "Chave de Produção detectada, mas ambiente Sandbox selecionado",
+      details: {
+        suggestion: "Selecione 'Produção' ou use uma chave sandbox ($aact_hmlg_...)",
+        detected_key_type: "production",
+        selected_environment: environment
+      }
+    };
+  }
+  
   try {
     const baseUrl = environment === "production" 
       ? "https://api.asaas.com/v3"
       : "https://sandbox.asaas.com/api/v3";
+    
+    console.log(`[Asaas] URL base: ${baseUrl}`);
       
     const response = await fetch(`${baseUrl}/myAccount`, {
       headers: { 
@@ -107,15 +210,52 @@ async function testAsaas(apiKey: string, environment: string = "production"): Pr
       }
     });
     
+    console.log(`[Asaas] Resposta HTTP: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+      const status = response.status;
+      const errorBody = await response.text();
+      
+      console.log(`[Asaas] Erro HTTP ${status}: ${errorBody}`);
+      
+      let errorData: { errors?: Array<{ code: string; description: string }> } = {};
+      try {
+        errorData = JSON.parse(errorBody);
+      } catch {
+        console.log("[Asaas] Não foi possível parsear resposta de erro como JSON");
+      }
+      
+      const firstError = errorData.errors?.[0];
+      const errorCode = firstError?.code || "UNKNOWN";
+      const errorDesc = firstError?.description || getHttpErrorMessage(status);
+      
+      // Sugestões baseadas no código de erro
+      let suggestion = "";
+      if (errorCode === "invalid_accessToken" || status === 401) {
+        suggestion = "Verifique se a chave API está correta e não expirou";
+      } else if (status === 403) {
+        suggestion = "A chave pode não ter permissões suficientes";
+      } else if (status === 404) {
+        suggestion = "Verifique se o ambiente selecionado está correto";
+      }
+      
       return { 
         success: false, 
-        message: error.errors?.[0]?.description || "Chave API inválida ou sem permissão" 
+        message: errorCode !== "UNKNOWN" ? `${errorDesc} (${errorCode})` : errorDesc,
+        details: {
+          http_status: status,
+          error_code: errorCode,
+          raw_response: errorBody.substring(0, 200),
+          suggestion: suggestion || undefined,
+          environment: environment
+        }
       };
     }
     
     const account = await response.json();
+    
+    console.log(`[Asaas] Conta encontrada: ${account.name} (${account.personType})`);
+    
     return { 
       success: true, 
       message: "Conexão estabelecida com Asaas",
@@ -126,9 +266,14 @@ async function testAsaas(apiKey: string, environment: string = "production"): Pr
       }
     };
   } catch (error) {
+    console.error("[Asaas] Erro de conexão:", error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : "Erro ao conectar com Asaas" 
+      message: error instanceof Error ? error.message : "Erro ao conectar com Asaas",
+      details: {
+        error_type: "connection_error",
+        suggestion: "Verifique sua conexão de internet e tente novamente"
+      }
     };
   }
 }
@@ -142,9 +287,17 @@ serve(async (req) => {
   try {
     const { integration, credentials }: TestRequest = await req.json();
 
+    console.log(`[test-integration] Requisição recebida: ${integration}`);
+
     if (!integration || !credentials?.api_key) {
       return new Response(
-        JSON.stringify({ success: false, message: "Parâmetros inválidos" }),
+        JSON.stringify({ 
+          success: false, 
+          message: "Parâmetros inválidos: integration e api_key são obrigatórios",
+          details: {
+            missing: !integration ? "integration" : "api_key"
+          }
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -162,8 +315,16 @@ serve(async (req) => {
         result = await testAsaas(credentials.api_key, credentials.environment);
         break;
       default:
-        result = { success: false, message: "Integração não suportada" };
+        result = { 
+          success: false, 
+          message: `Integração "${integration}" não suportada`,
+          details: {
+            supported_integrations: ["openai", "resend", "asaas"]
+          }
+        };
     }
+
+    console.log(`[test-integration] Resultado: ${result.success ? "SUCESSO" : "FALHA"} - ${result.message}`);
 
     return new Response(
       JSON.stringify(result),
@@ -173,11 +334,14 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error in test-integration:", error);
+    console.error("[test-integration] Erro interno:", error);
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: error instanceof Error ? error.message : "Erro interno" 
+        message: error instanceof Error ? error.message : "Erro interno do servidor",
+        details: {
+          error_type: "internal_error"
+        }
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
