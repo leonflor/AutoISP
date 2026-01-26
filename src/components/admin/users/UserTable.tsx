@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreHorizontal, Shield, ShieldOff, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Shield, ShieldOff, Trash2, History, CheckSquare } from 'lucide-react';
 import { Profile, AppRole } from '@/types/database';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -32,6 +32,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { UserActionsDialog } from './UserActionsDialog';
 
 interface AdminUser extends Profile {
   roles: AppRole[];
@@ -60,6 +62,10 @@ const roleColors: Record<AppRole, 'default' | 'secondary' | 'destructive' | 'out
 
 export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveAllRoles, currentUserId }: UserTableProps) {
   const [userToRemove, setUserToRemove] = useState<AdminUser | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [actionsDialogUser, setActionsDialogUser] = useState<AdminUser | null>(null);
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   if (isLoading) {
     return (
@@ -86,12 +92,79 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
     setUserToRemove(null);
   };
 
+  const toggleSelectUser = (userId: string) => {
+    const newSelected = new Set(selectedUsers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedUsers.size === users.filter(u => u.id !== currentUserId).length) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(users.filter(u => u.id !== currentUserId).map(u => u.id)));
+    }
+  };
+
+  const handleBulkRemove = async () => {
+    setIsRemoving(true);
+    try {
+      for (const userId of selectedUsers) {
+        await onRemoveAllRoles(userId);
+      }
+      setSelectedUsers(new Set());
+      setBulkRemoveOpen(false);
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const selectableUsers = users.filter(u => u.id !== currentUserId);
+  const allSelected = selectableUsers.length > 0 && selectedUsers.size === selectableUsers.length;
+
   return (
     <>
+      {/* Bulk actions bar */}
+      {selectedUsers.size > 0 && (
+        <div className="bg-muted/50 border rounded-lg p-3 mb-4 flex items-center justify-between">
+          <span className="text-sm">
+            <strong>{selectedUsers.size}</strong> usuário(s) selecionado(s)
+          </span>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setSelectedUsers(new Set())}
+            >
+              Limpar seleção
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={() => setBulkRemoveOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Revogar acessos
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox 
+                  checked={allSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Selecionar todos"
+                />
+              </TableHead>
               <TableHead>Usuário</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Permissões</TableHead>
@@ -102,13 +175,21 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Nenhum usuário encontrado
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => (
                 <TableRow key={user.id}>
+                  <TableCell>
+                    <Checkbox 
+                      checked={selectedUsers.has(user.id)}
+                      onCheckedChange={() => toggleSelectUser(user.id)}
+                      disabled={user.id === currentUserId}
+                      aria-label={`Selecionar ${user.full_name || user.email}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
@@ -143,6 +224,11 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setActionsDialogUser(user)}>
+                          <History className="h-4 w-4 mr-2" />
+                          Ver histórico
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                           Adicionar permissão
                         </div>
@@ -194,6 +280,7 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
         </Table>
       </div>
 
+      {/* Single user remove dialog */}
       <AlertDialog open={!!userToRemove} onOpenChange={(open) => !open && setUserToRemove(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -211,6 +298,39 @@ export function UserTable({ users, isLoading, onAddRole, onRemoveRole, onRemoveA
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk remove dialog */}
+      <AlertDialog open={bulkRemoveOpen} onOpenChange={setBulkRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revogar acessos em massa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso removerá todas as permissões de <strong>{selectedUsers.size}</strong> usuário(s).
+              Eles não terão mais acesso ao painel administrativo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemoving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkRemove} 
+              disabled={isRemoving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemoving ? 'Removendo...' : `Revogar ${selectedUsers.size} acessos`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* User actions history dialog */}
+      {actionsDialogUser && (
+        <UserActionsDialog
+          open={!!actionsDialogUser}
+          onOpenChange={(open) => !open && setActionsDialogUser(null)}
+          userId={actionsDialogUser.id}
+          userName={actionsDialogUser.full_name || actionsDialogUser.email}
+        />
+      )}
     </>
   );
 }
