@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 import { IntegrationConfigDialog, type IntegrationType } from "@/components/admin/integrations";
+import { useIntegrationCheck } from "@/hooks/admin/useIntegrationCheck";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Palette, 
@@ -27,11 +28,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Settings2,
-  Loader2
+  Loader2,
+  Zap
 } from "lucide-react";
 
 const Config = () => {
   const { configMap, isLoading, getValue, batchUpdate, updateConfig, isUpdating } = usePlatformConfig();
+  const { checkIntegration, isChecking, checkingIntegration } = useIntegrationCheck();
   const { toast } = useToast();
   
   // Dialog state for integration configuration
@@ -135,6 +138,25 @@ const Config = () => {
 
   const handleCloseIntegrationDialog = () => {
     setConfigDialog({ open: false, integration: null });
+  };
+
+  // Handler para teste direto de conectividade (sem abrir modal)
+  const handleTestIntegration = async (integrationKey: string) => {
+    const integration = integrationKey.replace("integration_", "") as "openai" | "resend" | "asaas";
+    const result = await checkIntegration(integration);
+    
+    if (result.success) {
+      toast({
+        title: "Integração Online",
+        description: result.message,
+      });
+    } else {
+      toast({
+        title: "Falha no Teste",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSaveIntegration = (integration: IntegrationType, config: Record<string, unknown>) => {
@@ -357,8 +379,14 @@ const Config = () => {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
+                            onClick={() => handleTestIntegration(integration.key)}
+                            disabled={isChecking && checkingIntegration === integration.key.replace("integration_", "")}
                           >
+                            {isChecking && checkingIntegration === integration.key.replace("integration_", "") ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Zap className="h-4 w-4 mr-2" />
+                            )}
                             Testar
                           </Button>
                           <Button 
@@ -366,6 +394,7 @@ const Config = () => {
                             size="sm"
                             onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
                           >
+                            <Settings2 className="h-4 w-4 mr-2" />
                             Editar
                           </Button>
                         </>

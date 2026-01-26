@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.test-integration]
 verify_jwt = false
+
+[functions.check-integration]
+verify_jwt = false
