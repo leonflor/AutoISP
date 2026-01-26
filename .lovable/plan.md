@@ -1,268 +1,325 @@
 
-## Plano: Melhorar Mensagens de Erro nas Integracoes
+## Plano: Separar Botao Testar do Modal de Configuracao
 
 ### Objetivo
-Tornar as mensagens de erro mais explicativas para facilitar o diagnostico de problemas ao testar chaves de API, especialmente para o Asaas.
+O botao "Testar" nas integracoes deve executar um teste direto de conectividade usando as credenciais ja salvas como Secrets no Supabase, sem abrir o modal de configuracao. O modal deve ser aberto apenas pelo botao "Editar" ou "Configurar".
 
 ---
 
-## 1. Problemas Identificados
+## 1. Arquitetura Atual vs Proposta
 
-### Edge Function (test-integration)
+### Atual
+```text
++------------------+     +------------------+
+| Botao "Testar"   | --> | Abre Modal       |
++------------------+     | (pede API key)   |
+                         +------------------+
 
-| Problema | Local | Impacto |
-|----------|-------|---------|
-| Erro generico quando JSON parsing falha | Linha 111-115 | Perde informacao do status HTTP |
-| Nao captura codigo de erro do Asaas | Linha 114 | Apenas `description`, ignora `code` |
-| Sem logs detalhados para debug | Funcao inteira | Dificil diagnosticar no servidor |
-| Nao valida prefixo da chave vs ambiente | Linha 97-108 | Incompatibilidade silenciosa |
-
-### Frontend (AsaasConfigForm)
-
-| Problema | Local | Impacto |
-|----------|-------|---------|
-| Sem validacao visual de ambiente | Formulario | Usuario pode usar chave errada |
-| Mensagem de erro simples | Linha 149-151 | Nao mostra detalhes tecnicos |
-| Sem indicacao de status HTTP | Resultado | Dificil saber tipo de falha |
-
----
-
-## 2. Arquivos a Modificar
-
-| Arquivo | Alteracoes |
-|---------|------------|
-| `supabase/functions/test-integration/index.ts` | Logs detalhados, captura codigo/status |
-| `src/hooks/admin/useIntegrationTest.ts` | Expandir interface TestResult |
-| `src/components/admin/integrations/AsaasConfigForm.tsx` | Validacao de prefixo, UI melhorada |
-
----
-
-## 3. Implementacao Detalhada
-
-### 3.1 Edge Function - Melhorias no Asaas
-
-**Antes:**
-```typescript
-if (!response.ok) {
-  const error = await response.json().catch(() => ({}));
-  return { 
-    success: false, 
-    message: error.errors?.[0]?.description || "Chave API invalida" 
-  };
-}
++------------------+     +------------------+
+| Botao "Editar"   | --> | Abre Modal       |
++------------------+     | (pede API key)   |
+                         +------------------+
 ```
 
-**Depois:**
+### Proposta
+```text
++------------------+     +------------------------+     +------------------+
+| Botao "Testar"   | --> | Edge Function          | --> | Usa Secrets      |
++------------------+     | check-integration      |     | ja configurados  |
+                         +------------------------+     +------------------+
+                                  |
+                                  v
+                         +------------------------+
+                         | Toast com resultado    |
+                         +------------------------+
+
++------------------+     +------------------+
+| Botao "Editar"   | --> | Abre Modal       |
++------------------+     | (configura keys) |
+                         +------------------+
+```
+
+---
+
+## 2. Secrets Necessarios
+
+Para que o teste funcione, o admin deve configurar os seguintes Secrets no Supabase:
+
+| Integracao | Secret Name       | Exemplo                |
+|------------|-------------------|------------------------|
+| OpenAI     | OPENAI_API_KEY    | sk-proj-...            |
+| Resend     | RESEND_API_KEY    | re_...                 |
+| Asaas      | ASAAS_API_KEY     | \$aact_prod_...        |
+| Asaas      | ASAAS_ENVIRONMENT | production ou sandbox  |
+
+---
+
+## 3. Arquivos a Modificar/Criar
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| `supabase/functions/check-integration/index.ts` | **CRIAR** - Nova Edge Function que testa usando Secrets |
+| `src/pages/admin/Config.tsx` | Separar handlers dos botoes Testar e Editar |
+| `src/hooks/admin/useIntegrationCheck.ts` | **CRIAR** - Hook para chamar check-integration |
+| `supabase/config.toml` | Adicionar config para nova Edge Function |
+
+---
+
+## 4. Nova Edge Function: check-integration
+
+Esta funcao usa os Secrets ja configurados no Supabase para testar conectividade.
+
 ```typescript
-if (!response.ok) {
-  const status = response.status;
-  const errorBody = await response.text();
-  
-  console.log(`[Asaas] HTTP ${status}: ${errorBody}`);
-  
-  let errorData: { errors?: Array<{ code: string; description: string }> } = {};
-  try {
-    errorData = JSON.parse(errorBody);
-  } catch {}
-  
-  const firstError = errorData.errors?.[0];
-  const errorCode = firstError?.code || "UNKNOWN";
-  const errorDesc = firstError?.description || getHttpErrorMessage(status);
-  
-  return { 
-    success: false, 
-    message: `${errorDesc} (${errorCode})`,
-    details: {
-      http_status: status,
-      error_code: errorCode,
-      raw_response: errorBody.substring(0, 200)
-    }
-  };
+// supabase/functions/check-integration/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface CheckRequest {
+  integration: "openai" | "resend" | "asaas";
 }
 
-// Helper para mensagens HTTP
-function getHttpErrorMessage(status: number): string {
-  switch (status) {
-    case 401: return "Chave API nao autorizada";
-    case 403: return "Acesso negado - verifique permissoes";
-    case 404: return "Endpoint nao encontrado - verifique ambiente";
-    case 429: return "Limite de requisicoes excedido";
-    case 500: return "Erro interno do Asaas";
-    default: return `Erro HTTP ${status}`;
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
-}
-```
 
-### 3.2 Validacao de Ambiente por Prefixo
+  // Validar autenticacao (mesmo padrao do test-integration)
+  const authHeader = req.headers.get("Authorization");
+  // ... validacao JWT ...
 
-**Na Edge Function - Detectar incompatibilidade:**
+  const { integration }: CheckRequest = await req.json();
 
-```typescript
-async function testAsaas(apiKey: string, environment: string = "production"): Promise<TestResult> {
-  // Validar prefixo da chave vs ambiente selecionado
-  const keyPrefix = apiKey.substring(0, 15);
-  const isProductionKey = keyPrefix.includes("_prod_");
-  const isSandboxKey = keyPrefix.includes("_hmlg_") || keyPrefix.includes("_sandbox_");
-  
-  if (environment === "production" && isSandboxKey) {
-    return {
-      success: false,
-      message: "Chave de Sandbox detectada, mas ambiente Production selecionado",
-      details: {
-        suggestion: "Selecione 'Sandbox (testes)' ou use uma chave de producao ($aact_prod_...)"
+  let result;
+  switch (integration) {
+    case "openai":
+      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!openaiKey) {
+        result = { success: false, message: "OPENAI_API_KEY nao configurada" };
+      } else {
+        // Testar conexao com OpenAI
+        result = await testOpenAI(openaiKey);
       }
-    };
-  }
-  
-  if (environment === "sandbox" && isProductionKey) {
-    return {
-      success: false,
-      message: "Chave de Producao detectada, mas ambiente Sandbox selecionado",
-      details: {
-        suggestion: "Selecione 'Producao' ou use uma chave sandbox ($aact_hmlg_...)"
+      break;
+
+    case "resend":
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+      if (!resendKey) {
+        result = { success: false, message: "RESEND_API_KEY nao configurada" };
+      } else {
+        result = await testResend(resendKey);
       }
-    };
+      break;
+
+    case "asaas":
+      const asaasKey = Deno.env.get("ASAAS_API_KEY");
+      const asaasEnv = Deno.env.get("ASAAS_ENVIRONMENT") || "production";
+      if (!asaasKey) {
+        result = { success: false, message: "ASAAS_API_KEY nao configurada" };
+      } else {
+        result = await testAsaas(asaasKey, asaasEnv);
+      }
+      break;
   }
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" }
+  });
+});
+```
+
+---
+
+## 5. Modificar Config.tsx
+
+### Adicionar novo handler para teste direto:
+
+```typescript
+// Importar novo hook
+import { useIntegrationCheck } from "@/hooks/admin/useIntegrationCheck";
+
+// No componente
+const { checkIntegration, isChecking, checkingIntegration } = useIntegrationCheck();
+
+const handleTestIntegration = async (integrationKey: string) => {
+  const integration = integrationKey.replace("integration_", "") as IntegrationType;
+  const result = await checkIntegration(integration);
   
-  // ... continuar com o teste
-}
+  if (result.success) {
+    toast({
+      title: "Integracao Online",
+      description: result.message,
+    });
+  } else {
+    toast({
+      title: "Falha no Teste",
+      description: result.message,
+      variant: "destructive",
+    });
+  }
+};
 ```
 
-### 3.3 Logs Detalhados na Edge Function
+### Separar botoes Testar e Editar:
 
-```typescript
-// No inicio da funcao testAsaas
-console.log(`[Asaas] Testando integracao - Ambiente: ${environment}`);
-console.log(`[Asaas] Prefixo da chave: ${apiKey.substring(0, 15)}...`);
-
-// Apos a requisicao
-console.log(`[Asaas] Resposta HTTP: ${response.status} ${response.statusText}`);
-
-// Em caso de sucesso
-console.log(`[Asaas] Conta encontrada: ${account.name} (${account.personType})`);
+```tsx
+{integration.configured ? (
+  <>
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={() => handleTestIntegration(integration.key)}
+      disabled={isChecking && checkingIntegration === integration.key}
+    >
+      {isChecking && checkingIntegration === integration.key && (
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+      )}
+      Testar
+    </Button>
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={() => handleOpenIntegrationDialog(
+        integration.key.replace("integration_", "") as IntegrationType
+      )}
+    >
+      Editar
+    </Button>
+  </>
+) : (
+  <Button 
+    size="sm"
+    onClick={() => handleOpenIntegrationDialog(
+      integration.key.replace("integration_", "") as IntegrationType
+    )}
+    disabled={integration.key === "integration_push"}
+  >
+    {integration.key === "integration_push" ? "Em breve" : "Configurar"}
+  </Button>
+)}
 ```
 
-### 3.4 Hook - Expandir Interface
+---
+
+## 6. Novo Hook: useIntegrationCheck
 
 ```typescript
-export interface TestResult {
+// src/hooks/admin/useIntegrationCheck.ts
+import { useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export type IntegrationType = "openai" | "resend" | "asaas";
+
+export interface CheckResult {
   success: boolean;
   message: string;
-  details?: {
-    http_status?: number;
-    error_code?: string;
-    raw_response?: string;
-    suggestion?: string;
-    account_name?: string;
-    environment?: string;
-    // ... outros campos
-    [key: string]: unknown;
-  };
+  details?: Record<string, unknown>;
+}
+
+export function useIntegrationCheck() {
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkingIntegration, setCheckingIntegration] = useState<IntegrationType | null>(null);
+
+  const checkIntegration = useCallback(async (integration: IntegrationType): Promise<CheckResult> => {
+    setIsChecking(true);
+    setCheckingIntegration(integration);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("check-integration", {
+        body: { integration }
+      });
+
+      if (error) {
+        return { 
+          success: false, 
+          message: error.message || "Erro ao verificar integracao" 
+        };
+      }
+
+      return data as CheckResult;
+    } catch (error) {
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : "Erro desconhecido" 
+      };
+    } finally {
+      setIsChecking(false);
+      setCheckingIntegration(null);
+    }
+  }, []);
+
+  return { checkIntegration, isChecking, checkingIntegration };
 }
 ```
 
-### 3.5 Frontend - UI Melhorada
+---
 
-**Alerta de ambiente incompativel:**
+## 7. Fluxo de Usuario Atualizado
 
-```tsx
-// Detectar prefixo no frontend
-const detectedEnvironment = useMemo(() => {
-  if (apiKey.includes("_prod_")) return "production";
-  if (apiKey.includes("_hmlg_") || apiKey.includes("_sandbox_")) return "sandbox";
-  return null;
-}, [apiKey]);
+### Cenario 1: Integracao nao configurada
 
-const hasEnvironmentMismatch = detectedEnvironment && detectedEnvironment !== environment;
+1. Usuario clica em "Configurar"
+2. Modal abre para inserir API key
+3. Testa e salva (existente)
+4. Secret deve ser configurado manualmente no Supabase
 
-// Renderizar alerta
-{hasEnvironmentMismatch && (
-  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-    <p className="text-sm text-amber-700">
-      <AlertTriangle className="h-4 w-4 inline mr-1" />
-      A chave parece ser de <strong>{detectedEnvironment}</strong>, 
-      mas voce selecionou <strong>{environment}</strong>.
-    </p>
-  </div>
-)}
-```
+### Cenario 2: Integracao ja configurada
 
-**Mensagem de erro expandida:**
+1. Usuario clica em "Testar"
+2. Loading aparece no botao
+3. Edge Function `check-integration` usa Secrets do Supabase
+4. Toast mostra resultado (sucesso/falha)
 
-```tsx
-{result && !result.success && (
-  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
-    <p className="text-sm font-medium text-destructive">{result.message}</p>
-    
-    {result.details?.http_status && (
-      <p className="text-xs text-muted-foreground">
-        Status HTTP: {result.details.http_status}
-      </p>
-    )}
-    
-    {result.details?.suggestion && (
-      <p className="text-xs text-amber-600">
-        Sugestao: {result.details.suggestion}
-      </p>
-    )}
-    
-    {result.details?.error_code && result.details.error_code !== "UNKNOWN" && (
-      <p className="text-xs text-muted-foreground">
-        Codigo: {result.details.error_code}
-      </p>
-    )}
-  </div>
-)}
-```
+### Cenario 3: Editar configuracao
+
+1. Usuario clica em "Editar"
+2. Modal abre para atualizar API key
+3. Testa nova chave e salva
 
 ---
 
-## 4. Codigos de Erro Asaas Comuns
+## 8. Configuracao de Secrets (Manual pelo Admin)
 
-| Codigo | Descricao | Causa Provavel |
-|--------|-----------|----------------|
-| invalid_accessToken | Token invalido | Chave errada ou expirada |
-| unauthorized | Nao autorizado | Ambiente incorreto |
-| forbidden | Acesso negado | Permissoes insuficientes |
-| not_found | Recurso nao encontrado | Endpoint errado |
+O admin deve configurar os Secrets no Supabase Dashboard:
 
----
-
-## 5. Resultado Esperado
-
-### Antes (Erro Generico)
-
-```
-"Chave API invalida ou sem permissao"
-```
-
-### Depois (Erro Detalhado)
-
-```
-Chave de Sandbox detectada, mas ambiente Production selecionado
-
-Status HTTP: 401
-Codigo: invalid_accessToken
-Sugestao: Selecione 'Sandbox (testes)' ou use uma chave de producao
-```
+1. Acessar: Settings > Edge Functions > Secrets
+2. Adicionar:
+   - `OPENAI_API_KEY`: Chave da OpenAI
+   - `RESEND_API_KEY`: Chave do Resend
+   - `ASAAS_API_KEY`: Chave do Asaas
+   - `ASAAS_ENVIRONMENT`: "production" ou "sandbox"
 
 ---
 
-## 6. Resumo de Alteracoes
+## 9. Mensagens de Erro Claras
 
-| Componente | Melhoria |
-|------------|----------|
-| Edge Function | Logs detalhados, captura codigo/status HTTP |
-| Edge Function | Validacao de ambiente vs prefixo da chave |
-| Hook | Interface expandida com campos de erro |
-| Frontend | Alerta visual de incompatibilidade |
-| Frontend | Mensagem de erro com detalhes tecnicos |
+| Cenario | Mensagem |
+|---------|----------|
+| Secret nao configurado | "OPENAI_API_KEY nao configurada no Supabase" |
+| Chave invalida | "Chave API nao autorizada (HTTP 401)" |
+| Conexao OK | "Conexao estabelecida com OpenAI" |
+| Timeout | "Timeout ao conectar - verifique sua rede" |
 
 ---
 
-## 7. Deploy
+## 10. Resumo de Arquivos
 
-Apos as alteracoes:
-1. Edge function sera redeployada automaticamente
-2. Logs estarao disponiveis no dashboard Supabase
-3. Frontend mostrara mensagens mais claras
+| Arquivo | Acao |
+|---------|------|
+| `supabase/functions/check-integration/index.ts` | Criar |
+| `supabase/config.toml` | Adicionar verify_jwt = false para check-integration |
+| `src/hooks/admin/useIntegrationCheck.ts` | Criar |
+| `src/pages/admin/Config.tsx` | Modificar handlers dos botoes |
+
+---
+
+## 11. Consideracoes de Seguranca
+
+1. A Edge Function `check-integration` valida JWT antes de executar
+2. Secrets nunca sao expostos ao cliente - apenas o resultado do teste
+3. Logs detalhados no servidor para diagnostico
+4. Somente admins autenticados podem executar testes
