@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePlatformConfig } from "@/hooks/usePlatformConfig";
+import { IntegrationConfigDialog, type IntegrationType } from "@/components/admin/integrations";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Palette, 
   Building2, 
@@ -29,7 +31,14 @@ import {
 } from "lucide-react";
 
 const Config = () => {
-  const { configMap, isLoading, getValue, batchUpdate, isUpdating } = usePlatformConfig();
+  const { configMap, isLoading, getValue, batchUpdate, updateConfig, isUpdating } = usePlatformConfig();
+  const { toast } = useToast();
+  
+  // Dialog state for integration configuration
+  const [configDialog, setConfigDialog] = useState<{
+    open: boolean;
+    integration: IntegrationType;
+  }>({ open: false, integration: null });
 
   // Local states for form fields
   const [platformName, setPlatformName] = useState("");
@@ -118,6 +127,31 @@ const Config = () => {
       { key: "maintenance_mode", value: { value: maintenanceMode } },
       { key: "log_retention_days", value: { value: parseInt(logRetention) } },
     ]);
+  };
+
+  const handleOpenIntegrationDialog = (integration: IntegrationType) => {
+    setConfigDialog({ open: true, integration });
+  };
+
+  const handleCloseIntegrationDialog = () => {
+    setConfigDialog({ open: false, integration: null });
+  };
+
+  const handleSaveIntegration = (integration: IntegrationType, config: Record<string, unknown>) => {
+    if (!integration) return;
+    
+    const key = `integration_${integration}`;
+    updateConfig({ 
+      key, 
+      value: config 
+    });
+    
+    toast({
+      title: "Integração configurada",
+      description: `A integração ${integration.toUpperCase()} foi configurada com sucesso.`,
+    });
+    
+    handleCloseIntegrationDialog();
   };
 
   if (isLoading) {
@@ -320,15 +354,29 @@ const Config = () => {
                     <div className="flex items-center gap-2">
                       {integration.configured ? (
                         <>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
+                          >
                             Testar
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
+                          >
                             Editar
                           </Button>
                         </>
                       ) : (
-                        <Button size="sm">Configurar</Button>
+                        <Button 
+                          size="sm"
+                          onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
+                          disabled={integration.key === "integration_push"}
+                        >
+                          {integration.key === "integration_push" ? "Em breve" : "Configurar"}
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -555,6 +603,20 @@ const Config = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Integration Config Dialog */}
+      <IntegrationConfigDialog
+        open={configDialog.open}
+        integration={configDialog.integration}
+        isConfigured={
+          configDialog.integration 
+            ? (configMap?.[`integration_${configDialog.integration}`]?.configured ?? false)
+            : false
+        }
+        onClose={handleCloseIntegrationDialog}
+        onSave={handleSaveIntegration}
+        isSaving={isUpdating}
+      />
     </div>
   );
 };

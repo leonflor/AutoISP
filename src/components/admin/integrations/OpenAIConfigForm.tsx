@@ -1,0 +1,175 @@
+import { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useIntegrationTest, type TestResult } from "@/hooks/admin/useIntegrationTest";
+import { Loader2, CheckCircle2, XCircle, CircleDot } from "lucide-react";
+
+interface OpenAIConfigFormProps {
+  isConfigured: boolean;
+  onSave: (config: { default_model: string; tested_at: string }) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}
+
+const OPENAI_MODELS = [
+  { value: "gpt-4o-mini", label: "GPT-4o Mini (Recomendado)" },
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+  { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+];
+
+export function OpenAIConfigForm({ 
+  isConfigured, 
+  onSave, 
+  onCancel,
+  isSaving 
+}: OpenAIConfigFormProps) {
+  const [apiKey, setApiKey] = useState("");
+  const [defaultModel, setDefaultModel] = useState("gpt-4o-mini");
+  const { testIntegration, isLoading, result, resetResult } = useIntegrationTest();
+
+  useEffect(() => {
+    resetResult();
+  }, [apiKey, resetResult]);
+
+  const handleTest = async () => {
+    if (!apiKey.trim()) return;
+    await testIntegration("openai", { api_key: apiKey.trim() });
+  };
+
+  const handleSave = () => {
+    if (result?.success) {
+      onSave({
+        default_model: defaultModel,
+        tested_at: new Date().toISOString(),
+      });
+    }
+  };
+
+  const getStatusBadge = () => {
+    if (isLoading) {
+      return (
+        <Badge variant="secondary" className="gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Testando...
+        </Badge>
+      );
+    }
+    if (result?.success) {
+      return (
+        <Badge variant="default" className="gap-1 bg-green-600">
+          <CheckCircle2 className="h-3 w-3" />
+          Conexão válida
+        </Badge>
+      );
+    }
+    if (result && !result.success) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <XCircle className="h-3 w-3" />
+          Falha na conexão
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="gap-1">
+        <CircleDot className="h-3 w-3" />
+        Não testado
+      </Badge>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="openai-api-key">API Key</Label>
+        <Input
+          id="openai-api-key"
+          type="password"
+          placeholder={isConfigured ? "••••••••••••••••••••" : "sk-..."}
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Obtenha sua chave em{" "}
+          <a 
+            href="https://platform.openai.com/api-keys" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            platform.openai.com
+          </a>
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="openai-model">Modelo Padrão</Label>
+        <Select value={defaultModel} onValueChange={setDefaultModel}>
+          <SelectTrigger id="openai-model">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {OPENAI_MODELS.map((model) => (
+              <SelectItem key={model.value} value={model.value}>
+                {model.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <span className="text-sm font-medium">Status:</span>
+        {getStatusBadge()}
+      </div>
+
+      {result && !result.success && (
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+          <p className="text-sm text-destructive">{result.message}</p>
+        </div>
+      )}
+
+      {result?.success && result.details && (
+        <div className="p-3 rounded-lg bg-green-50 border border-green-200 dark:bg-green-950/20 dark:border-green-900">
+          <p className="text-sm text-green-700 dark:text-green-400">
+            {result.details.available_models as number} modelos GPT disponíveis
+          </p>
+        </div>
+      )}
+
+      <div className="flex justify-between pt-4">
+        <Button 
+          variant="outline" 
+          onClick={handleTest} 
+          disabled={!apiKey.trim() || isLoading}
+        >
+          {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          Testar Conexão
+        </Button>
+
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={!result?.success || isSaving}
+          >
+            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Salvar Configuração
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
