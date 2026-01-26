@@ -941,6 +941,44 @@ export type Database = {
         }
         Relationships: []
       }
+      sla_configs: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          plan_id: string | null
+          resolution_hours: number
+          response_hours: number
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          plan_id?: string | null
+          resolution_hours?: number
+          response_hours?: number
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          plan_id?: string | null
+          resolution_hours?: number
+          response_hours?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sla_configs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscribers: {
         Row: {
           address: Json | null
@@ -1107,41 +1145,85 @@ export type Database = {
           },
         ]
       }
+      support_ticket_notes: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_notes_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_tickets: {
         Row: {
+          assigned_to: string | null
           category: string
           created_at: string | null
           description: string
+          first_response_at: string | null
           id: string
           isp_id: string
           priority: string | null
           resolved_at: string | null
+          sla_resolution_hours: number | null
+          sla_response_hours: number | null
           status: string | null
           subject: string
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
+          assigned_to?: string | null
           category: string
           created_at?: string | null
           description: string
+          first_response_at?: string | null
           id?: string
           isp_id: string
           priority?: string | null
           resolved_at?: string | null
+          sla_resolution_hours?: number | null
+          sla_response_hours?: number | null
           status?: string | null
           subject: string
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          assigned_to?: string | null
           category?: string
           created_at?: string | null
           description?: string
+          first_response_at?: string | null
           id?: string
           isp_id?: string
           priority?: string | null
           resolved_at?: string | null
+          sla_resolution_hours?: number | null
+          sla_response_hours?: number | null
           status?: string | null
           subject?: string
           updated_at?: string | null

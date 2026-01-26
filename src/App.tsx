@@ -45,6 +45,8 @@ const PainelWhatsApp = lazy(() => import("./pages/painel/WhatsAppConfig"));
 // Lazy load - Admin extra pages
 const AdminSupport = lazy(() => import("./pages/admin/Support"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
+const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
+const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +89,8 @@ const App = () => (
                 <Route path="assinaturas" element={<SubscriptionsPage />} />
                 <Route path="usuarios" element={<UsersPage />} />
                 <Route path="suporte" element={<AdminSupport />} />
+                <Route path="tickets" element={<SupportTickets />} />
+                <Route path="tickets/:id" element={<SupportTicketDetail />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
               </Route>
