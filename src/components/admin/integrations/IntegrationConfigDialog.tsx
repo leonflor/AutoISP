@@ -9,6 +9,7 @@ import { OpenAIConfigForm } from "./OpenAIConfigForm";
 import { ResendConfigForm } from "./ResendConfigForm";
 import { AsaasConfigForm } from "./AsaasConfigForm";
 import { Brain, Mail, CreditCard } from "lucide-react";
+import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 
 export type IntegrationType = "openai" | "resend" | "asaas" | null;
 
@@ -17,8 +18,6 @@ interface IntegrationConfigDialogProps {
   integration: IntegrationType;
   isConfigured: boolean;
   onClose: () => void;
-  onSave: (integration: IntegrationType, config: Record<string, unknown>) => void;
-  isSaving: boolean;
 }
 
 const INTEGRATION_INFO = {
@@ -44,23 +43,25 @@ export function IntegrationConfigDialog({
   integration,
   isConfigured,
   onClose,
-  onSave,
-  isSaving,
 }: IntegrationConfigDialogProps) {
+  const { configMap } = usePlatformConfig();
+  
   if (!integration) return null;
 
   const info = INTEGRATION_INFO[integration];
   const Icon = info.icon;
 
-  const handleSave = (config: Record<string, unknown>) => {
-    onSave(integration, {
-      ...config,
-      configured: true,
-    });
-  };
+  // Get existing config for the integration
+  const configKey = `integration_${integration}`;
+  const existingConfig = configMap?.[configKey] as {
+    masked_key?: string;
+    default_model?: string;
+    from_email?: string;
+    environment?: "sandbox" | "production";
+  } | undefined;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -73,27 +74,27 @@ export function IntegrationConfigDialog({
         {integration === "openai" && (
           <OpenAIConfigForm
             isConfigured={isConfigured}
-            onSave={handleSave}
+            existingConfig={existingConfig}
+            onSave={onClose}
             onCancel={onClose}
-            isSaving={isSaving}
           />
         )}
 
         {integration === "resend" && (
           <ResendConfigForm
             isConfigured={isConfigured}
-            onSave={handleSave}
+            existingConfig={existingConfig}
+            onSave={onClose}
             onCancel={onClose}
-            isSaving={isSaving}
           />
         )}
 
         {integration === "asaas" && (
           <AsaasConfigForm
             isConfigured={isConfigured}
-            onSave={handleSave}
+            existingConfig={existingConfig}
+            onSave={onClose}
             onCancel={onClose}
-            isSaving={isSaving}
           />
         )}
       </DialogContent>

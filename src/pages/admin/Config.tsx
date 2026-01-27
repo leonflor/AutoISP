@@ -344,72 +344,90 @@ const Config = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {integrations.map((integration) => (
-                  <div
-                    key={integration.name}
-                    className="flex items-center justify-between p-4 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                        <integration.icon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{integration.name}</span>
-                          {integration.configured ? (
-                            <Badge variant="default" className="gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Configurado
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              Pendente
-                            </Badge>
+                {integrations.map((integration) => {
+                  const integrationConfig = configMap?.[integration.key] as {
+                    masked_key?: string;
+                    environment?: string;
+                  } | undefined;
+                  
+                  return (
+                    <div
+                      key={integration.name}
+                      className="flex items-center justify-between p-4 rounded-lg border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                          <integration.icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{integration.name}</span>
+                            {integration.configured ? (
+                              <Badge variant="default" className="gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Configurado
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Pendente
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {integration.description}
+                          </p>
+                          {/* Show masked key if configured */}
+                          {integration.configured && integrationConfig?.masked_key && (
+                            <p className="text-xs font-mono text-muted-foreground mt-1">
+                              {integrationConfig.masked_key}
+                              {integrationConfig.environment && (
+                                <span className="ml-2 text-xs">
+                                  ({integrationConfig.environment})
+                                </span>
+                              )}
+                            </p>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {integration.description}
-                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {integration.configured ? (
-                        <>
+                      <div className="flex items-center gap-2">
+                        {integration.configured ? (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleTestIntegration(integration.key)}
+                              disabled={isChecking && checkingIntegration === integration.key.replace("integration_", "")}
+                            >
+                              {isChecking && checkingIntegration === integration.key.replace("integration_", "") ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Zap className="h-4 w-4 mr-2" />
+                              )}
+                              Testar
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
+                            >
+                              <Settings2 className="h-4 w-4 mr-2" />
+                              Editar
+                            </Button>
+                          </>
+                        ) : (
                           <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integration.key)}
-                            disabled={isChecking && checkingIntegration === integration.key.replace("integration_", "")}
-                          >
-                            {isChecking && checkingIntegration === integration.key.replace("integration_", "") ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Zap className="h-4 w-4 mr-2" />
-                            )}
-                            Testar
-                          </Button>
-                          <Button 
-                            variant="outline" 
                             size="sm"
                             onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
+                            disabled={integration.key === "integration_push"}
                           >
-                            <Settings2 className="h-4 w-4 mr-2" />
-                            Editar
+                            {integration.key === "integration_push" ? "Em breve" : "Configurar"}
                           </Button>
-                        </>
-                      ) : (
-                        <Button 
-                          size="sm"
-                          onClick={() => handleOpenIntegrationDialog(integration.key.replace("integration_", "") as IntegrationType)}
-                          disabled={integration.key === "integration_push"}
-                        >
-                          {integration.key === "integration_push" ? "Em breve" : "Configurar"}
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -643,8 +661,6 @@ const Config = () => {
             : false
         }
         onClose={handleCloseIntegrationDialog}
-        onSave={handleSaveIntegration}
-        isSaving={isUpdating}
       />
     </div>
   );
