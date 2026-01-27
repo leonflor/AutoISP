@@ -5,27 +5,38 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useIntegrationTest } from "@/hooks/admin/useIntegrationTest";
-import { Loader2, CheckCircle2, XCircle, CircleDot, AlertTriangle } from "lucide-react";
+import { useSaveIntegration } from "@/hooks/admin/useSaveIntegration";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, CheckCircle2, XCircle, CircleDot, AlertTriangle, KeyRound } from "lucide-react";
 
 interface AsaasConfigFormProps {
   isConfigured: boolean;
-  onSave: (config: { environment: string; tested_at: string }) => void;
+  existingConfig?: {
+    masked_key?: string;
+    environment?: "sandbox" | "production";
+  };
+  onSave: () => void;
   onCancel: () => void;
-  isSaving: boolean;
 }
 
 export function AsaasConfigForm({ 
   isConfigured, 
+  existingConfig,
   onSave, 
   onCancel,
-  isSaving 
 }: AsaasConfigFormProps) {
   const [apiKey, setApiKey] = useState("");
-  const [environment, setEnvironment] = useState<"sandbox" | "production">("production");
+  const [environment, setEnvironment] = useState<"sandbox" | "production">(
+    existingConfig?.environment || "production"
+  );
   const [webhookToken, setWebhookToken] = useState("");
-  const { testIntegration, isLoading, result, resetResult } = useIntegrationTest();
+  const { testIntegration, isLoading: isTesting, result, resetResult } = useIntegrationTest();
+  const { saveIntegration, isSaving } = useSaveIntegration();
+  const { toast } = useToast();
 
-  // Detectar ambiente baseado no prefixo da chave
+  const maskedKey = existingConfig?.masked_key;
+
+  // Detect environment based on key prefix
   const detectedEnvironment = useMemo(() => {
     if (!apiKey || apiKey.length < 10) return null;
     if (apiKey.includes("_prod_")) return "production";
@@ -48,17 +59,39 @@ export function AsaasConfigForm({
     });
   };
 
-  const handleSave = () => {
-    if (result?.success) {
-      onSave({
-        environment,
-        tested_at: new Date().toISOString(),
+  const handleSave = async () => {
+    if (!apiKey.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Chave obrigatória",
+        description: "Digite a API Key para salvar.",
+      });
+      return;
+    }
+
+    const saveResult = await saveIntegration("asaas", {
+      api_key: apiKey.trim(),
+      environment,
+      webhook_token: webhookToken || undefined,
+    });
+
+    if (saveResult.success) {
+      toast({
+        title: "Integração salva",
+        description: saveResult.message,
+      });
+      onSave();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar",
+        description: saveResult.message,
       });
     }
   };
 
   const getStatusBadge = () => {
-    if (isLoading) {
+    if (isTesting) {
       return (
         <Badge variant="secondary" className="gap-1">
           <Loader2 className="h-3 w-3 animate-spin" />
@@ -94,24 +127,43 @@ export function AsaasConfigForm({
     <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="asaas-api-key">API Key</Label>
+        
+        {/* Show masked key if configured */}
+        {maskedKey && !apiKey && (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <span className="font-mono text-sm">{maskedKey}</span>
+            <Badge variant="outline" className="ml-auto">Configurada</Badge>
+          </div>
+        )}
+        
         <Input
           id="asaas-api-key"
           type="password"
-          placeholder={isConfigured ? "••••••••••••••••••••" : "$aact_..."}
+          placeholder={maskedKey ? "Digite nova chave para alterar" : "$aact_..."}
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          Obtenha sua chave em{" "}
-          <a 
-            href="https://www.asaas.com/config/api" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            asaas.com
-          </a>
-        </p>
+        
+        {maskedKey && (
+          <p className="text-xs text-muted-foreground">
+            Deixe em branco para manter a chave atual (não é possível visualizá-la)
+          </p>
+        )}
+        
+        {!maskedKey && (
+          <p className="text-xs text-muted-foreground">
+            Obtenha sua chave em{" "}
+            <a 
+              href="https://www.asaas.com/config/api" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              asaas.com
+            </a>
+          </p>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -136,7 +188,7 @@ export function AsaasConfigForm({
         </RadioGroup>
       </div>
 
-      {/* Alerta de incompatibilidade de ambiente */}
+      {/* Environment mismatch warning */}
       {hasEnvironmentMismatch && (
         <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
           <p className="text-sm text-amber-700 dark:text-amber-400 flex items-start gap-2">
@@ -168,7 +220,7 @@ export function AsaasConfigForm({
         {getStatusBadge()}
       </div>
 
-      {/* Mensagem de erro expandida */}
+      {/* Error message */}
       {result && !result.success && (
         <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
           <p className="text-sm font-medium text-destructive">{result.message}</p>
@@ -206,9 +258,9 @@ export function AsaasConfigForm({
         <Button 
           variant="outline" 
           onClick={handleTest} 
-          disabled={!apiKey.trim() || isLoading}
+          disabled={!apiKey.trim() || isTesting}
         >
-          {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Testar Conexão
         </Button>
 
@@ -218,7 +270,7 @@ export function AsaasConfigForm({
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={!result?.success || isSaving}
+            disabled={!apiKey.trim() || isSaving}
           >
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Salvar Configuração

@@ -16,6 +16,36 @@ interface CheckResult {
   details?: Record<string, unknown>;
 }
 
+// ============= Decryption Function =============
+
+async function deriveKey(masterKey: string): Promise<CryptoKey> {
+  const keyMaterial = new TextEncoder().encode(masterKey);
+  const keyData = keyMaterial.slice(0, 32);
+  return await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    "AES-GCM",
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function decrypt(ciphertext: string, iv: string, masterKey: string): Promise<string> {
+  const key = await deriveKey(masterKey);
+  const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+  const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: ivBytes },
+    key,
+    ciphertextBytes
+  );
+  
+  return new TextDecoder().decode(decrypted);
+}
+
+// ============= Integration Test Functions =============
+
 async function testOpenAI(apiKey: string): Promise<CheckResult> {
   console.log("[OpenAI] Testando conectividade...");
   
@@ -47,7 +77,7 @@ async function testOpenAI(apiKey: string): Promise<CheckResult> {
       return {
         success: false,
         message: "Chave API inválida ou expirada",
-        details: { http_status: 401, suggestion: "Verifique se a chave está correta no Supabase Secrets" }
+        details: { http_status: 401 }
       };
     }
 
@@ -98,7 +128,7 @@ async function testResend(apiKey: string): Promise<CheckResult> {
       return {
         success: false,
         message: "Chave API inválida",
-        details: { http_status: 401, suggestion: "Verifique a RESEND_API_KEY no Supabase Secrets" }
+        details: { http_status: 401 }
       };
     }
 
@@ -123,36 +153,6 @@ async function testAsaas(apiKey: string, environment: string): Promise<CheckResu
   const baseUrl = environment === "sandbox" 
     ? "https://sandbox.asaas.com/api/v3"
     : "https://api.asaas.com/v3";
-
-  // Validar prefixo da chave vs ambiente
-  const isProductionKey = apiKey.includes("_prod_");
-  const isSandboxKey = apiKey.includes("_hmlg_") || apiKey.includes("_sandbox_");
-
-  if (environment === "production" && isSandboxKey) {
-    console.log("[Asaas] Mismatch: chave sandbox com ambiente produção");
-    return {
-      success: false,
-      message: "Chave de Sandbox detectada, mas ASAAS_ENVIRONMENT está como 'production'",
-      details: { 
-        suggestion: "Altere ASAAS_ENVIRONMENT para 'sandbox' no Supabase Secrets",
-        environment,
-        key_type: "sandbox"
-      }
-    };
-  }
-
-  if (environment === "sandbox" && isProductionKey) {
-    console.log("[Asaas] Mismatch: chave produção com ambiente sandbox");
-    return {
-      success: false,
-      message: "Chave de Produção detectada, mas ASAAS_ENVIRONMENT está como 'sandbox'",
-      details: { 
-        suggestion: "Altere ASAAS_ENVIRONMENT para 'production' no Supabase Secrets",
-        environment,
-        key_type: "production"
-      }
-    };
-  }
 
   try {
     const response = await fetch(`${baseUrl}/finance/balance`, {
@@ -187,8 +187,7 @@ async function testAsaas(apiKey: string, environment: string): Promise<CheckResu
         message: "Chave API não autorizada",
         details: { 
           http_status: 401, 
-          environment,
-          suggestion: "Verifique se a ASAAS_API_KEY está correta no Supabase Secrets"
+          environment
         }
       };
     }
@@ -208,6 +207,8 @@ async function testAsaas(apiKey: string, environment: string): Promise<CheckResu
   }
 }
 
+// ============= Main Handler =============
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -216,7 +217,7 @@ serve(async (req) => {
 
   console.log("[check-integration] Requisição recebida");
 
-  // Validar autenticação
+  // Validate authentication
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     console.log("[check-integration] Token ausente");
@@ -228,12 +229,13 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } }
   });
 
-  // Validar JWT
+  // Validate JWT
   const token = authHeader.replace("Bearer ", "");
   const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
 
@@ -251,49 +253,90 @@ serve(async (req) => {
     const { integration }: CheckRequest = await req.json();
     console.log(`[check-integration] Testando integração: ${integration}`);
 
+    // Get encryption key
+    const masterKey = Deno.env.get("ENCRYPTION_KEY");
+    if (!masterKey || masterKey.length < 32) {
+      console.error("[check-integration] ENCRYPTION_KEY não configurada");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Erro de configuração: ENCRYPTION_KEY não definida" 
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Read config from database using service role to bypass RLS
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const configKey = `integration_${integration}`;
+
+    const { data: config, error: configError } = await supabaseAdmin
+      .from("platform_config")
+      .select("value")
+      .eq("key", configKey)
+      .single();
+
+    if (configError) {
+      console.error(`[check-integration] Erro ao ler config: ${configError.message}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `Erro ao ler configuração: ${configError.message}` 
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const configValue = config?.value as Record<string, unknown> | null;
+
+    // Check if encrypted key exists
+    if (!configValue?.api_key_encrypted || !configValue?.encryption_iv) {
+      console.log(`[check-integration] ${integration} não configurado no banco`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `Integração ${integration.toUpperCase()} não configurada. Configure via painel de administração.`,
+          details: { suggestion: "Acesse Configurações > Integrações para configurar" }
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Decrypt API key
+    let apiKey: string;
+    try {
+      apiKey = await decrypt(
+        configValue.api_key_encrypted as string,
+        configValue.encryption_iv as string,
+        masterKey
+      );
+      console.log(`[check-integration] Chave descriptografada com sucesso`);
+    } catch (decryptError) {
+      console.error(`[check-integration] Erro ao descriptografar:`, decryptError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Erro ao descriptografar chave. A chave pode estar corrompida." 
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Test integration
     let result: CheckResult;
 
     switch (integration) {
-      case "openai": {
-        const openaiKey = Deno.env.get("OPENAI_API_KEY");
-        if (!openaiKey) {
-          result = { 
-            success: false, 
-            message: "OPENAI_API_KEY não configurada no Supabase Secrets",
-            details: { suggestion: "Adicione a secret OPENAI_API_KEY nas configurações do Supabase" }
-          };
-        } else {
-          result = await testOpenAI(openaiKey);
-        }
+      case "openai":
+        result = await testOpenAI(apiKey);
         break;
-      }
 
-      case "resend": {
-        const resendKey = Deno.env.get("RESEND_API_KEY");
-        if (!resendKey) {
-          result = { 
-            success: false, 
-            message: "RESEND_API_KEY não configurada no Supabase Secrets",
-            details: { suggestion: "Adicione a secret RESEND_API_KEY nas configurações do Supabase" }
-          };
-        } else {
-          result = await testResend(resendKey);
-        }
+      case "resend":
+        result = await testResend(apiKey);
         break;
-      }
 
       case "asaas": {
-        const asaasKey = Deno.env.get("ASAAS_API_KEY");
-        const asaasEnv = Deno.env.get("ASAAS_ENVIRONMENT") || "production";
-        if (!asaasKey) {
-          result = { 
-            success: false, 
-            message: "ASAAS_API_KEY não configurada no Supabase Secrets",
-            details: { suggestion: "Adicione a secret ASAAS_API_KEY nas configurações do Supabase" }
-          };
-        } else {
-          result = await testAsaas(asaasKey, asaasEnv);
-        }
+        const environment = (configValue.environment as string) || "production";
+        result = await testAsaas(apiKey, environment);
         break;
       }
 

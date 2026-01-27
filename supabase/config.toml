@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.check-integration]
 verify_jwt = false
+
+[functions.save-integration]
+verify_jwt = false
