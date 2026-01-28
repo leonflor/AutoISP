@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Bot, Shield } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -48,6 +48,14 @@ const menuItems: MenuItem[] = [
     submenu: [
       { title: 'Tickets ISPs', url: '/admin/tickets', icon: MessageSquare },
       { title: 'Conversas', url: '/admin/suporte', icon: MessageSquare },
+    ]
+  },
+  { 
+    title: 'IA', 
+    icon: Bot,
+    submenu: [
+      { title: 'Templates de Agentes', url: '/admin/ai-agents', icon: Bot },
+      { title: 'Cláusulas LGPD', url: '/admin/ai-security', icon: Shield },
     ]
   },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
