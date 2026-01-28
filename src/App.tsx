@@ -39,6 +39,7 @@ const PainelReports = lazy(() => import("./pages/painel/Reports"));
 const PainelSettings = lazy(() => import("./pages/painel/Settings"));
 const PainelAiAgents = lazy(() => import("./pages/painel/AiAgents"));
 const PainelAiChat = lazy(() => import("./pages/painel/AiChat"));
+const PainelAgentKnowledge = lazy(() => import("./pages/painel/AiAgentKnowledge"));
 const PainelInvoices = lazy(() => import("./pages/painel/Invoices"));
 const PainelWhatsApp = lazy(() => import("./pages/painel/WhatsAppConfig"));
 
@@ -108,6 +109,7 @@ const App = () => (
                 <Route path="comunicacao" element={<PainelCommunication />} />
                 <Route path="usuarios" element={<PainelUsers />} />
                 <Route path="agentes" element={<PainelAiAgents />} />
+                <Route path="agentes/:agentId/conhecimento" element={<PainelAgentKnowledge />} />
                 <Route path="chat" element={<PainelAiChat />} />
                 <Route path="faturas" element={<PainelInvoices />} />
                 <Route path="relatorios" element={<PainelReports />} />
