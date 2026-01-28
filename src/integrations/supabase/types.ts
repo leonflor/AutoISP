@@ -14,11 +14,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_knowledge_base: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          isp_agent_id: string
+          question: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          isp_agent_id: string
+          question: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          isp_agent_id?: string
+          question?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_knowledge_base_isp_agent_id_fkey"
+            columns: ["isp_agent_id"]
+            isOneToOne: false
+            referencedRelation: "isp_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agents: {
         Row: {
+          allowed_data_access: Json | null
           avatar_url: string | null
           created_at: string | null
           description: string | null
+          feature_custom: Json | null
+          feature_tags: Json | null
           features: Json | null
           id: string
           is_active: boolean | null
@@ -26,16 +73,22 @@ export type Database = {
           max_tokens: number | null
           model: string | null
           name: string
+          scope: Database["public"]["Enums"]["ai_agent_scope"] | null
           slug: string
+          sort_order: number | null
           system_prompt: string | null
           temperature: number | null
           type: Database["public"]["Enums"]["tipo_agente"]
           updated_at: string | null
+          uses_knowledge_base: boolean | null
         }
         Insert: {
+          allowed_data_access?: Json | null
           avatar_url?: string | null
           created_at?: string | null
           description?: string | null
+          feature_custom?: Json | null
+          feature_tags?: Json | null
           features?: Json | null
           id?: string
           is_active?: boolean | null
@@ -43,16 +96,22 @@ export type Database = {
           max_tokens?: number | null
           model?: string | null
           name: string
+          scope?: Database["public"]["Enums"]["ai_agent_scope"] | null
           slug: string
+          sort_order?: number | null
           system_prompt?: string | null
           temperature?: number | null
           type: Database["public"]["Enums"]["tipo_agente"]
           updated_at?: string | null
+          uses_knowledge_base?: boolean | null
         }
         Update: {
+          allowed_data_access?: Json | null
           avatar_url?: string | null
           created_at?: string | null
           description?: string | null
+          feature_custom?: Json | null
+          feature_tags?: Json | null
           features?: Json | null
           id?: string
           is_active?: boolean | null
@@ -60,11 +119,14 @@ export type Database = {
           max_tokens?: number | null
           model?: string | null
           name?: string
+          scope?: Database["public"]["Enums"]["ai_agent_scope"] | null
           slug?: string
+          sort_order?: number | null
           system_prompt?: string | null
           temperature?: number | null
           type?: Database["public"]["Enums"]["tipo_agente"]
           updated_at?: string | null
+          uses_knowledge_base?: boolean | null
         }
         Relationships: []
       }
@@ -75,6 +137,7 @@ export type Database = {
           daily_limit: number | null
           id: string
           is_enabled: boolean | null
+          max_agents_active: number | null
           monthly_limit: number | null
           plan_id: string
           updated_at: string | null
@@ -85,6 +148,7 @@ export type Database = {
           daily_limit?: number | null
           id?: string
           is_enabled?: boolean | null
+          max_agents_active?: number | null
           monthly_limit?: number | null
           plan_id: string
           updated_at?: string | null
@@ -95,6 +159,7 @@ export type Database = {
           daily_limit?: number | null
           id?: string
           is_enabled?: boolean | null
+          max_agents_active?: number | null
           monthly_limit?: number | null
           plan_id?: string
           updated_at?: string | null
@@ -115,6 +180,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_security_clauses: {
+        Row: {
+          applies_to:
+            | Database["public"]["Enums"]["security_clause_applies"]
+            | null
+          content: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to?:
+            | Database["public"]["Enums"]["security_clause_applies"]
+            | null
+          content: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to?:
+            | Database["public"]["Enums"]["security_clause_applies"]
+            | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       ai_usage: {
         Row: {
@@ -674,6 +778,57 @@ export type Database = {
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      isp_agents: {
+        Row: {
+          additional_prompt: string | null
+          agent_id: string
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          id: string
+          is_enabled: boolean | null
+          isp_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          additional_prompt?: string | null
+          agent_id: string
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          isp_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          additional_prompt?: string | null
+          agent_id?: string
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          isp_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "isp_agents_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "isp_agents_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
             referencedColumns: ["id"]
           },
         ]
@@ -1435,8 +1590,10 @@ export type Database = {
       }
     }
     Enums: {
+      ai_agent_scope: "tenant" | "platform"
       app_role: "super_admin" | "admin" | "support"
       isp_member_role: "owner" | "admin" | "operator" | "viewer"
+      security_clause_applies: "all" | "tenant" | "platform"
       status_assinatura:
         | "trial"
         | "ativa"
@@ -1578,8 +1735,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_agent_scope: ["tenant", "platform"],
       app_role: ["super_admin", "admin", "support"],
       isp_member_role: ["owner", "admin", "operator", "viewer"],
+      security_clause_applies: ["all", "tenant", "platform"],
       status_assinatura: [
         "trial",
         "ativa",
