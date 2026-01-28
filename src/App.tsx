@@ -46,6 +46,8 @@ const PainelWhatsApp = lazy(() => import("./pages/painel/WhatsAppConfig"));
 const AdminSupport = lazy(() => import("./pages/admin/Support"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
+const AiAgentsPage = lazy(() => import("./pages/admin/AiAgents"));
+const AiSecurityPage = lazy(() => import("./pages/admin/AiSecurity"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 
 const queryClient = new QueryClient({
@@ -91,6 +93,8 @@ const App = () => (
                 <Route path="suporte" element={<AdminSupport />} />
                 <Route path="tickets" element={<SupportTickets />} />
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
+                <Route path="ai-agents" element={<AiAgentsPage />} />
+                <Route path="ai-security" element={<AiSecurityPage />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
               </Route>
