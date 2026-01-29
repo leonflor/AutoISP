@@ -9,6 +9,7 @@ interface AuthContextType {
   profile: Profile | null;
   roles: AppRole[];
   loading: boolean;
+  rolesLoaded: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -23,6 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -59,13 +61,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Fire-and-forget - não afeta loading
         if (session?.user) {
+          setRolesLoaded(false); // Resetar quando usuário muda
           fetchProfile(session.user.id);
           fetchRolesAsync(session.user.id).then(roles => {
-            if (isMounted) setRoles(roles);
+            if (isMounted) {
+              setRoles(roles);
+              setRolesLoaded(true);
+            }
           });
         } else {
           setProfile(null);
           setRoles([]);
+          setRolesLoaded(true); // Sem usuário = roles "carregados" (vazio)
         }
       }
     );
@@ -83,7 +90,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           fetchProfile(session.user.id);
           const roles = await fetchRolesAsync(session.user.id);
-          if (isMounted) setRoles(roles);
+          if (isMounted) {
+            setRoles(roles);
+            setRolesLoaded(true);
+          }
+        } else {
+          setRolesLoaded(true);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -130,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setRolesLoaded(false);
   };
 
   const hasRole = (role: AppRole): boolean => {
@@ -144,6 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         roles,
         loading,
+        rolesLoaded,
         signUp,
         signIn,
         signOut,
