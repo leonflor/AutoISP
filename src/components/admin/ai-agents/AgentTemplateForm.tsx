@@ -37,6 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FeatureTagsSelector } from './FeatureTagsSelector';
 import { PersonalizationTab } from './PersonalizationTab';
+import { TemplateAvatarUpload } from './TemplateAvatarUpload';
 import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS, DEFAULT_VOICE_TONES, DEFAULT_ESCALATION_OPTIONS } from './constants';
 import type { AiAgent } from '@/hooks/admin/useAiAgentTemplates';
 
@@ -363,10 +364,17 @@ export function AgentTemplateForm({
                     name="avatar_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>URL do Avatar</FormLabel>
+                        <FormLabel>Avatar do Agente</FormLabel>
                         <FormControl>
-                          <Input placeholder="https://..." {...field} />
+                          <TemplateAvatarUpload
+                            value={field.value}
+                            onChange={field.onChange}
+                            slug={form.watch('slug')}
+                          />
                         </FormControl>
+                        <FormDescription>
+                          Será usado como padrão se o ISP não enviar avatar próprio.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
