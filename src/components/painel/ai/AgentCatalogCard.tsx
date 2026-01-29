@@ -34,7 +34,7 @@ export function AgentCatalogCard({
 
   return (
     <Card
-      className={`relative overflow-hidden transition-all ${
+      className={`flex flex-col h-full relative overflow-hidden transition-all ${
         isBlocked || isAlreadyActivated
           ? "opacity-60"
           : "hover:shadow-lg hover:border-primary/50"
@@ -73,7 +73,7 @@ export function AgentCatalogCard({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col space-y-4">
         <CardDescription className="line-clamp-2">{agent.description}</CardDescription>
 
         <div className="space-y-1">
@@ -106,7 +106,7 @@ export function AgentCatalogCard({
         )}
 
         <Button
-          className="w-full"
+          className="w-full mt-auto"
           variant={isAlreadyActivated ? "secondary" : isBlocked || !canActivate ? "outline" : "default"}
           disabled={isBlocked || isAlreadyActivated || !canActivate}
           onClick={() => onActivate(agent)}
