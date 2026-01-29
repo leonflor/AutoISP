@@ -57,7 +57,7 @@ export default function AiSecurityPage() {
   const inactiveCount = clauses?.filter(c => !c.is_active).length || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cláusulas de Segurança</h1>
