@@ -13,8 +13,6 @@ export default function SettingsPage() {
   const integrations = [
     { name: 'WhatsApp Business', status: 'pendente', icon: '💬' },
     { name: 'ERP (SGP/IXC)', status: 'pendente', icon: '📊' },
-    { name: 'Asaas (Pagamentos)', status: 'configurado', icon: '💳' },
-    { name: 'OpenAI', status: 'configurado', icon: '🤖' },
   ];
 
   return (
