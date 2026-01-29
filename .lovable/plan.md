@@ -1,71 +1,120 @@
 
-# Remoção da Coluna Premium da Tabela de Agentes
+# Correção de Overflow no Dialog de Novo Agente
 
-## Contexto
+## Problema Identificado
 
-A coluna **Premium** será removida da tabela de Agentes de IA porque essa informação será configurada diretamente nos **Planos de assinatura** — uma abordagem mais flexível que permite vincular agentes específicos a cada plano.
+Os elementos dentro do dialog de criação/edição de agentes estão excedendo os limites do container. O problema principal está na estrutura de layout:
+
+| Componente | Classe Atual | Problema |
+|------------|--------------|----------|
+| `ScrollArea` | `flex-1 px-6` | Padding horizontal aplicado, mas conteúdo interno pode transbordar |
+| `Tabs` | `w-full` | Sem controle de overflow |
+| `TabsList` | `grid w-full grid-cols-4` | Pode comprimir muito em telas menores |
+| `TabsContent` | `space-y-4 mt-0` | Sem overflow-hidden |
 
 ---
 
-## Mudanças
+## Solução
 
-### Arquivo: `src/components/admin/ai-agents/AgentTemplateTable.tsx`
+### Arquivo: `src/components/admin/ai-agents/AgentTemplateForm.tsx`
 
-| Item | Ação |
-|------|------|
-| Import `Crown` | Remover (não será mais usado) |
-| `<TableHead>Premium</TableHead>` | Remover (linha 93) |
-| `<TableCell>` com ícone Crown | Remover (linhas 138-142) |
+### Mudanças Propostas
 
-### Estrutura Final do Header
-
-```
-TableHeader
-├── Avatar (w-12)
-├── Nome
-├── Tipo
-├── Modelo
-├── Escopo
-├── Status (text-center)
-└── Ações (w-12)
-```
+1. **Adicionar `overflow-hidden` ao container das Tabs**
+2. **Adicionar padding direito extra no ScrollArea para compensar scrollbar**
+3. **Limitar largura máxima dos elementos internos**
+4. **Adicionar `overflow-hidden` a cada `TabsContent`**
 
 ---
 
 ## Seção Técnica
 
-### Alteração 1: Remover import Crown (linha 2)
+### Alteração 1: Ajustar ScrollArea (Linha 182)
 
 ```tsx
 // Antes
-import { Edit, Trash2, Copy, MoreHorizontal, Bot, Crown, Building2, Server } from 'lucide-react';
+<ScrollArea className="flex-1 px-6">
 
 // Depois
-import { Edit, Trash2, Copy, MoreHorizontal, Bot, Building2, Server } from 'lucide-react';
+<ScrollArea className="flex-1 px-6 pr-4">
 ```
 
-### Alteração 2: Remover TableHead Premium (linha 93)
+Reduzir padding direito para `pr-4` para compensar a scrollbar.
+
+### Alteração 2: Adicionar container com overflow às Tabs (Linha 183)
 
 ```tsx
-// Remover esta linha
-<TableHead className="text-center">Premium</TableHead>
+// Antes
+<Tabs defaultValue="basic" className="w-full">
+
+// Depois
+<Tabs defaultValue="basic" className="w-full overflow-hidden">
 ```
 
-### Alteração 3: Remover TableCell Premium (linhas 138-142)
+### Alteração 3: Adicionar overflow-hidden a cada TabsContent
+
+**Linha 191 - Aba Básico:**
+```tsx
+// Antes
+<TabsContent value="basic" className="space-y-4 mt-0">
+
+// Depois
+<TabsContent value="basic" className="space-y-4 mt-0 overflow-hidden">
+```
+
+**Linha 351 - Aba Configuração IA:**
+```tsx
+// Antes
+<TabsContent value="ai" className="space-y-4 mt-0">
+
+// Depois
+<TabsContent value="ai" className="space-y-4 mt-0 overflow-hidden">
+```
+
+**Linha 442 - Aba Features:**
+```tsx
+// Antes
+<TabsContent value="features" className="space-y-4 mt-0">
+
+// Depois
+<TabsContent value="features" className="space-y-4 mt-0 overflow-hidden">
+```
+
+**Linha 515 - Aba Status:**
+```tsx
+// Antes
+<TabsContent value="status" className="space-y-4 mt-0">
+
+// Depois
+<TabsContent value="status" className="space-y-4 mt-0 overflow-hidden">
+```
+
+### Alteração 4: Adicionar padding bottom ao conteúdo scrollável
+
+Adicionar uma `div` wrapper com padding bottom para garantir que o último elemento não fique colado no footer:
 
 ```tsx
-// Remover este bloco
-<TableCell className="text-center">
-  {agent.is_premium && (
-    <Crown className="h-4 w-4 text-amber-500 mx-auto" />
-  )}
-</TableCell>
+// Antes (linha 182-576)
+<ScrollArea className="flex-1 px-6 pr-4">
+  <Tabs defaultValue="basic" className="w-full overflow-hidden">
+    ...
+  </Tabs>
+</ScrollArea>
+
+// Depois
+<ScrollArea className="flex-1 px-6 pr-4">
+  <div className="pb-4">
+    <Tabs defaultValue="basic" className="w-full overflow-hidden">
+      ...
+    </Tabs>
+  </div>
+</ScrollArea>
 ```
 
 ---
 
-## Resumo
+## Resumo de Arquivos
 
 | Tipo | Arquivo | Mudança |
 |------|---------|---------|
-| Modificar | `src/components/admin/ai-agents/AgentTemplateTable.tsx` | Remover coluna Premium |
+| Modificar | `src/components/admin/ai-agents/AgentTemplateForm.tsx` | Corrigir overflow em Tabs e TabsContent, ajustar padding |
