@@ -55,7 +55,9 @@ const ImplementacaoTab = () => {
     { nome: "ASAAS_API_KEY", fase: "F2", descricao: "Chave da API Asaas (sandbox/prod)" },
     { nome: "ASAAS_WEBHOOK_TOKEN", fase: "F2", descricao: "Token para validar webhooks Asaas" },
     { nome: "OPENAI_API_KEY", fase: "F2", descricao: "Chave da API OpenAI" },
-    { nome: "WHATSAPP_TOKEN", fase: "F2", descricao: "Token WhatsApp Business (futuro)" },
+    { nome: "WHATSAPP_TOKEN", fase: "F2", descricao: "Token WhatsApp Business" },
+    { nome: "RESEND_API_KEY", fase: "F2", descricao: "Chave da API Resend para emails" },
+    { nome: "ENCRYPTION_KEY", fase: "F1", descricao: "Chave para criptografia de dados sensíveis" },
   ];
 
   const riscos = [
@@ -67,12 +69,17 @@ const ImplementacaoTab = () => {
   ];
 
   const edgeFunctions = [
-    "asaas-create-customer",
-    "asaas-create-subscription",
+    "asaas-customer",
+    "asaas-subscription",
     "asaas-webhook",
-    "ai-chat (OpenAI API)",
+    "ai-chat",
     "ai-usage",
     "whatsapp-webhook",
+    "check-integration",
+    "test-integration",
+    "save-integration",
+    "send-email",
+    "invite-admin",
   ];
 
   return (
