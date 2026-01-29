@@ -8,7 +8,9 @@ import {
   LogOut,
   Wifi,
   Send,
-  UserCog
+  UserCog,
+  Bot,
+  Receipt
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,10 +36,10 @@ const menuItems = [
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
   { title: 'WhatsApp', url: '/painel/whatsapp', icon: MessageCircle },
-  { title: 'Agentes IA', url: '/painel/agentes', icon: Wifi },
+  { title: 'Agentes IA', url: '/painel/agentes', icon: Bot },
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
-  { title: 'Faturas', url: '/painel/faturas', icon: BarChart3 },
+  { title: 'Faturas', url: '/painel/faturas', icon: Receipt },
   { title: 'Relatórios', url: '/painel/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/painel/configuracoes', icon: Settings },
 ];
