@@ -64,6 +64,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           description: string | null
+          escalation_options: Json | null
           feature_custom: Json | null
           feature_tags: Json | null
           features: Json | null
@@ -81,12 +82,14 @@ export type Database = {
           type: Database["public"]["Enums"]["tipo_agente"]
           updated_at: string | null
           uses_knowledge_base: boolean | null
+          voice_tones: Json | null
         }
         Insert: {
           allowed_data_access?: Json | null
           avatar_url?: string | null
           created_at?: string | null
           description?: string | null
+          escalation_options?: Json | null
           feature_custom?: Json | null
           feature_tags?: Json | null
           features?: Json | null
@@ -104,12 +107,14 @@ export type Database = {
           type: Database["public"]["Enums"]["tipo_agente"]
           updated_at?: string | null
           uses_knowledge_base?: boolean | null
+          voice_tones?: Json | null
         }
         Update: {
           allowed_data_access?: Json | null
           avatar_url?: string | null
           created_at?: string | null
           description?: string | null
+          escalation_options?: Json | null
           feature_custom?: Json | null
           feature_tags?: Json | null
           features?: Json | null
@@ -127,6 +132,7 @@ export type Database = {
           type?: Database["public"]["Enums"]["tipo_agente"]
           updated_at?: string | null
           uses_knowledge_base?: boolean | null
+          voice_tones?: Json | null
         }
         Relationships: []
       }
@@ -789,10 +795,12 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           display_name: string | null
+          escalation_config: Json | null
           id: string
           is_enabled: boolean | null
           isp_id: string
           updated_at: string | null
+          voice_tone: string | null
         }
         Insert: {
           additional_prompt?: string | null
@@ -800,10 +808,12 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
+          escalation_config?: Json | null
           id?: string
           is_enabled?: boolean | null
           isp_id: string
           updated_at?: string | null
+          voice_tone?: string | null
         }
         Update: {
           additional_prompt?: string | null
@@ -811,10 +821,12 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
+          escalation_config?: Json | null
           id?: string
           is_enabled?: boolean | null
           isp_id?: string
           updated_at?: string | null
+          voice_tone?: string | null
         }
         Relationships: [
           {
