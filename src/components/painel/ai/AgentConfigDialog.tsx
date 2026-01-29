@@ -93,8 +93,8 @@ export function AgentConfigDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
               Configurar: {agent.display_name || template.name}
@@ -104,7 +104,7 @@ export function AgentConfigDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 py-4">
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div>
                 <Label htmlFor="is_enabled" className="font-medium">
@@ -153,33 +153,33 @@ export function AgentConfigDialog({
                 {...form.register("additional_prompt")}
               />
             </div>
+          </form>
 
-            <DialogFooter className="flex justify-between sm:justify-between">
+          <div className="flex justify-between items-center pt-4 border-t flex-shrink-0">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => setShowRemoveAlert(true)}
+              disabled={isLoading}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Remover
+            </Button>
+            <div className="flex gap-2">
               <Button
                 type="button"
-                variant="destructive"
-                onClick={() => setShowRemoveAlert(true)}
+                variant="outline"
+                onClick={() => onOpenChange(false)}
                 disabled={isLoading}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Remover
+                Cancelar
               </Button>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Salvar
-                </Button>
-              </div>
-            </DialogFooter>
-          </form>
+              <Button onClick={handleSubmit} disabled={isLoading}>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
