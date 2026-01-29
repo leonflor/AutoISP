@@ -37,7 +37,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { SECURITY_PLACEHOLDERS, APPLIES_TO_OPTIONS } from '../ai-agents/constants';
 import type { AiSecurityClause } from '@/hooks/admin/useAiSecurityClauses';
 
@@ -128,8 +128,8 @@ export function SecurityClauseForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{clause ? 'Editar Cláusula' : 'Nova Cláusula'}</DialogTitle>
           <DialogDescription>
             Cláusulas de segurança são injetadas automaticamente em todos os prompts de IA.
@@ -137,9 +137,8 @@ export function SecurityClauseForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
-            <ScrollArea className="flex-1 px-6 max-h-[60vh]">
-              <div className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-y-auto py-4 px-6">
+            <div className="space-y-4">
                 <FormField
                   control={form.control}
                   name="name"
@@ -282,19 +281,17 @@ export function SecurityClauseForm({
                       </FormItem>
                     )}
                   />
-                </div>
               </div>
-            </ScrollArea>
-
-            <DialogFooter className="p-6 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Salvando...' : clause ? 'Salvar Alterações' : 'Criar Cláusula'}
-              </Button>
-            </DialogFooter>
+            </div>
           </form>
+          <div className="flex justify-end gap-2 pt-4 border-t px-6 pb-6 flex-shrink-0">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting} onClick={form.handleSubmit(onSubmit)}>
+              {isSubmitting ? 'Salvando...' : clause ? 'Salvar Alterações' : 'Criar Cláusula'}
+            </Button>
+          </div>
         </Form>
       </DialogContent>
     </Dialog>
