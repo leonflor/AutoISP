@@ -84,7 +84,7 @@ export function ActiveAgentCard({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col space-y-4">
+      <CardContent className="flex-1 flex flex-col gap-4">
         <CardDescription className="line-clamp-2">
           {template.description}
         </CardDescription>
