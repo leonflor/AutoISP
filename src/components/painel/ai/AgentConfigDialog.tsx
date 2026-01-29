@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Bot, Save, Trash2, AlertTriangle } from "lucide-react";
+import { AvatarUpload } from "./AvatarUpload";
+import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,8 @@ export function AgentConfigDialog({
   isLoading,
 }: AgentConfigDialogProps) {
   const [showRemoveAlert, setShowRemoveAlert] = useState(false);
+  const { configMap } = usePlatformConfig();
+  const defaultAvatar = (configMap?.default_agent_avatar?.value as string) || '';
 
   const form = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
@@ -131,11 +135,12 @@ export function AgentConfigDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="avatar_url">URL do Avatar (opcional)</Label>
-              <Input
-                id="avatar_url"
-                placeholder="https://exemplo.com/avatar.png"
-                {...form.register("avatar_url")}
+              <Label>Avatar do Agente</Label>
+              <AvatarUpload
+                value={form.watch("avatar_url") || ""}
+                onChange={(url) => form.setValue("avatar_url", url, { shouldDirty: true })}
+                ispId={agent.isp_id}
+                defaultAvatar={agent.ai_agents.avatar_url || defaultAvatar}
               />
             </div>
           </form>
