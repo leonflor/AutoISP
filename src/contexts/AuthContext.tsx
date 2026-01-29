@@ -36,53 +36,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const fetchRoles = async (userId: string) => {
+  // Função assíncrona que retorna os roles
+  const fetchRolesAsync = async (userId: string): Promise<AppRole[]> => {
     const { data } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId);
     
-    if (data && Array.isArray(data)) {
-      setRoles(data.map((r: { role: AppRole }) => r.role));
-    }
+    return data?.map((r: { role: AppRole }) => r.role) ?? [];
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let isMounted = true;
+
+    // Listener para MUDANÇAS CONTÍNUAS (não controla loading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!isMounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Defer Supabase calls with setTimeout to prevent deadlock
+
+        // Fire-and-forget - não afeta loading
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            fetchRoles(session.user.id);
-          }, 0);
+          fetchProfile(session.user.id);
+          fetchRolesAsync(session.user.id).then(roles => {
+            if (isMounted) setRoles(roles);
+          });
         } else {
           setProfile(null);
           setRoles([]);
         }
-        
-        setLoading(false);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchRoles(session.user.id);
-      }
-      
-      setLoading(false);
-    });
+    // CARGA INICIAL (controla loading)
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
 
-    return () => subscription.unsubscribe();
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        // Buscar roles ANTES de definir loading=false
+        if (session?.user) {
+          fetchProfile(session.user.id);
+          const roles = await fetchRolesAsync(session.user.id);
+          if (isMounted) setRoles(roles);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
