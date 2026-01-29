@@ -16,6 +16,11 @@ export interface AgentActivationForm {
   display_name: string;
   avatar_url?: string;
   additional_prompt?: string;
+  voice_tone?: string;
+  escalation_config?: {
+    triggers: string[];
+    max_interactions: number;
+  };
 }
 
 export interface CatalogTemplate extends AiAgent {
@@ -127,6 +132,8 @@ export function useIspAgents() {
           display_name: data.form.display_name,
           avatar_url: data.form.avatar_url || null,
           additional_prompt: data.form.additional_prompt || null,
+          voice_tone: data.form.voice_tone || null,
+          escalation_config: data.form.escalation_config || null,
           is_enabled: true,
         })
         .select()
@@ -152,15 +159,20 @@ export function useIspAgents() {
   // Mutation para atualizar agente
   const updateAgent = useMutation({
     mutationFn: async (data: { id: string; form: Partial<AgentActivationForm> & { is_enabled?: boolean } }) => {
+      const updateData: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (data.form.display_name !== undefined) updateData.display_name = data.form.display_name;
+      if (data.form.avatar_url !== undefined) updateData.avatar_url = data.form.avatar_url || null;
+      if (data.form.additional_prompt !== undefined) updateData.additional_prompt = data.form.additional_prompt || null;
+      if (data.form.voice_tone !== undefined) updateData.voice_tone = data.form.voice_tone || null;
+      if (data.form.escalation_config !== undefined) updateData.escalation_config = data.form.escalation_config || null;
+      if (data.form.is_enabled !== undefined) updateData.is_enabled = data.form.is_enabled;
+
       const { data: result, error } = await supabase
         .from("isp_agents")
-        .update({
-          display_name: data.form.display_name,
-          avatar_url: data.form.avatar_url || null,
-          additional_prompt: data.form.additional_prompt || null,
-          is_enabled: data.form.is_enabled,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq("id", data.id)
         .select()
         .single();

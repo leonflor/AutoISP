@@ -73,3 +73,53 @@ export const APPLIES_TO_OPTIONS = [
   { value: 'tenant', label: 'Apenas ISPs', color: 'bg-blue-500/10 text-blue-600' },
   { value: 'platform', label: 'Apenas Plataforma', color: 'bg-purple-500/10 text-purple-600' },
 ] as const;
+
+// ===== NOVOS TIPOS PARA PERSONALIZAÇÃO =====
+
+export interface VoiceTone {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface EscalationTrigger {
+  id: string;
+  label: string;
+  default?: boolean;
+}
+
+export interface EscalationOptions {
+  triggers: EscalationTrigger[];
+  max_interactions: {
+    min: number;
+    max: number;
+    default: number;
+  };
+}
+
+export interface EscalationConfig {
+  triggers: string[];
+  max_interactions: number;
+}
+
+// Tons de voz padrão disponíveis
+export const DEFAULT_VOICE_TONES: VoiceTone[] = [
+  { id: 'formal', label: 'Formal e Profissional', description: 'Tom corporativo e objetivo' },
+  { id: 'friendly', label: 'Amigável e Acolhedor', description: 'Tom caloroso e empático' },
+  { id: 'casual', label: 'Casual e Descontraído', description: 'Tom leve e informal' },
+  { id: 'technical', label: 'Técnico e Preciso', description: 'Tom focado em detalhes técnicos' },
+];
+
+// Gatilhos de escalonamento padrão
+export const DEFAULT_ESCALATION_TRIGGERS: EscalationTrigger[] = [
+  { id: 'user_request', label: 'Quando o cliente solicitar', default: true },
+  { id: 'low_confidence', label: 'Quando a IA não souber responder', default: true },
+  { id: 'sensitive_topic', label: 'Assuntos financeiros ou cancelamento', default: false },
+  { id: 'repeated_issue', label: 'Problema recorrente (3+ vezes)', default: false },
+];
+
+// Configuração padrão de escalonamento
+export const DEFAULT_ESCALATION_OPTIONS: EscalationOptions = {
+  triggers: DEFAULT_ESCALATION_TRIGGERS,
+  max_interactions: { min: 3, max: 10, default: 5 },
+};

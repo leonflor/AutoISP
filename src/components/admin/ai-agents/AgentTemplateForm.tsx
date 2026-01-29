@@ -36,7 +36,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FeatureTagsSelector } from './FeatureTagsSelector';
-import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS } from './constants';
+import { PersonalizationTab } from './PersonalizationTab';
+import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS, DEFAULT_VOICE_TONES, DEFAULT_ESCALATION_OPTIONS } from './constants';
 import type { AiAgent } from '@/hooks/admin/useAiAgentTemplates';
 
 const agentSchema = z.object({
@@ -57,6 +58,24 @@ const agentSchema = z.object({
   is_premium: z.boolean().default(false),
   sort_order: z.coerce.number().default(0),
   allowed_data_access: z.array(z.string()).default([]),
+  // Novos campos de personalização
+  voice_tones: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+  })).default([]),
+  escalation_options: z.object({
+    triggers: z.array(z.object({
+      id: z.string(),
+      label: z.string(),
+      default: z.boolean().optional(),
+    })).default([]),
+    max_interactions: z.object({
+      min: z.number().default(3),
+      max: z.number().default(10),
+      default: z.number().default(5),
+    }).default({ min: 3, max: 10, default: 5 }),
+  }).default({ triggers: [], max_interactions: { min: 3, max: 10, default: 5 } }),
 });
 
 type AgentFormValues = z.infer<typeof agentSchema>;
@@ -98,6 +117,8 @@ export function AgentTemplateForm({
       is_premium: false,
       sort_order: 0,
       allowed_data_access: [],
+      voice_tones: DEFAULT_VOICE_TONES,
+      escalation_options: DEFAULT_ESCALATION_OPTIONS,
     },
   });
 
@@ -123,6 +144,8 @@ export function AgentTemplateForm({
         is_premium: agent.is_premium || false,
         sort_order: agent.sort_order || 0,
         allowed_data_access: (agent.allowed_data_access as string[]) || [],
+        voice_tones: (agent.voice_tones as any[]) || DEFAULT_VOICE_TONES,
+        escalation_options: (agent.escalation_options as any) || DEFAULT_ESCALATION_OPTIONS,
       });
     } else {
       form.reset();
@@ -182,10 +205,11 @@ export function AgentTemplateForm({
             <ScrollArea className="flex-1 px-6 pr-4">
               <div className="pb-4">
                 <Tabs defaultValue="basic" className="w-full overflow-hidden">
-                <TabsList className="grid w-full grid-cols-4 mb-4">
+                <TabsList className="grid w-full grid-cols-5 mb-4">
                   <TabsTrigger value="basic">Básico</TabsTrigger>
-                  <TabsTrigger value="ai">Configuração IA</TabsTrigger>
+                  <TabsTrigger value="ai">Config IA</TabsTrigger>
                   <TabsTrigger value="features">Features</TabsTrigger>
+                  <TabsTrigger value="personalization" disabled={scope === 'platform'}>Personalização</TabsTrigger>
                   <TabsTrigger value="status">Status</TabsTrigger>
                 </TabsList>
 
@@ -511,6 +535,10 @@ export function AgentTemplateForm({
                       )}
                     />
                   )}
+                </TabsContent>
+
+                <TabsContent value="personalization" className="space-y-4 mt-0 overflow-hidden">
+                  <PersonalizationTab form={form} scope={scope as 'tenant' | 'platform'} />
                 </TabsContent>
 
                 <TabsContent value="status" className="space-y-4 mt-0 overflow-hidden">
