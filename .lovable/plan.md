@@ -1,92 +1,43 @@
 
-# Correção de Layout do Dialog de Cláusulas LGPD
 
-## Problemas Identificados
+# Correção de Margens na Página de Cláusulas LGPD
 
-### 1. Input Excedendo o Limite do Dialog
-O formulário tem `px-6` aplicado diretamente, e os campos internos podem exceder o container quando não há controle de overflow adequado.
+## Problema Identificado
 
-### 2. Dois Inputs Desalinhados no Final
-O grid com dois campos na parte inferior apresenta desalinhamento visual:
+A página de **Cláusulas LGPD** (`AiSecurity.tsx`) está com textos e botões muito próximos das bordas porque não possui o padding padrão `p-6` usado em outras páginas admin.
 
-| Campo | Estrutura Atual | Problema |
-|-------|-----------------|----------|
-| Ordem de Injeção | `FormItem` padrão com Input + FormDescription | Altura menor |
-| Cláusula Ativa | `FormItem` com `flex flex-col justify-end` + div com border/padding | Altura maior devido ao container estilizado |
+### Comparação de Páginas
 
-A diferença de altura e estrutura causa desalinhamento visual entre os dois campos.
+| Página | Container Principal | Resultado |
+|--------|---------------------|-----------|
+| Dashboard | `<div className="p-6 space-y-6">` | ✅ Margens corretas |
+| Users | `<div className="p-6 space-y-6">` | ✅ Margens corretas |
+| AiSecurity | `<div className="space-y-6">` | ❌ Sem margens |
+| AiAgents | `<div className="space-y-6">` | ❌ Sem margens |
 
 ---
 
 ## Solução
 
-### Arquivo a Modificar
+### Arquivos a Modificar
 
-**`src/components/admin/ai-security/SecurityClauseForm.tsx`**
+1. **`src/pages/admin/AiSecurity.tsx`** - Adicionar `p-6` ao container principal
+2. **`src/pages/admin/AiAgents.tsx`** - Adicionar `p-6` ao container principal (mesmo problema)
 
-### Mudanças Propostas
-
-1. **Adicionar `overflow-hidden` ao container do form**:
-   - Alterar `<div className="space-y-4">` para `<div className="space-y-4 overflow-hidden">`
-
-2. **Equalizar altura dos campos no grid**:
-   - Ambos os campos devem ter a mesma estrutura visual
-   - Usar `h-full` no FormItem do switch para ocupar toda a altura disponível
-   - Ajustar o container do switch para alinhar verticalmente com o input
-
-### Estrutura Final do Grid
-
-```
-grid grid-cols-2 gap-4
-├── FormItem (Ordem de Injeção)
-│   ├── FormLabel
-│   ├── FormControl > Input
-│   ├── FormDescription
-│   └── FormMessage
-└── FormItem (Cláusula Ativa) [h-full flex flex-col]
-    ├── div (spacer ou label área)
-    └── div (flex-1 flex items-center justify-between rounded-lg border p-3)
-        ├── FormLabel
-        └── Switch
-```
-
----
-
-## Seção Técnica
-
-### Alteração 1: Overflow no Container (Linha 141)
+### Mudança
 
 ```tsx
 // Antes
-<div className="space-y-4">
+<div className="space-y-6">
 
-// Depois  
-<div className="space-y-4 overflow-hidden">
+// Depois
+<div className="p-6 space-y-6">
 ```
 
-### Alteração 2: Equalizar Grid Items (Linhas 249-284)
-
-```tsx
-// Antes - sort_order sem altura definida
-<FormItem>
-
-// Depois - sort_order com estrutura para preencher altura
-<FormItem className="space-y-2">
-
-// Antes - is_active com flex-col justify-end
-<FormItem className="flex flex-col justify-end">
-  <div className="flex items-center justify-between rounded-lg border p-3">
-
-// Depois - is_active com estrutura equalizada
-<FormItem className="flex flex-col">
-  <FormLabel>Cláusula Ativa</FormLabel>
-  <div className="flex-1 flex items-center justify-between rounded-lg border p-3 h-10">
-```
-
-Isso garante que:
-- O label "Cláusula Ativa" fica na mesma posição vertical que "Ordem de Injeção"
-- Os containers de input (Input e Switch) ficam alinhados horizontalmente
-- Ambos os campos têm altura visual consistente
+Isso aplicará:
+- **padding: 24px (1.5rem)** em todos os lados
+- Alinhamento visual com as demais páginas admin
+- Espaço adequado entre o conteúdo e as bordas do container
 
 ---
 
@@ -94,4 +45,6 @@ Isso garante que:
 
 | Tipo | Arquivo | Mudança |
 |------|---------|---------|
-| Modificar | `src/components/admin/ai-security/SecurityClauseForm.tsx` | Corrigir overflow e alinhar grid |
+| Modificar | `src/pages/admin/AiSecurity.tsx` | Adicionar `p-6` ao container |
+| Modificar | `src/pages/admin/AiAgents.tsx` | Adicionar `p-6` ao container |
+
