@@ -1,118 +1,79 @@
 
-# Sincronizar Templates com Agentes ISP
+# Remover Abas do Dialog "Ativar Agente"
 
-## Problema Identificado
+## Objetivo
 
-A arquitetura atual está correta no frontend - ISP agents fazem JOIN com templates e sempre recebem dados atualizados. Porém, a Edge Function `ai-chat` está quebrada e precisa ser corrigida para usar a estrutura de join corretamente.
-
-### Problemas Atuais:
-
-1. **Edge Function `ai-chat`** busca `ai_agents.isp_id` que não existe
-2. Não usa `isp_agents` para obter customizações do ISP
-3. Não injeta `voice_tone`, `additional_prompt` ou `security_clauses` no prompt
+Simplificar a interface do dialog de ativação de agente removendo o sistema de abas e exibindo todo o conteúdo em uma única visualização contínua.
 
 ---
 
-## Solução
+## Mudança Visual
 
-Corrigir a Edge Function para buscar corretamente a configuração do agente através do join `isp_agents` → `ai_agents`, garantindo que:
-- Mudanças no template (system_prompt, model, temperature) são aplicadas imediatamente
-- Customizações do ISP (voice_tone, escalation_config) são respeitadas
-- Cláusulas de segurança globais são injetadas
+**Antes:**
+```
+┌─────────────────────────────────────────┐
+│ Ativar Agente: Nome                     │
+│                                         │
+│ [Configuração] [Comportamento]  ← Abas  │
+│                                         │
+│ Conteúdo da aba selecionada             │
+└─────────────────────────────────────────┘
+```
+
+**Depois:**
+```
+┌─────────────────────────────────────────┐
+│ Ativar Agente: Nome                     │
+│                                         │
+│ Nome de Exibição                        │
+│ Avatar do Agente                        │
+│ Base de Conhecimento (se aplicável)     │
+│ ─────────────────────────────────────── │
+│ Tom de Voz (se aplicável)               │
+│ Escalonamento (se aplicável)            │
+└─────────────────────────────────────────┘
+```
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
-| Tipo | Arquivo | Mudança |
-|------|---------|---------|
-| Modificar | `supabase/functions/ai-chat/index.ts` | Corrigir query para usar isp_agents JOIN ai_agents |
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/painel/ai/AgentActivationDialog.tsx` | Remover Tabs e mostrar conteúdo em scroll contínuo |
 
 ---
 
 ## Seção Técnica
 
-### Nova Lógica da Edge Function
+### Mudanças no AgentActivationDialog.tsx
 
-```text
-1. Receber: ispAgentId (ou agentId + ispId)
-2. Buscar: isp_agents JOIN ai_agents WHERE isp_agents.id = ispAgentId
-3. Validar: ISP tem acesso, agente está ativo
-4. Buscar: ai_security_clauses ativas
-5. Buscar: agent_knowledge_base (se uses_knowledge_base = true)
-6. Montar prompt final:
-   - Base: template.system_prompt
-   - + Voice tone injection (se configurado)
-   - + Knowledge base context (se houver)
-   - + Security clauses (sempre)
-7. Chamar AI Gateway com template.model, template.temperature
-8. Registrar uso
+1. **Remover imports não utilizados:**
+   - Remover `Tabs`, `TabsContent`, `TabsList`, `TabsTrigger`
+   - Remover `Settings2` (ícone da aba)
+   - Remover estado `activeTab`
+
+2. **Substituir estrutura de Tabs** por um `ScrollArea` único contendo:
+   - Seção de Configuração (nome, avatar, upload de base)
+   - Separador visual
+   - Seção de Comportamento (tom de voz, escalonamento) - apenas se houver opções disponíveis
+
+3. **Layout final:**
+```tsx
+<ScrollArea className="flex-1 mt-4">
+  <div className="space-y-4 px-1">
+    {/* Configuração */}
+    <div className="space-y-4">
+      {/* Nome, Avatar, Upload CSV, Badges */}
+    </div>
+    
+    {/* Comportamento - se houver opções */}
+    {hasBehaviorOptions && (
+      <>
+        <Separator />
+        <BehaviorTab ... />
+      </>
+    )}
+  </div>
+</ScrollArea>
 ```
-
-### Estrutura do Prompt Final
-
-```text
-[SYSTEM_PROMPT do template]
-
-[Se voice_tone configurado]
-Adote o seguinte tom de voz: {voice_tone}
-
-[Se knowledge_base disponível]
-Base de conhecimento disponível:
-Q: {pergunta1}
-A: {resposta1}
-...
-
-[Sempre - Security Clauses]
-REGRAS OBRIGATÓRIAS:
-- {clausula1}
-- {clausula2}
-```
-
-### Hierarquia de Dados (Template vs ISP)
-
-| Campo | Origem | Descrição |
-|-------|--------|-----------|
-| system_prompt | Template | Prompt base do agente |
-| model | Template | Modelo de IA a usar |
-| temperature | Template | Criatividade das respostas |
-| max_tokens | Template | Limite de tokens |
-| voice_tone | ISP | Tom selecionado pelo ISP |
-| escalation_config | ISP | Regras de escalação customizadas |
-| avatar_url | ISP > Template | Prioridade para customização do ISP |
-| display_name | ISP > Template | Prioridade para customização do ISP |
-
----
-
-## Fluxo de Dados Corrigido
-
-```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   AiChat.tsx    │────►│  ai-chat (Edge)  │────►│ AI Gateway      │
-│                 │     │                  │     │                 │
-│ - ispAgentId    │     │ 1. Query JOIN    │     │ - model         │
-│ - messages      │     │ 2. Build prompt  │     │ - temperature   │
-│ - ispId         │     │ 3. Add security  │     │ - messages      │
-└─────────────────┘     │ 4. Add knowledge │     └─────────────────┘
-                        └──────────────────┘
-                               │
-                               ▼
-                        ┌──────────────────┐
-                        │   Supabase DB    │
-                        │                  │
-                        │ - isp_agents     │
-                        │ - ai_agents      │
-                        │ - security_clauses│
-                        │ - knowledge_base │
-                        └──────────────────┘
-```
-
----
-
-## Benefícios da Correção
-
-1. **Atualizações Automáticas**: Mudanças no template refletem imediatamente
-2. **Segurança Centralizada**: Cláusulas de segurança sempre injetadas
-3. **Personalização ISP**: Voice tone e customizações respeitadas
-4. **Knowledge Base**: Contexto específico do ISP incluído
-5. **Consistência**: Mesmo agente, comportamento uniforme entre ISPs
