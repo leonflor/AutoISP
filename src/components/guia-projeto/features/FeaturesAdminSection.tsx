@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Building2, CreditCard, FileText, Settings, Headphones, BarChart3, Users } from "lucide-react";
+import { LayoutDashboard, Building2, CreditCard, FileText, Settings, Headphones, BarChart3, Users, Bot } from "lucide-react";
 import DashboardFeatures from "./modules/DashboardFeatures";
 import ClientesFeatures from "./modules/ClientesFeatures";
 import PlanosFeatures from "./modules/PlanosFeatures";
@@ -8,6 +8,7 @@ import SuporteFeatures from "./modules/SuporteFeatures";
 import RelatoriosFeatures from "./modules/RelatoriosFeatures";
 import EquipeFeatures from "./modules/EquipeFeatures";
 import ConfiguracoesFeatures from "./modules/ConfiguracoesFeatures";
+import IAFeatures from "./modules/IAFeatures";
 
 const FeaturesAdminSection = () => {
   const modulos = [
@@ -19,6 +20,7 @@ const FeaturesAdminSection = () => {
     { id: "relatorios", label: "Relatórios", icon: BarChart3, count: 15 },
     { id: "equipe", label: "Equipe", icon: Users, count: 11 },
     { id: "configuracoes", label: "Configurações", icon: Settings, count: 14 },
+    { id: "ia", label: "IA", icon: Bot, count: 8 },
   ];
 
   return (
@@ -81,6 +83,10 @@ const FeaturesAdminSection = () => {
 
           <TabsContent value="configuracoes" className="mt-0">
             <ConfiguracoesFeatures />
+          </TabsContent>
+
+          <TabsContent value="ia" className="mt-0">
+            <IAFeatures />
           </TabsContent>
         </Tabs>
       </div>

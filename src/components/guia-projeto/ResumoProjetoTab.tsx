@@ -130,7 +130,7 @@ const ResumoProjetoTab = () => {
             <dl className="space-y-3">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Duração</dt>
-                <dd className="font-medium text-foreground">7 dias</dd>
+                <dd className="font-medium text-foreground">Configurável por plano (padrão: 14 dias)</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Recursos</dt>
