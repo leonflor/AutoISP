@@ -1,99 +1,84 @@
 
-# Corrigir Race Condition no Login Admin
+# Corrigir Race Condition no Fluxo de Login Admin
 
-## Problema Identificado
+## Problema Real
 
-O `AuthContext` define `loading=false` ANTES de completar o carregamento dos roles do usuário, causando um flash da tela "Acesso Restrito" durante o login admin.
+A correção anterior só resolve o **carregamento inicial** (refresh de página). O bug persiste no **fluxo de login ativo** porque o `onAuthStateChange` atualiza `user` imediatamente, mas os `roles` são carregados de forma assíncrona sem bloquear a renderização.
 
 ## Solução
 
-Separar o fluxo de inicialização do fluxo de mudanças contínuas de auth, garantindo que `loading` só seja `false` após carregar os roles.
+Adicionar um estado `rolesLoaded` no AuthContext que indica quando os roles estão sincronizados com o usuário atual. O AdminLogin deve aguardar este estado antes de decidir se mostra a tela de "Acesso Restrito".
 
 ---
 
-## Arquivo a Modificar
+## Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/contexts/AuthContext.tsx` | Aguardar roles antes de definir loading=false |
+| `src/contexts/AuthContext.tsx` | Adicionar estado `rolesLoaded` |
+| `src/pages/admin/AdminLogin.tsx` | Aguardar `rolesLoaded` antes de mostrar "Acesso Restrito" |
 
 ---
 
 ## Seção Técnica
 
-### Mudança no AuthContext.tsx
-
-**Padrão**: Separar "carga inicial" de "mudanças contínuas"
+### 1. AuthContext.tsx - Adicionar estado `rolesLoaded`
 
 ```tsx
-useEffect(() => {
-  let isMounted = true;
+// Novos estados
+const [rolesLoaded, setRolesLoaded] = useState(false);
 
-  // Função que busca roles e retorna Promise
-  const fetchRolesAsync = async (userId: string): Promise<AppRole[]> => {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    
-    return data?.map((r) => r.role as AppRole) ?? [];
-  };
-
-  // Listener para MUDANÇAS CONTÍNUAS (NÃO controla loading)
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (event, session) => {
-      if (!isMounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      // Fire-and-forget - não await, não afeta loading
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchRolesAsync(session.user.id).then(roles => {
-          if (isMounted) setRoles(roles);
-        });
-      } else {
-        setProfile(null);
-        setRoles([]);
-      }
+// No onAuthStateChange
+if (session?.user) {
+  setRolesLoaded(false); // Resetar quando usuário muda
+  fetchProfile(session.user.id);
+  fetchRolesAsync(session.user.id).then(roles => {
+    if (isMounted) {
+      setRoles(roles);
+      setRolesLoaded(true); // Marcar como carregado
     }
-  );
+  });
+} else {
+  setProfile(null);
+  setRoles([]);
+  setRolesLoaded(true); // Sem usuário = roles "carregados" (vazio)
+}
 
-  // CARGA INICIAL (controla loading)
-  const initializeAuth = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!isMounted) return;
+// No initializeAuth
+if (session?.user) {
+  fetchProfile(session.user.id);
+  const roles = await fetchRolesAsync(session.user.id);
+  if (isMounted) {
+    setRoles(roles);
+    setRolesLoaded(true);
+  }
+} else {
+  setRolesLoaded(true);
+}
 
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      // Buscar roles ANTES de definir loading=false
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        const roles = await fetchRolesAsync(session.user.id);
-        if (isMounted) setRoles(roles);
-      }
-    } finally {
-      if (isMounted) setLoading(false);
-    }
-  };
-
-  initializeAuth();
-
-  return () => {
-    isMounted = false;
-    subscription.unsubscribe();
-  };
-}, []);
+// Exportar no contexto
+value={{ ..., rolesLoaded }}
 ```
 
-### Por que isso resolve:
+### 2. AdminLogin.tsx - Aguardar rolesLoaded
 
-1. **Carga inicial**: `loading` só fica `false` APÓS `fetchRolesAsync` completar
-2. **Mudanças contínuas**: Não afetam `loading`, apenas atualizam os estados
-3. **Cleanup**: Flag `isMounted` evita atualizações em componente desmontado
+```tsx
+const { user, loading, signIn, signOut, hasRole, rolesLoaded } = useAuth();
+
+// Mostrar loading enquanto roles não carregaram
+if (loading || (user && !rolesLoaded)) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-secondary">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+// Agora sim, só mostra "Acesso Restrito" quando roles estão carregados
+if (user && !hasRole('super_admin')) {
+  // ... tela de acesso restrito
+}
+```
 
 ---
 
@@ -101,15 +86,27 @@ useEffect(() => {
 
 ```
 ANTES (bugado):
-1. Login → user definido
-2. loading = false (imediato)
-3. roles = [] → "Acesso Restrito" aparece! ❌
-4. roles carrega → navega para /admin
+1. signIn() → sucesso
+2. onAuthStateChange → setUser(user)
+3. roles = [] (ainda carregando)
+4. user && !hasRole() = true → "Acesso Restrito" aparece! ❌
+5. roles carregam → navega para /admin
 
 DEPOIS (corrigido):
-1. Login → user definido
-2. Aguarda fetchRoles completar
-3. roles = ['super_admin']
-4. loading = false
-5. hasRole('super_admin') = true → navega direto ✅
+1. signIn() → sucesso
+2. onAuthStateChange → setUser(user), setRolesLoaded(false)
+3. Componente vê: user existe + rolesLoaded=false → mostra loading
+4. roles carregam → setRoles(), setRolesLoaded(true)
+5. hasRole('super_admin') = true → navega direto para /admin ✅
+```
+
+---
+
+## Tipos a Atualizar
+
+```tsx
+interface AuthContextType {
+  // ... campos existentes
+  rolesLoaded: boolean; // Novo campo
+}
 ```
