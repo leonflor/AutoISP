@@ -1,49 +1,24 @@
 
-# Simplificar Tela "Ativar Agente" com Upload de Base de Conhecimento
+# Sincronizar Templates com Agentes ISP
 
-## Objetivo
+## Problema Identificado
 
-Modificar o dialog de ativação de agente no Painel ISP para:
-1. Remover a aba Preview
-2. Remover o campo "Instruções Adicionais"
-3. Adicionar upload de arquivo CSV para base de conhecimento (quando configurado no admin)
-4. Oferecer opções de "adicionar" ou "substituir" ao importar arquivo
+A arquitetura atual está correta no frontend - ISP agents fazem JOIN com templates e sempre recebem dados atualizados. Porém, a Edge Function `ai-chat` está quebrada e precisa ser corrigida para usar a estrutura de join corretamente.
+
+### Problemas Atuais:
+
+1. **Edge Function `ai-chat`** busca `ai_agents.isp_id` que não existe
+2. Não usa `isp_agents` para obter customizações do ISP
+3. Não injeta `voice_tone`, `additional_prompt` ou `security_clauses` no prompt
 
 ---
 
-## Mudanças na Interface
+## Solução
 
-**Antes:**
-```text
-Tabs: [Configuração] [Comportamento] [Preview]
-
-Configuração:
-- Nome de Exibição
-- Avatar do Agente
-- Instruções Adicionais  <-- Remover
-- Badges de modelo
-```
-
-**Depois:**
-```text
-Tabs: [Configuração] [Comportamento]  (sem Preview)
-
-Configuração:
-- Nome de Exibição
-- Avatar do Agente
-- [Se uses_knowledge_base=true]
-  ┌─────────────────────────────────────────────────┐
-  │ Base de Conhecimento                            │
-  │ ┌─────────────────────────────────────────────┐ │
-  │ │  📄  Selecionar arquivo CSV                 │ │
-  │ └─────────────────────────────────────────────┘ │
-  │                                                 │
-  │ Ao importar:                                    │
-  │ ○ Adicionar às perguntas existentes            │
-  │ ● Substituir toda a base (confirmar)           │
-  └─────────────────────────────────────────────────┘
-- Badges de modelo
-```
+Corrigir a Edge Function para buscar corretamente a configuração do agente através do join `isp_agents` → `ai_agents`, garantindo que:
+- Mudanças no template (system_prompt, model, temperature) são aplicadas imediatamente
+- Customizações do ISP (voice_tone, escalation_config) são respeitadas
+- Cláusulas de segurança globais são injetadas
 
 ---
 
@@ -51,173 +26,93 @@ Configuração:
 
 | Tipo | Arquivo | Mudança |
 |------|---------|---------|
-| Modificar | `src/components/painel/ai/AgentActivationDialog.tsx` | Remover Preview, Instruções, adicionar upload |
-| Modificar | `src/hooks/painel/useIspAgents.ts` | Adicionar lógica de importação na ativação |
+| Modificar | `supabase/functions/ai-chat/index.ts` | Corrigir query para usar isp_agents JOIN ai_agents |
 
 ---
 
-## Seção Tecnica
+## Seção Técnica
 
-### Mudanças no AgentActivationDialog.tsx
-
-**1. Remover importações não utilizadas:**
-```typescript
-// Remover: Eye (ícone do Preview)
-import { Bot, Zap, Settings2 } from "lucide-react";
-```
-
-**2. Remover campo do schema:**
-```typescript
-const activationSchema = z.object({
-  display_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  avatar_url: z.string().url("URL inválida").or(z.literal("")).optional(),
-  // REMOVER: additional_prompt
-  voice_tone: z.string().optional(),
-  escalation_config: z.object({...}).optional(),
-  // ADICIONAR:
-  knowledge_file: z.any().optional(),
-  knowledge_import_mode: z.enum(['append', 'replace']).optional(),
-});
-```
-
-**3. Adicionar estado para upload:**
-```typescript
-const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
-const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
-const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
-```
-
-**4. Remover aba Preview e campo Instruções Adicionais:**
-- Remover `<TabsTrigger value="preview">` e `<TabsContent value="preview">`
-- Remover bloco do campo `additional_prompt`
-- Remover função `buildPreviewPrompt`
-
-**5. Adicionar seção de upload (condicional):**
-```tsx
-{agent.uses_knowledge_base && (
-  <div className="space-y-3 pt-4 border-t">
-    <Label>Base de Conhecimento</Label>
-    <div className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer">
-      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-      <p className="text-sm">Selecionar arquivo CSV</p>
-      <input type="file" accept=".csv" className="hidden" ... />
-    </div>
-    
-    {knowledgeFile && (
-      <>
-        <RadioGroup value={importMode} onValueChange={setImportMode}>
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="append" id="append" />
-            <Label htmlFor="append">Adicionar às perguntas existentes</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="replace" id="replace" />
-            <Label htmlFor="replace">Substituir toda a base</Label>
-          </div>
-        </RadioGroup>
-      </>
-    )}
-  </div>
-)}
-```
-
-**6. Dialog de confirmação para substituição:**
-```tsx
-<AlertDialog open={showReplaceConfirm} onOpenChange={setShowReplaceConfirm}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Substituir Base de Conhecimento?</AlertDialogTitle>
-      <AlertDialogDescription>
-        Esta ação irá apagar todas as perguntas existentes e importar 
-        apenas as do novo arquivo. Esta ação não pode ser desfeita.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-      <AlertDialogAction onClick={confirmActivation}>
-        Confirmar e Ativar
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-```
-
-### Mudanças no useIspAgents.ts
-
-**Estender AgentActivationForm:**
-```typescript
-export interface AgentActivationForm {
-  display_name: string;
-  avatar_url?: string;
-  // REMOVER: additional_prompt?: string;
-  voice_tone?: string;
-  escalation_config?: {...};
-  // ADICIONAR:
-  knowledge_items?: KnowledgeBaseForm[];
-  knowledge_import_mode?: 'append' | 'replace';
-}
-```
-
-**Modificar mutation activateAgent:**
-```typescript
-const activateAgent = useMutation({
-  mutationFn: async (data: { agentId: string; form: AgentActivationForm }) => {
-    // 1. Criar o isp_agent
-    const { data: ispAgent, error } = await supabase
-      .from("isp_agents")
-      .insert({...})
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // 2. Se houver items de conhecimento, importar
-    if (data.form.knowledge_items?.length) {
-      const records = data.form.knowledge_items.map((item, idx) => ({
-        isp_agent_id: ispAgent.id,
-        question: item.question,
-        answer: item.answer,
-        category: item.category || null,
-        sort_order: idx,
-        is_active: true,
-      }));
-      
-      await supabase
-        .from("agent_knowledge_base")
-        .insert(records);
-    }
-    
-    return ispAgent;
-  },
-});
-```
-
----
-
-## Fluxo de Ativação com Arquivo
+### Nova Lógica da Edge Function
 
 ```text
-1. ISP clica em "Ativar" no catálogo
-2. Dialog abre com campos simplificados
-3. Se agent.uses_knowledge_base = true:
-   - Mostra seção de upload de arquivo
-4. ISP seleciona CSV (opcional)
-5. Se selecionou arquivo:
-   - Mostra opções: Adicionar / Substituir
-6. ISP clica em "Ativar Agente"
-7. Se modo = "replace":
-   - Mostra dialog de confirmação
-8. Sistema:
-   - Cria registro em isp_agents
-   - Se há arquivo: importa Q&As para agent_knowledge_base
+1. Receber: ispAgentId (ou agentId + ispId)
+2. Buscar: isp_agents JOIN ai_agents WHERE isp_agents.id = ispAgentId
+3. Validar: ISP tem acesso, agente está ativo
+4. Buscar: ai_security_clauses ativas
+5. Buscar: agent_knowledge_base (se uses_knowledge_base = true)
+6. Montar prompt final:
+   - Base: template.system_prompt
+   - + Voice tone injection (se configurado)
+   - + Knowledge base context (se houver)
+   - + Security clauses (sempre)
+7. Chamar AI Gateway com template.model, template.temperature
+8. Registrar uso
+```
+
+### Estrutura do Prompt Final
+
+```text
+[SYSTEM_PROMPT do template]
+
+[Se voice_tone configurado]
+Adote o seguinte tom de voz: {voice_tone}
+
+[Se knowledge_base disponível]
+Base de conhecimento disponível:
+Q: {pergunta1}
+A: {resposta1}
+...
+
+[Sempre - Security Clauses]
+REGRAS OBRIGATÓRIAS:
+- {clausula1}
+- {clausula2}
+```
+
+### Hierarquia de Dados (Template vs ISP)
+
+| Campo | Origem | Descrição |
+|-------|--------|-----------|
+| system_prompt | Template | Prompt base do agente |
+| model | Template | Modelo de IA a usar |
+| temperature | Template | Criatividade das respostas |
+| max_tokens | Template | Limite de tokens |
+| voice_tone | ISP | Tom selecionado pelo ISP |
+| escalation_config | ISP | Regras de escalação customizadas |
+| avatar_url | ISP > Template | Prioridade para customização do ISP |
+| display_name | ISP > Template | Prioridade para customização do ISP |
+
+---
+
+## Fluxo de Dados Corrigido
+
+```text
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   AiChat.tsx    │────►│  ai-chat (Edge)  │────►│ AI Gateway      │
+│                 │     │                  │     │                 │
+│ - ispAgentId    │     │ 1. Query JOIN    │     │ - model         │
+│ - messages      │     │ 2. Build prompt  │     │ - temperature   │
+│ - ispId         │     │ 3. Add security  │     │ - messages      │
+└─────────────────┘     │ 4. Add knowledge │     └─────────────────┘
+                        └──────────────────┘
+                               │
+                               ▼
+                        ┌──────────────────┐
+                        │   Supabase DB    │
+                        │                  │
+                        │ - isp_agents     │
+                        │ - ai_agents      │
+                        │ - security_clauses│
+                        │ - knowledge_base │
+                        └──────────────────┘
 ```
 
 ---
 
-## Validações
+## Benefícios da Correção
 
-- Arquivo CSV deve ter colunas: Pergunta, Resposta, Categoria (opcional)
-- Perguntas devem ter pelo menos 10 caracteres
-- Respostas devem ter pelo menos 20 caracteres
-- Upload limitado a um arquivo por vez
-- Confirmação obrigatória para modo "substituir"
+1. **Atualizações Automáticas**: Mudanças no template refletem imediatamente
+2. **Segurança Centralizada**: Cláusulas de segurança sempre injetadas
+3. **Personalização ISP**: Voice tone e customizações respeitadas
+4. **Knowledge Base**: Contexto específico do ISP incluído
+5. **Consistência**: Mesmo agente, comportamento uniforme entre ISPs
