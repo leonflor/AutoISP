@@ -12,9 +12,90 @@ interface ChatMessage {
 
 interface ChatRequest {
   isp_id: string;
-  agent_id: string;
+  isp_agent_id: string;
   messages: ChatMessage[];
   stream?: boolean;
+}
+
+interface IspAgentWithTemplate {
+  id: string;
+  isp_id: string;
+  agent_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  voice_tone: string | null;
+  escalation_config: unknown;
+  is_enabled: boolean;
+  ai_agents: {
+    id: string;
+    name: string;
+    slug: string;
+    system_prompt: string | null;
+    model: string | null;
+    temperature: number | null;
+    max_tokens: number | null;
+    is_active: boolean;
+    uses_knowledge_base: boolean;
+    scope: string;
+  };
+}
+
+interface SecurityClause {
+  id: string;
+  name: string;
+  content: string;
+  applies_to: string;
+}
+
+interface KnowledgeItem {
+  question: string;
+  answer: string;
+  category: string | null;
+}
+
+// Build the final system prompt with all layers
+function buildSystemPrompt(
+  template: IspAgentWithTemplate["ai_agents"],
+  ispAgent: IspAgentWithTemplate,
+  securityClauses: SecurityClause[],
+  knowledgeBase: KnowledgeItem[],
+  ispName: string
+): string {
+  const parts: string[] = [];
+
+  // 1. Base system prompt from template
+  if (template.system_prompt) {
+    parts.push(template.system_prompt);
+  }
+
+  // 2. Voice tone injection (if configured by ISP)
+  if (ispAgent.voice_tone) {
+    parts.push(`\nAdote o seguinte tom de voz em suas respostas: ${ispAgent.voice_tone}`);
+  }
+
+  // 3. Knowledge base context (if available)
+  if (knowledgeBase.length > 0) {
+    const kbSection = knowledgeBase
+      .map((item) => `P: ${item.question}\nR: ${item.answer}`)
+      .join("\n\n");
+    
+    parts.push(`\n## Base de Conhecimento Disponível\nUse as seguintes informações para responder perguntas dos usuários:\n\n${kbSection}`);
+  }
+
+  // 4. Security clauses (always injected)
+  if (securityClauses.length > 0) {
+    const clausesText = securityClauses
+      .map((c) => `- ${c.content}`)
+      .join("\n");
+    
+    parts.push(`\n## REGRAS OBRIGATÓRIAS DE SEGURANÇA\nVocê DEVE seguir estas regras em todas as interações:\n${clausesText}`);
+  }
+
+  // 5. Context anchoring (prevent cross-tenant data leakage)
+  const contextAnchor = `\n## Contexto Atual\n- Provedor: ${ispName}\n- Data: ${new Date().toLocaleDateString("pt-BR")}\n- Agente: ${ispAgent.display_name || template.name}`;
+  parts.push(contextAnchor);
+
+  return parts.join("\n");
 }
 
 Deno.serve(async (req) => {
@@ -80,9 +161,9 @@ Deno.serve(async (req) => {
     // Parse request body
     const body: ChatRequest = await req.json();
     
-    if (!body.isp_id || !body.agent_id || !body.messages?.length) {
+    if (!body.isp_id || !body.isp_agent_id || !body.messages?.length) {
       return new Response(
-        JSON.stringify({ error: "Validation error", message: "Campos obrigatórios: isp_id, agent_id, messages" }),
+        JSON.stringify({ error: "Validation error", message: "Campos obrigatórios: isp_id, isp_agent_id, messages" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -91,10 +172,11 @@ Deno.serve(async (req) => {
 
     // Verify user belongs to ISP
     const { data: membership } = await supabaseAdmin
-      .from("isp_members")
+      .from("isp_users")
       .select("role")
       .eq("isp_id", body.isp_id)
       .eq("user_id", userId)
+      .eq("is_active", true)
       .single();
 
     if (!membership) {
@@ -104,64 +186,143 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get agent configuration
-    const { data: agent, error: agentError } = await supabaseAdmin
-      .from("ai_agents")
-      .select("*")
-      .eq("id", body.agent_id)
+    // Get ISP agent with template data via JOIN
+    const { data: ispAgent, error: agentError } = await supabaseAdmin
+      .from("isp_agents")
+      .select(`
+        id,
+        isp_id,
+        agent_id,
+        display_name,
+        avatar_url,
+        voice_tone,
+        escalation_config,
+        is_enabled,
+        ai_agents (
+          id,
+          name,
+          slug,
+          system_prompt,
+          model,
+          temperature,
+          max_tokens,
+          is_active,
+          uses_knowledge_base,
+          scope
+        )
+      `)
+      .eq("id", body.isp_agent_id)
       .eq("isp_id", body.isp_id)
-      .single();
+      .single() as { data: IspAgentWithTemplate | null; error: unknown };
 
-    if (agentError || !agent) {
+    if (agentError || !ispAgent) {
       return new Response(
-        JSON.stringify({ error: "Not found", message: "Agente de IA não encontrado" }),
+        JSON.stringify({ error: "Not found", message: "Agente de IA não encontrado para este ISP" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!agent.is_active) {
+    const template = ispAgent.ai_agents;
+
+    // Validate agent is enabled and active
+    if (!ispAgent.is_enabled) {
       return new Response(
-        JSON.stringify({ error: "Unavailable", message: "Este agente está desativado" }),
+        JSON.stringify({ error: "Unavailable", message: "Este agente está desativado pelo ISP" }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check AI usage limits
-    const { data: limits } = await supabaseAdmin
-      .from("ai_limits")
-      .select("*")
-      .eq("isp_id", body.isp_id)
+    if (!template.is_active) {
+      return new Response(
+        JSON.stringify({ error: "Unavailable", message: "Este template de agente foi desativado pelo administrador" }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get ISP name for context anchoring
+    const { data: isp } = await supabaseAdmin
+      .from("isps")
+      .select("name")
+      .eq("id", body.isp_id)
       .single();
 
-    if (limits) {
-      // Get current month usage
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-      const { data: usage } = await supabaseAdmin
-        .from("ai_usage")
-        .select("tokens_used")
-        .eq("isp_id", body.isp_id)
-        .gte("created_at", `${currentMonth}-01`)
-        .lt("created_at", `${currentMonth}-32`);
+    const ispName = isp?.name || "ISP";
 
-      const totalTokens = usage?.reduce((sum, u) => sum + (u.tokens_used || 0), 0) || 0;
+    // Fetch active security clauses (applies to 'all' or 'tenant')
+    const { data: securityClauses } = await supabaseAdmin
+      .from("ai_security_clauses")
+      .select("id, name, content, applies_to")
+      .eq("is_active", true)
+      .in("applies_to", ["all", "tenant"])
+      .order("sort_order");
 
-      if (totalTokens >= limits.monthly_token_limit) {
-        return new Response(
-          JSON.stringify({ 
-            error: "Limit exceeded", 
-            message: `Limite mensal de ${limits.monthly_token_limit.toLocaleString()} tokens atingido. Contate o suporte para aumentar.`,
-            usage: { current: totalTokens, limit: limits.monthly_token_limit }
-          }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    // Fetch knowledge base if enabled for this agent
+    let knowledgeBase: KnowledgeItem[] = [];
+    if (template.uses_knowledge_base) {
+      const { data: kbItems } = await supabaseAdmin
+        .from("agent_knowledge_base")
+        .select("question, answer, category")
+        .eq("isp_agent_id", ispAgent.id)
+        .eq("is_active", true)
+        .order("sort_order");
+      
+      knowledgeBase = kbItems || [];
+    }
+
+    // Check AI usage limits
+    const { data: subscription } = await supabaseAdmin
+      .from("subscriptions")
+      .select("plan_id")
+      .eq("isp_id", body.isp_id)
+      .eq("status", "ativa")
+      .single();
+
+    if (subscription) {
+      const { data: limits } = await supabaseAdmin
+        .from("ai_limits")
+        .select("monthly_limit, daily_limit")
+        .eq("plan_id", subscription.plan_id)
+        .eq("agent_id", template.id)
+        .single();
+
+      if (limits?.monthly_limit) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const { data: usage } = await supabaseAdmin
+          .from("ai_usage")
+          .select("tokens_total")
+          .eq("isp_id", body.isp_id)
+          .gte("created_at", `${currentMonth}-01`)
+          .lt("created_at", `${currentMonth}-32`);
+
+        const totalTokens = usage?.reduce((sum, u) => sum + (u.tokens_total || 0), 0) || 0;
+
+        if (totalTokens >= limits.monthly_limit) {
+          return new Response(
+            JSON.stringify({ 
+              error: "Limit exceeded", 
+              message: `Limite mensal de ${limits.monthly_limit.toLocaleString()} tokens atingido. Contate o suporte para aumentar.`,
+              usage: { current: totalTokens, limit: limits.monthly_limit }
+            }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 
-    console.log(`🤖 AI Chat request from user ${userId} for agent ${agent.name}`);
+    // Build complete system prompt with all layers
+    const systemPrompt = buildSystemPrompt(
+      template,
+      ispAgent,
+      securityClauses || [],
+      knowledgeBase,
+      ispName
+    );
 
-    // Build messages with system prompt
+    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length} items, Security=${securityClauses?.length || 0} clauses`);
+
+    // Build messages with enriched system prompt
     const messages: ChatMessage[] = [
-      { role: "system", content: agent.system_prompt || "Você é um assistente útil." },
+      { role: "system", content: systemPrompt },
       ...body.messages
     ];
 
@@ -174,7 +335,7 @@ Deno.serve(async (req) => {
       "claude-sonnet": "anthropic/claude-sonnet-4"
     };
 
-    const model = modelMap[agent.model] || "google/gemini-2.5-flash-preview";
+    const model = modelMap[template.model || "gemini-flash"] || "google/gemini-2.5-flash-preview";
 
     // Call Lovable AI Gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -186,8 +347,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model,
         messages,
-        temperature: agent.temperature || 0.7,
-        max_tokens: agent.max_tokens || 1000,
+        temperature: template.temperature || 0.7,
+        max_tokens: template.max_tokens || 1000,
         stream: body.stream || false
       })
     });
@@ -223,15 +384,20 @@ Deno.serve(async (req) => {
 
     console.log(`✅ AI response generated, tokens: ${tokensUsed}`);
 
-    // Log usage
+    // Log usage with correct column names
     await supabaseAdmin.from("ai_usage").insert({
       isp_id: body.isp_id,
-      agent_id: body.agent_id,
+      agent_id: template.id,
       user_id: userId,
-      tokens_used: tokensUsed,
-      prompt_tokens: aiData.usage?.prompt_tokens || 0,
-      completion_tokens: aiData.usage?.completion_tokens || 0,
-      model: model
+      tokens_total: tokensUsed,
+      tokens_input: aiData.usage?.prompt_tokens || 0,
+      tokens_output: aiData.usage?.completion_tokens || 0,
+      metadata: {
+        model: model,
+        isp_agent_id: ispAgent.id,
+        knowledge_items: knowledgeBase.length,
+        security_clauses: securityClauses?.length || 0
+      }
     });
 
     return new Response(
