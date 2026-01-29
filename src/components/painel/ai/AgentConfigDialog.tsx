@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -23,19 +22,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { IspAgentWithTemplate, AgentActivationForm } from "@/hooks/painel/useIspAgents";
+import type { IspAgentWithTemplate } from "@/hooks/painel/useIspAgents";
 
 const configSchema = z.object({
   display_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   avatar_url: z.string().url("URL inválida").or(z.literal("")).optional(),
-  additional_prompt: z.string().optional(),
   is_enabled: z.boolean(),
 });
 
-type ConfigForm = AgentActivationForm & { is_enabled: boolean };
+type ConfigForm = z.infer<typeof configSchema>;
 
 interface AgentConfigDialogProps {
   agent: IspAgentWithTemplate | null;
@@ -61,7 +58,6 @@ export function AgentConfigDialog({
     defaultValues: {
       display_name: "",
       avatar_url: "",
-      additional_prompt: "",
       is_enabled: true,
     },
   });
@@ -71,7 +67,6 @@ export function AgentConfigDialog({
       form.reset({
         display_name: agent.display_name || agent.ai_agents.name,
         avatar_url: agent.avatar_url || "",
-        additional_prompt: agent.additional_prompt || "",
         is_enabled: agent.is_enabled ?? true,
       });
     }
@@ -141,16 +136,6 @@ export function AgentConfigDialog({
                 id="avatar_url"
                 placeholder="https://exemplo.com/avatar.png"
                 {...form.register("avatar_url")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="additional_prompt">Instruções Adicionais</Label>
-              <Textarea
-                id="additional_prompt"
-                placeholder="Adicione instruções específicas do seu provedor..."
-                className="min-h-[120px]"
-                {...form.register("additional_prompt")}
               />
             </div>
           </form>

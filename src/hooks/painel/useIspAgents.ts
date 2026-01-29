@@ -12,15 +12,22 @@ export interface IspAgentWithTemplate extends IspAgent {
   knowledge_count?: number;
 }
 
+export interface KnowledgeItem {
+  question: string;
+  answer: string;
+  category?: string;
+}
+
 export interface AgentActivationForm {
   display_name: string;
   avatar_url?: string;
-  additional_prompt?: string;
   voice_tone?: string;
   escalation_config?: {
     triggers: string[];
     max_interactions: number;
   };
+  knowledge_items?: KnowledgeItem[];
+  knowledge_import_mode?: 'append' | 'replace';
 }
 
 export interface CatalogTemplate extends AiAgent {
@@ -124,14 +131,13 @@ export function useIspAgents() {
   // Mutation para ativar agente
   const activateAgent = useMutation({
     mutationFn: async (data: { agentId: string; form: AgentActivationForm }) => {
-      const { data: result, error } = await supabase
+      const { data: ispAgent, error } = await supabase
         .from("isp_agents")
         .insert({
           isp_id: membership!.ispId,
           agent_id: data.agentId,
           display_name: data.form.display_name,
           avatar_url: data.form.avatar_url || null,
-          additional_prompt: data.form.additional_prompt || null,
           voice_tone: data.form.voice_tone || null,
           escalation_config: data.form.escalation_config || null,
           is_enabled: true,
@@ -140,7 +146,28 @@ export function useIspAgents() {
         .single();
 
       if (error) throw error;
-      return result;
+
+      // Import knowledge base if provided
+      if (data.form.knowledge_items?.length && ispAgent) {
+        const records = data.form.knowledge_items.map((item, idx) => ({
+          isp_agent_id: ispAgent.id,
+          question: item.question,
+          answer: item.answer,
+          category: item.category || null,
+          sort_order: idx,
+          is_active: true,
+        }));
+
+        const { error: kbError } = await supabase
+          .from("agent_knowledge_base")
+          .insert(records);
+
+        if (kbError) {
+          console.error("Error importing knowledge base:", kbError);
+        }
+      }
+
+      return ispAgent;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["isp-agents"] });
@@ -165,7 +192,6 @@ export function useIspAgents() {
       
       if (data.form.display_name !== undefined) updateData.display_name = data.form.display_name;
       if (data.form.avatar_url !== undefined) updateData.avatar_url = data.form.avatar_url || null;
-      if (data.form.additional_prompt !== undefined) updateData.additional_prompt = data.form.additional_prompt || null;
       if (data.form.voice_tone !== undefined) updateData.voice_tone = data.form.voice_tone || null;
       if (data.form.escalation_config !== undefined) updateData.escalation_config = data.form.escalation_config || null;
       if (data.form.is_enabled !== undefined) updateData.is_enabled = data.form.is_enabled;
