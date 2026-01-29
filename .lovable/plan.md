@@ -1,112 +1,83 @@
 
-# Corrigir Race Condition no Fluxo de Login Admin
+# Substituir Input de URL por AvatarUpload no AgentConfigDialog
 
-## Problema Real
+## Problema
 
-A correção anterior só resolve o **carregamento inicial** (refresh de página). O bug persiste no **fluxo de login ativo** porque o `onAuthStateChange` atualiza `user` imediatamente, mas os `roles` são carregados de forma assíncrona sem bloquear a renderização.
+No dialog de configuração de agentes ativos ("Meus Agentes" → Configurar), o avatar ainda é configurado via campo de texto URL, enquanto o padrão no dialog de ativação já usa o componente `AvatarUpload` com cropper.
 
 ## Solução
 
-Adicionar um estado `rolesLoaded` no AuthContext que indica quando os roles estão sincronizados com o usuário atual. O AdminLogin deve aguardar este estado antes de decidir se mostra a tela de "Acesso Restrito".
+Substituir o campo `Input` por `AvatarUpload`, seguindo exatamente o mesmo padrão do `AgentActivationDialog`.
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/contexts/AuthContext.tsx` | Adicionar estado `rolesLoaded` |
-| `src/pages/admin/AdminLogin.tsx` | Aguardar `rolesLoaded` antes de mostrar "Acesso Restrito" |
+| `src/components/painel/ai/AgentConfigDialog.tsx` | Substituir input URL por AvatarUpload |
 
 ---
 
 ## Seção Técnica
 
-### 1. AuthContext.tsx - Adicionar estado `rolesLoaded`
+### Mudanças no AgentConfigDialog.tsx
 
+1. **Adicionar imports:**
 ```tsx
-// Novos estados
-const [rolesLoaded, setRolesLoaded] = useState(false);
-
-// No onAuthStateChange
-if (session?.user) {
-  setRolesLoaded(false); // Resetar quando usuário muda
-  fetchProfile(session.user.id);
-  fetchRolesAsync(session.user.id).then(roles => {
-    if (isMounted) {
-      setRoles(roles);
-      setRolesLoaded(true); // Marcar como carregado
-    }
-  });
-} else {
-  setProfile(null);
-  setRoles([]);
-  setRolesLoaded(true); // Sem usuário = roles "carregados" (vazio)
-}
-
-// No initializeAuth
-if (session?.user) {
-  fetchProfile(session.user.id);
-  const roles = await fetchRolesAsync(session.user.id);
-  if (isMounted) {
-    setRoles(roles);
-    setRolesLoaded(true);
-  }
-} else {
-  setRolesLoaded(true);
-}
-
-// Exportar no contexto
-value={{ ..., rolesLoaded }}
+import { AvatarUpload } from "./AvatarUpload";
+import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 ```
 
-### 2. AdminLogin.tsx - Aguardar rolesLoaded
-
+2. **Obter configurações globais:**
 ```tsx
-const { user, loading, signIn, signOut, hasRole, rolesLoaded } = useAuth();
-
-// Mostrar loading enquanto roles não carregaram
-if (loading || (user && !rolesLoaded)) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
-}
-
-// Agora sim, só mostra "Acesso Restrito" quando roles estão carregados
-if (user && !hasRole('super_admin')) {
-  // ... tela de acesso restrito
-}
+const { configMap } = usePlatformConfig();
+const defaultAvatar = (configMap?.default_agent_avatar?.value as string) || '';
 ```
+
+3. **Substituir o input URL pelo componente AvatarUpload:**
+
+**Antes (linhas 133-140):**
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="avatar_url">URL do Avatar (opcional)</Label>
+  <Input
+    id="avatar_url"
+    placeholder="https://exemplo.com/avatar.png"
+    {...form.register("avatar_url")}
+  />
+</div>
+```
+
+**Depois:**
+```tsx
+<div className="space-y-2">
+  <Label>Avatar do Agente</Label>
+  <AvatarUpload
+    value={form.watch("avatar_url") || ""}
+    onChange={(url) => form.setValue("avatar_url", url, { shouldDirty: true })}
+    ispId={agent.isp_id}
+    defaultAvatar={agent.ai_agents.default_avatar_url || defaultAvatar}
+  />
+</div>
+```
+
+### Fontes de Dados
+- **`ispId`**: vem de `agent.isp_id` (do registro `isp_agents`)
+- **`defaultAvatar`**: hierarquia → template (`ai_agents.default_avatar_url`) > platform config (`default_agent_avatar`)
 
 ---
 
-## Fluxo Corrigido
+## Resultado
 
 ```
-ANTES (bugado):
-1. signIn() → sucesso
-2. onAuthStateChange → setUser(user)
-3. roles = [] (ainda carregando)
-4. user && !hasRole() = true → "Acesso Restrito" aparece! ❌
-5. roles carregam → navega para /admin
+ANTES:
+- Campo de texto para colar URL manualmente
+- Sem preview nem validação visual
 
-DEPOIS (corrigido):
-1. signIn() → sucesso
-2. onAuthStateChange → setUser(user), setRolesLoaded(false)
-3. Componente vê: user existe + rolesLoaded=false → mostra loading
-4. roles carregam → setRoles(), setRolesLoaded(true)
-5. hasRole('super_admin') = true → navega direto para /admin ✅
-```
-
----
-
-## Tipos a Atualizar
-
-```tsx
-interface AuthContextType {
-  // ... campos existentes
-  rolesLoaded: boolean; // Novo campo
-}
+DEPOIS:
+- Botão "Fazer Upload" → Abre dialog de crop
+- Preview do avatar atual
+- Botão "Remover" para limpar
+- Mesmo comportamento do dialog de ativação
 ```
