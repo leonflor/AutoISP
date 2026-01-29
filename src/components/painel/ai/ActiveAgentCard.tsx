@@ -33,7 +33,7 @@ export function ActiveAgentCard({
 
   return (
     <Card
-      className={`relative overflow-hidden transition-all hover:shadow-lg ${
+      className={`flex flex-col h-full relative overflow-hidden transition-all hover:shadow-lg ${
         agent.is_enabled ? "hover:border-primary/50" : "opacity-60 border-muted"
       }`}
     >
@@ -84,7 +84,7 @@ export function ActiveAgentCard({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="flex-1 flex flex-col space-y-4">
         <CardDescription className="line-clamp-2">
           {template.description}
         </CardDescription>
@@ -95,7 +95,7 @@ export function ActiveAgentCard({
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto pt-2">
           <Button
             variant="outline"
             size="sm"
