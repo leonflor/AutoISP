@@ -1,95 +1,44 @@
 
+## Objetivo
+Garantir que o botão “Ativar Agente” (e os botões dos cards ativos) fique sempre alinhado no rodapé do card, independentemente do tamanho do texto/quantidade de features.
 
-# Alinhar Botões ao Bottom nos Cards de Agentes IA
-
-## Problema
-
-Os cards de agentes IA (`ActiveAgentCard` e `AgentCatalogCard`) possuem conteúdo de tamanhos variáveis:
-- Descrições de diferentes comprimentos
-- Instruções extras (opcional)
-- Lista de features
-- Tags de features
-
-Isso faz com que os botões fiquem em alturas diferentes quando os cards são exibidos lado a lado em grid.
-
----
+## Diagnóstico (por que ainda está desalinhado)
+Mesmo com `flex-1` e `mt-auto`, o alinhamento não acontece porque o `space-y-*` do Tailwind aplica `margin-top` nos filhos via seletor (`.space-y-4 > ...`), que acaba sobrescrevendo o `mt-auto` do botão/linha de botões. Resultado: o botão não “empurra” para baixo e fica flutuando acima.
 
 ## Solução
+Substituir `space-y-4` por `gap-4` nos containers que precisam permitir `mt-auto`:
+- `gap-*` usa `gap` do flexbox (não mexe em `margin-top` dos filhos).
+- Assim, `mt-auto` volta a funcionar e o botão vai para o fundo do card.
 
-Usar `flex` com `flex-col` e `h-full` nos cards para que:
-1. O card ocupe toda a altura disponível
-2. O `CardContent` cresça para preencher o espaço (`flex-1`)
-3. Os botões fiquem sempre no final com `mt-auto`
+## Mudanças propostas
 
----
+### 1) AgentCatalogCard (Catálogo)
+**Arquivo:** `src/components/painel/ai/AgentCatalogCard.tsx`
 
-## Mudanças
+- Trocar:
+  - `CardContent className="flex-1 flex flex-col space-y-4"`
+  - por `CardContent className="flex-1 flex flex-col gap-4"`
+- Manter o botão com `className="w-full mt-auto"` (agora o `mt-auto` funcionará de verdade).
 
-### 1. ActiveAgentCard.tsx
+**Efeito esperado:** o botão “Ativar Agente” fica sempre no bottom do card, mesmo quando não houver lista de features/tags.
 
-| Elemento | Antes | Depois |
-|----------|-------|--------|
-| Card | `relative overflow-hidden...` | `flex flex-col h-full relative overflow-hidden...` |
-| CardContent | `space-y-4` | `flex-1 flex flex-col space-y-4` |
-| Div dos botões | `flex gap-2` | `flex gap-2 mt-auto pt-2` |
+### 2) ActiveAgentCard (Meus Agentes)
+**Arquivo:** `src/components/painel/ai/ActiveAgentCard.tsx`
 
-### 2. AgentCatalogCard.tsx
+- Trocar:
+  - `CardContent className="flex-1 flex flex-col space-y-4"`
+  - por `CardContent className="flex-1 flex flex-col gap-4"`
+- Manter a linha de botões com `className="flex gap-2 mt-auto pt-2"`.
 
-| Elemento | Antes | Depois |
-|----------|-------|--------|
-| Card | `relative overflow-hidden...` | `flex flex-col h-full relative overflow-hidden...` |
-| CardContent | `space-y-4` | `flex-1 flex flex-col space-y-4` |
-| Button | `w-full` | `w-full mt-auto` |
+**Efeito esperado:** os botões “Configurar / Base Q&A / Chat” ficam sempre alinhados no rodapé do card, mesmo com/sem “Instruções extras”.
 
----
+## Checklist de validação (manual)
+1. Ir em **Painel → Agentes de IA → Catálogo** e conferir uma linha com cards com:
+   - poucos recursos (sem lista) e muitos recursos (com lista).
+   - O botão deve ficar alinhado com os demais na mesma linha.
+2. Ir em **Painel → Agentes de IA → Meus Agentes** e conferir:
+   - agentes com e sem “Instruções extras”.
+   - os botões inferiores devem alinhar.
 
-## Seção Técnica
-
-### ActiveAgentCard.tsx (linhas 35-38 e 87-98)
-
-```tsx
-// Card - adicionar flex flex-col h-full
-<Card
-  className={`flex flex-col h-full relative overflow-hidden transition-all hover:shadow-lg ${
-    agent.is_enabled ? "hover:border-primary/50" : "opacity-60 border-muted"
-  }`}
->
-
-// CardContent - adicionar flex-1 flex flex-col
-<CardContent className="flex-1 flex flex-col space-y-4">
-
-// Div dos botões - adicionar mt-auto pt-2
-<div className="flex gap-2 mt-auto pt-2">
-```
-
-### AgentCatalogCard.tsx (linhas 36-41, 76 e 108)
-
-```tsx
-// Card - adicionar flex flex-col h-full  
-<Card
-  className={`flex flex-col h-full relative overflow-hidden transition-all ${
-    isBlocked || isAlreadyActivated
-      ? "opacity-60"
-      : "hover:shadow-lg hover:border-primary/50"
-  }`}
->
-
-// CardContent - adicionar flex-1 flex flex-col
-<CardContent className="flex-1 flex flex-col space-y-4">
-
-// Button - adicionar mt-auto
-<Button
-  className="w-full mt-auto"
-  ...
->
-```
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/painel/ai/ActiveAgentCard.tsx` | Adicionar classes flex para alinhar botões ao bottom |
-| `src/components/painel/ai/AgentCatalogCard.tsx` | Adicionar classes flex para alinhar botões ao bottom |
-
+## Observação técnica
+- Não vamos remover espaçamentos visuais: `gap-4` mantém o mesmo “respiro” que `space-y-4`, mas sem conflitar com `mt-auto`.
