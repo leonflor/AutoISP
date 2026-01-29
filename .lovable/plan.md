@@ -1,31 +1,13 @@
 
-# Adicionar Cropper Dialog no Upload de Avatar do Admin
+# Corrigir Race Condition no Login Admin
 
-## Objetivo
+## Problema Identificado
 
-Integrar o mesmo componente `ImageCropperDialog` já existente no upload de avatar dos templates de agentes do painel Admin, permitindo que superadmins também possam enquadrar a imagem antes do upload.
+O `AuthContext` define `loading=false` ANTES de completar o carregamento dos roles do usuário, causando um flash da tela "Acesso Restrito" durante o login admin.
 
----
+## Solução
 
-## Mudança Visual
-
-**Antes:**
-```
-1. Admin clica "Fazer Upload"
-2. Seleciona arquivo
-3. Upload direto → Avatar exibido
-```
-
-**Depois:**
-```
-1. Admin clica "Fazer Upload"
-2. Seleciona arquivo
-3. → Abre dialog de preview/crop
-4. Admin ajusta zoom e posição
-5. Clica "Confirmar"
-6. Upload da imagem recortada
-7. Avatar exibido
-```
+Separar o fluxo de inicialização do fluxo de mudanças contínuas de auth, garantindo que `loading` só seja `false` após carregar os roles.
 
 ---
 
@@ -33,56 +15,101 @@ Integrar o mesmo componente `ImageCropperDialog` já existente no upload de avat
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/admin/ai-agents/TemplateAvatarUpload.tsx` | Integrar ImageCropperDialog existente |
+| `src/contexts/AuthContext.tsx` | Aguardar roles antes de definir loading=false |
 
 ---
 
 ## Seção Técnica
 
-### Mudanças no TemplateAvatarUpload.tsx
+### Mudança no AuthContext.tsx
 
-1. **Importar o componente existente:**
+**Padrão**: Separar "carga inicial" de "mudanças contínuas"
+
 ```tsx
-import { ImageCropperDialog } from '@/components/painel/ai/ImageCropperDialog';
+useEffect(() => {
+  let isMounted = true;
+
+  // Função que busca roles e retorna Promise
+  const fetchRolesAsync = async (userId: string): Promise<AppRole[]> => {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    
+    return data?.map((r) => r.role as AppRole) ?? [];
+  };
+
+  // Listener para MUDANÇAS CONTÍNUAS (NÃO controla loading)
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      if (!isMounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      // Fire-and-forget - não await, não afeta loading
+      if (session?.user) {
+        fetchProfile(session.user.id);
+        fetchRolesAsync(session.user.id).then(roles => {
+          if (isMounted) setRoles(roles);
+        });
+      } else {
+        setProfile(null);
+        setRoles([]);
+      }
+    }
+  );
+
+  // CARGA INICIAL (controla loading)
+  const initializeAuth = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!isMounted) return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      // Buscar roles ANTES de definir loading=false
+      if (session?.user) {
+        fetchProfile(session.user.id);
+        const roles = await fetchRolesAsync(session.user.id);
+        if (isMounted) setRoles(roles);
+      }
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  initializeAuth();
+
+  return () => {
+    isMounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
 ```
 
-2. **Adicionar estados para o dialog:**
-```tsx
-const [cropDialogOpen, setCropDialogOpen] = useState(false);
-const [tempImageUrl, setTempImageUrl] = useState<string>('');
-```
+### Por que isso resolve:
 
-3. **Modificar `handleFileSelect`** para abrir o dialog em vez de upload direto:
-   - Manter validações de formato e tamanho
-   - Criar ObjectURL temporária
-   - Abrir dialog de crop
-
-4. **Adicionar handlers:**
-```tsx
-const handleCropConfirm = async (croppedBlob: Blob) => {
-  // Upload do blob recortado para templates/{slug}/
-  // Limpar URL temporária
-};
-
-const handleCropCancel = () => {
-  // Fechar dialog e limpar URL temporária
-};
-```
-
-5. **Renderizar o dialog:**
-```tsx
-<ImageCropperDialog
-  open={cropDialogOpen}
-  imageUrl={tempImageUrl}
-  onConfirm={handleCropConfirm}
-  onCancel={handleCropCancel}
-/>
-```
+1. **Carga inicial**: `loading` só fica `false` APÓS `fetchRolesAsync` completar
+2. **Mudanças contínuas**: Não afetam `loading`, apenas atualizam os estados
+3. **Cleanup**: Flag `isMounted` evita atualizações em componente desmontado
 
 ---
 
-## Benefícios
+## Fluxo Corrigido
 
-- **Consistência**: Mesmo fluxo de upload em ambos os painéis (Admin e ISP)
-- **Reutilização**: Aproveita o componente `ImageCropperDialog` já implementado
-- **Qualidade**: Avatares de templates com enquadramento padronizado (512x512px)
+```
+ANTES (bugado):
+1. Login → user definido
+2. loading = false (imediato)
+3. roles = [] → "Acesso Restrito" aparece! ❌
+4. roles carrega → navega para /admin
+
+DEPOIS (corrigido):
+1. Login → user definido
+2. Aguarda fetchRoles completar
+3. roles = ['super_admin']
+4. loading = false
+5. hasRole('super_admin') = true → navega direto ✅
+```
