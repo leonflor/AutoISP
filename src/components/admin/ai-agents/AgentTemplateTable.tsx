@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit, Trash2, Copy, MoreHorizontal, Bot, Crown, Building2, Server } from 'lucide-react';
+import { Edit, Trash2, Copy, MoreHorizontal, Bot, Building2, Server } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -90,7 +90,7 @@ export function AgentTemplateTable({
             <TableHead>Tipo</TableHead>
             <TableHead>Modelo</TableHead>
             <TableHead>Escopo</TableHead>
-            <TableHead className="text-center">Premium</TableHead>
+            
             <TableHead className="text-center">Status</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
@@ -134,11 +134,6 @@ export function AgentTemplateTable({
                     <><Building2 className="h-3 w-3 mr-1" /> ISPs</>
                   )}
                 </Badge>
-              </TableCell>
-              <TableCell className="text-center">
-                {agent.is_premium && (
-                  <Crown className="h-4 w-4 text-amber-500 mx-auto" />
-                )}
               </TableCell>
               <TableCell className="text-center">
                 <Badge variant={agent.is_active ? 'default' : 'secondary'}>
