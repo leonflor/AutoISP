@@ -1,133 +1,119 @@
 
-# Upload de Avatar no Template de Agente (Admin)
+# Corrigir Upload de Avatar - Criar Bucket
 
-## Objetivo
+## Problema Identificado
 
-Substituir o campo de URL de avatar por um componente de upload no formulário de criação/edição de templates de agentes no painel Admin. Este avatar servirá como padrão do template e será usado pelo ISP caso ele não envie uma imagem própria.
-
----
-
-## Mudança na Interface
-
-**Antes (campo de URL):**
-```text
-URL do Avatar
-[https://...]
-```
-
-**Depois (componente de upload):**
-```text
-Avatar do Agente
-┌──────────┐
-│    🤖    │  [Fazer Upload] [Remover]
-└──────────┘
-JPG, PNG ou WEBP. Máx 2MB.
-Será usado como padrão se o ISP não enviar avatar próprio.
-```
+O componente `TemplateAvatarUpload.tsx` tenta fazer upload para o bucket `agent-avatars`, que **não existe** no Storage do Supabase. Isso faz com que qualquer tentativa de upload falhe silenciosamente ou com erro.
 
 ---
 
-## Arquivos a Modificar/Criar
+## Solução
+
+Criar o bucket `agent-avatars` com as políticas RLS necessárias para permitir:
+1. **Admins da plataforma** fazerem upload/gerenciamento de avatares de templates
+2. **ISPs** fazerem upload de avatares personalizados (para seus agentes)
+3. **Leitura pública** para exibição dos avatares
+
+---
+
+## Arquivos a Modificar
 
 | Tipo | Arquivo | Mudança |
 |------|---------|---------|
-| Criar | `src/components/admin/ai-agents/TemplateAvatarUpload.tsx` | Componente de upload para templates (sem dependência de ispId) |
-| Modificar | `src/components/admin/ai-agents/AgentTemplateForm.tsx` | Substituir campo URL pelo componente de upload |
+| Criar | `supabase/migrations/xxx_create_agent_avatars_bucket.sql` | Criar bucket e políticas RLS |
 
 ---
 
 ## Seção Técnica
 
-### Novo Componente: TemplateAvatarUpload
+### Migration SQL
 
-Adaptação do componente existente `AvatarUpload` para uso no contexto de admin:
+```sql
+-- Criar bucket agent-avatars (público para leitura)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('agent-avatars', 'agent-avatars', true)
+ON CONFLICT (id) DO NOTHING;
 
-```typescript
-interface TemplateAvatarUploadProps {
-  value?: string;
-  onChange: (url: string) => void;
-  slug?: string; // Para organizar por template
-}
+-- Política: Leitura pública
+CREATE POLICY "Agent avatars are publicly accessible"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'agent-avatars');
 
-// Storage path: templates/{slug ou uuid}/avatar-{uuid}.{ext}
-// Bucket: agent-avatars (já existente)
-```
+-- Política: Upload para superadmins (templates)
+CREATE POLICY "Superadmins can upload agent template avatars"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'agent-avatars'
+  AND (storage.foldername(name))[1] = 'templates'
+  AND public.has_role(auth.uid(), 'superadmin')
+);
 
-**Diferenças do AvatarUpload original:**
-- Não requer `ispId`
-- Usa path `templates/` em vez de `{ispId}/`
-- Opcionalmente usa o `slug` do agente para organização
+-- Política: Update para superadmins
+CREATE POLICY "Superadmins can update agent template avatars"
+ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'agent-avatars'
+  AND (storage.foldername(name))[1] = 'templates'
+  AND public.has_role(auth.uid(), 'superadmin')
+);
 
-### Modificação no AgentTemplateForm.tsx
+-- Política: Delete para superadmins
+CREATE POLICY "Superadmins can delete agent template avatars"
+ON storage.objects FOR DELETE
+USING (
+  bucket_id = 'agent-avatars'
+  AND (storage.foldername(name))[1] = 'templates'
+  AND public.has_role(auth.uid(), 'superadmin')
+);
 
-**Importação:**
-```typescript
-import { TemplateAvatarUpload } from './TemplateAvatarUpload';
-```
+-- Políticas para ISPs (avatares customizados)
+CREATE POLICY "ISP admins can upload custom agent avatars"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'agent-avatars'
+  AND (storage.foldername(name))[1] != 'templates'
+  AND (storage.foldername(name))[1] != 'platform'
+  AND public.is_isp_admin(auth.uid(), (storage.foldername(name))[1]::uuid)
+);
 
-**Substituir campo (linhas 361-373):**
+CREATE POLICY "ISP admins can update custom agent avatars"
+ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'agent-avatars'
+  AND (storage.foldername(name))[1] != 'templates'
+  AND (storage.foldername(name))[1] != 'platform'
+  AND public.is_isp_admin(auth.uid(), (storage.foldername(name))[1]::uuid)
+);
 
-De:
-```tsx
-<FormField
-  control={form.control}
-  name="avatar_url"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>URL do Avatar</FormLabel>
-      <FormControl>
-        <Input placeholder="https://..." {...field} />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-```
-
-Para:
-```tsx
-<FormField
-  control={form.control}
-  name="avatar_url"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Avatar do Agente</FormLabel>
-      <FormControl>
-        <TemplateAvatarUpload
-          value={field.value}
-          onChange={field.onChange}
-          slug={form.watch('slug')}
-        />
-      </FormControl>
-      <FormDescription>
-        Será usado como padrão se o ISP não enviar avatar próprio.
-      </FormDescription>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
+CREATE POLICY "ISP admins can delete custom agent avatars"
+ON storage.objects FOR DELETE
+USING (
+  bucket_id = 'agent-avatars'
+  AND (storage.foldername(name))[1] != 'templates'
+  AND (storage.foldername(name))[1] != 'platform'
+  AND public.is_isp_admin(auth.uid(), (storage.foldername(name))[1]::uuid)
+);
 ```
 
 ---
 
-## Fluxo de Dados
+## Estrutura de Pastas no Bucket
 
 ```text
-1. Admin cria/edita template de agente
-2. Faz upload de imagem de avatar
-3. Imagem salva em: agent-avatars/templates/{slug}/{uuid}.{ext}
-4. URL pública armazenada em ai_agents.avatar_url
-5. Quando ISP ativa agente:
-   - Se enviar avatar próprio → usa avatar do ISP
-   - Se não enviar → usa ai_agents.avatar_url do template
-   - Se template também não tiver → usa platform_config.default_agent_avatar
+agent-avatars/
+├── templates/           # Avatares padrão dos templates (superadmin)
+│   ├── atendente/
+│   ├── cobrador/
+│   └── vendedor/
+├── platform/            # Avatar padrão global (superadmin)
+└── {isp_id}/            # Avatares customizados por ISP
+    └── agents/
 ```
 
 ---
 
-## Validações
+## Após Implementação
 
-- Formatos aceitos: JPG, PNG, WEBP
-- Tamanho máximo: 2MB
-- Preview visual no componente
-- Botão de remover disponível quando há imagem
+1. Criar a migration com o SQL acima
+2. Testar upload de avatar no formulário de template (Admin > IA > Agentes)
+3. Verificar se o arquivo aparece no Storage e a URL é salva no registro
