@@ -73,7 +73,7 @@ export function AgentCatalogCard({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col space-y-4">
+      <CardContent className="flex-1 flex flex-col gap-4">
         <CardDescription className="line-clamp-2">{agent.description}</CardDescription>
 
         <div className="space-y-1">
