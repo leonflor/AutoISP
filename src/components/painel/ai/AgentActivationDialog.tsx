@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -74,8 +73,8 @@ export function AgentActivationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
             Ativar Agente: {agent.name}
@@ -86,7 +85,7 @@ export function AgentActivationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto py-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="config">Configuração</TabsTrigger>
@@ -159,28 +158,28 @@ export function AgentActivationDialog({
               </div>
             </TabsContent>
           </Tabs>
-
-          <DialogFooter className="mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                "Ativando..."
-              ) : (
-                <>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Ativar Agente
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </form>
+
+        <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? (
+              "Ativando..."
+            ) : (
+              <>
+                <Zap className="h-4 w-4 mr-2" />
+                Ativar Agente
+              </>
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
