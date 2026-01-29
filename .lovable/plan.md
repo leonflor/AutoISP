@@ -1,44 +1,122 @@
 
-## Objetivo
-Garantir que o botão “Ativar Agente” (e os botões dos cards ativos) fique sempre alinhado no rodapé do card, independentemente do tamanho do texto/quantidade de features.
 
-## Diagnóstico (por que ainda está desalinhado)
-Mesmo com `flex-1` e `mt-auto`, o alinhamento não acontece porque o `space-y-*` do Tailwind aplica `margin-top` nos filhos via seletor (`.space-y-4 > ...`), que acaba sobrescrevendo o `mt-auto` do botão/linha de botões. Resultado: o botão não “empurra” para baixo e fica flutuando acima.
+# Converter Cards para Abas na Página de Configurações do Cliente
 
-## Solução
-Substituir `space-y-4` por `gap-4` nos containers que precisam permitir `mt-auto`:
-- `gap-*` usa `gap` do flexbox (não mexe em `margin-top` dos filhos).
-- Assim, `mt-auto` volta a funcionar e o botão vai para o fundo do card.
+## Visão Geral
 
-## Mudanças propostas
+Atualmente a página de Configurações exibe 4 cards em grid (2 colunas). Vamos reorganizar para uma interface com abas, onde cada seção ocupa uma aba dedicada.
 
-### 1) AgentCatalogCard (Catálogo)
-**Arquivo:** `src/components/painel/ai/AgentCatalogCard.tsx`
+---
 
-- Trocar:
-  - `CardContent className="flex-1 flex flex-col space-y-4"`
-  - por `CardContent className="flex-1 flex flex-col gap-4"`
-- Manter o botão com `className="w-full mt-auto"` (agora o `mt-auto` funcionará de verdade).
+## Nova Estrutura
 
-**Efeito esperado:** o botão “Ativar Agente” fica sempre no bottom do card, mesmo quando não houver lista de features/tags.
+| Aba | Ícone | Conteúdo |
+|-----|-------|----------|
+| Dados da Empresa | Building2 | Formulário com nome, CNPJ, e-mail, telefone |
+| Personalização | Palette | Upload de logo, cor primária |
+| Notificações | Bell | Switches de preferências de alertas |
+| Integrações | Link | Lista de status das integrações |
 
-### 2) ActiveAgentCard (Meus Agentes)
-**Arquivo:** `src/components/painel/ai/ActiveAgentCard.tsx`
+---
 
-- Trocar:
-  - `CardContent className="flex-1 flex flex-col space-y-4"`
-  - por `CardContent className="flex-1 flex flex-col gap-4"`
-- Manter a linha de botões com `className="flex gap-2 mt-auto pt-2"`.
+## Layout Proposto
 
-**Efeito esperado:** os botões “Configurar / Base Q&A / Chat” ficam sempre alinhados no rodapé do card, mesmo com/sem “Instruções extras”.
+```text
+┌────────────────────────────────────────────────────────┐
+│  Configurações                                         │
+│  Gerencie as configurações do seu provedor             │
+├────────────────────────────────────────────────────────┤
+│  [Empresa] [Personalização] [Notificações] [Integrações]│
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│     Conteúdo da aba selecionada                        │
+│     (em um Card único)                                 │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
 
-## Checklist de validação (manual)
-1. Ir em **Painel → Agentes de IA → Catálogo** e conferir uma linha com cards com:
-   - poucos recursos (sem lista) e muitos recursos (com lista).
-   - O botão deve ficar alinhado com os demais na mesma linha.
-2. Ir em **Painel → Agentes de IA → Meus Agentes** e conferir:
-   - agentes com e sem “Instruções extras”.
-   - os botões inferiores devem alinhar.
+---
 
-## Observação técnica
-- Não vamos remover espaçamentos visuais: `gap-4` mantém o mesmo “respiro” que `space-y-4`, mas sem conflitar com `mt-auto`.
+## Mudanças
+
+### Arquivo: `src/pages/painel/Settings.tsx`
+
+**Imports a adicionar:**
+- `Tabs, TabsList, TabsTrigger, TabsContent` de `@/components/ui/tabs`
+
+**Estrutura:**
+1. Substituir o grid de cards por um componente `<Tabs>`
+2. Criar `<TabsList>` com 4 triggers (ícone + texto)
+3. Cada `<TabsContent>` contém o conteúdo do card correspondente dentro de um único `<Card>`
+
+---
+
+## Seção Técnica
+
+### Estrutura do código:
+
+```tsx
+<Tabs defaultValue="empresa" className="space-y-4">
+  <TabsList className="grid w-full grid-cols-4">
+    <TabsTrigger value="empresa" className="flex items-center gap-2">
+      <Building2 className="h-4 w-4" />
+      <span className="hidden sm:inline">Empresa</span>
+    </TabsTrigger>
+    <TabsTrigger value="personalizacao" className="flex items-center gap-2">
+      <Palette className="h-4 w-4" />
+      <span className="hidden sm:inline">Personalização</span>
+    </TabsTrigger>
+    <TabsTrigger value="notificacoes" className="flex items-center gap-2">
+      <Bell className="h-4 w-4" />
+      <span className="hidden sm:inline">Notificações</span>
+    </TabsTrigger>
+    <TabsTrigger value="integracoes" className="flex items-center gap-2">
+      <Link className="h-4 w-4" />
+      <span className="hidden sm:inline">Integrações</span>
+    </TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="empresa">
+    <Card>
+      <CardHeader>...</CardHeader>
+      <CardContent>...</CardContent>
+    </Card>
+  </TabsContent>
+
+  <TabsContent value="personalizacao">
+    <Card>
+      <CardHeader>...</CardHeader>
+      <CardContent>...</CardContent>
+    </Card>
+  </TabsContent>
+
+  <TabsContent value="notificacoes">
+    <Card>
+      <CardHeader>...</CardHeader>
+      <CardContent>...</CardContent>
+    </Card>
+  </TabsContent>
+
+  <TabsContent value="integracoes">
+    <Card>
+      <CardHeader>...</CardHeader>
+      <CardContent>...</CardContent>
+    </Card>
+  </TabsContent>
+</Tabs>
+```
+
+### Detalhes:
+- `defaultValue="empresa"` - aba inicial
+- `grid-cols-4` no `TabsList` para distribuir igualmente
+- `hidden sm:inline` no texto das abas para responsividade (em mobile mostra só ícone)
+- Cada `TabsContent` mantém o conteúdo original do card correspondente
+
+---
+
+## Resumo de Arquivos
+
+| Tipo | Arquivo | Mudança |
+|------|---------|---------|
+| Modificar | `src/pages/painel/Settings.tsx` | Converter grid de cards para interface com Tabs |
+
