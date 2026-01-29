@@ -1,50 +1,71 @@
 
+# Remoção da Coluna Premium da Tabela de Agentes
 
-# Correção de Margens na Página de Cláusulas LGPD
+## Contexto
 
-## Problema Identificado
-
-A página de **Cláusulas LGPD** (`AiSecurity.tsx`) está com textos e botões muito próximos das bordas porque não possui o padding padrão `p-6` usado em outras páginas admin.
-
-### Comparação de Páginas
-
-| Página | Container Principal | Resultado |
-|--------|---------------------|-----------|
-| Dashboard | `<div className="p-6 space-y-6">` | ✅ Margens corretas |
-| Users | `<div className="p-6 space-y-6">` | ✅ Margens corretas |
-| AiSecurity | `<div className="space-y-6">` | ❌ Sem margens |
-| AiAgents | `<div className="space-y-6">` | ❌ Sem margens |
+A coluna **Premium** será removida da tabela de Agentes de IA porque essa informação será configurada diretamente nos **Planos de assinatura** — uma abordagem mais flexível que permite vincular agentes específicos a cada plano.
 
 ---
 
-## Solução
+## Mudanças
 
-### Arquivos a Modificar
+### Arquivo: `src/components/admin/ai-agents/AgentTemplateTable.tsx`
 
-1. **`src/pages/admin/AiSecurity.tsx`** - Adicionar `p-6` ao container principal
-2. **`src/pages/admin/AiAgents.tsx`** - Adicionar `p-6` ao container principal (mesmo problema)
+| Item | Ação |
+|------|------|
+| Import `Crown` | Remover (não será mais usado) |
+| `<TableHead>Premium</TableHead>` | Remover (linha 93) |
+| `<TableCell>` com ícone Crown | Remover (linhas 138-142) |
 
-### Mudança
+### Estrutura Final do Header
+
+```
+TableHeader
+├── Avatar (w-12)
+├── Nome
+├── Tipo
+├── Modelo
+├── Escopo
+├── Status (text-center)
+└── Ações (w-12)
+```
+
+---
+
+## Seção Técnica
+
+### Alteração 1: Remover import Crown (linha 2)
 
 ```tsx
 // Antes
-<div className="space-y-6">
+import { Edit, Trash2, Copy, MoreHorizontal, Bot, Crown, Building2, Server } from 'lucide-react';
 
 // Depois
-<div className="p-6 space-y-6">
+import { Edit, Trash2, Copy, MoreHorizontal, Bot, Building2, Server } from 'lucide-react';
 ```
 
-Isso aplicará:
-- **padding: 24px (1.5rem)** em todos os lados
-- Alinhamento visual com as demais páginas admin
-- Espaço adequado entre o conteúdo e as bordas do container
+### Alteração 2: Remover TableHead Premium (linha 93)
+
+```tsx
+// Remover esta linha
+<TableHead className="text-center">Premium</TableHead>
+```
+
+### Alteração 3: Remover TableCell Premium (linhas 138-142)
+
+```tsx
+// Remover este bloco
+<TableCell className="text-center">
+  {agent.is_premium && (
+    <Crown className="h-4 w-4 text-amber-500 mx-auto" />
+  )}
+</TableCell>
+```
 
 ---
 
-## Resumo de Arquivos
+## Resumo
 
 | Tipo | Arquivo | Mudança |
 |------|---------|---------|
-| Modificar | `src/pages/admin/AiSecurity.tsx` | Adicionar `p-6` ao container |
-| Modificar | `src/pages/admin/AiAgents.tsx` | Adicionar `p-6` ao container |
-
+| Modificar | `src/components/admin/ai-agents/AgentTemplateTable.tsx` | Remover coluna Premium |
