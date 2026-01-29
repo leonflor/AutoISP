@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Bot, Zap, Settings2, Upload, FileText, X } from "lucide-react";
+import { Bot, Zap, Upload, FileText, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,8 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AvatarUpload } from "./AvatarUpload";
 import { BehaviorTab } from "./BehaviorTab";
@@ -90,7 +90,6 @@ export function AgentActivationDialog({
   onActivate,
   isLoading,
 }: AgentActivationDialogProps) {
-  const [activeTab, setActiveTab] = useState("config");
   const { membership } = useIspMembership();
   const { configMap } = usePlatformConfig();
   
@@ -146,7 +145,6 @@ export function AgentActivationDialog({
           max_interactions: escalationOptions.max_interactions?.default || 5,
         },
       });
-      setActiveTab("config");
       setKnowledgeFile(null);
       setParsedItems([]);
       setParseError(null);
@@ -232,19 +230,10 @@ export function AgentActivationDialog({
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className={`grid w-full ${hasBehaviorOptions ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                <TabsTrigger value="config">Configuração</TabsTrigger>
-                {hasBehaviorOptions && (
-                  <TabsTrigger value="behavior">
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    Comportamento
-                  </TabsTrigger>
-                )}
-              </TabsList>
-
-              <ScrollArea className="flex-1 mt-4">
-                <TabsContent value="config" className="space-y-4 mt-0 px-1">
+            <ScrollArea className="flex-1 mt-4">
+              <div className="space-y-4 px-1">
+                {/* Configuração */}
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="display_name">Nome de Exibição</Label>
                     <Input
@@ -354,19 +343,21 @@ export function AgentActivationDialog({
                       <Badge variant="secondary">Suporta Base de Conhecimento</Badge>
                     )}
                   </div>
-                </TabsContent>
+                </div>
 
+                {/* Comportamento - apenas se houver opções */}
                 {hasBehaviorOptions && (
-                  <TabsContent value="behavior" className="mt-0 px-1">
+                  <>
+                    <Separator className="my-4" />
                     <BehaviorTab
                       form={form}
                       voiceTones={voiceTones}
                       escalationOptions={escalationOptions}
                     />
-                  </TabsContent>
+                  </>
                 )}
-              </ScrollArea>
-            </Tabs>
+              </div>
+            </ScrollArea>
 
             <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0 mt-4">
               <Button
