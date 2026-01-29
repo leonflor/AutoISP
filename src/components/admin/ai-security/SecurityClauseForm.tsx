@@ -138,7 +138,7 @@ export function SecurityClauseForm({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-y-auto py-4 px-6">
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-hidden">
                 <FormField
                   control={form.control}
                   name="name"
@@ -251,7 +251,7 @@ export function SecurityClauseForm({
                     control={form.control}
                     name="sort_order"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="space-y-2">
                         <FormLabel>Ordem de Injeção</FormLabel>
                         <FormControl>
                           <Input type="number" min={0} {...field} />
@@ -268,9 +268,10 @@ export function SecurityClauseForm({
                     control={form.control}
                     name="is_active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-col justify-end">
-                        <div className="flex items-center justify-between rounded-lg border p-3">
-                          <FormLabel className="text-sm">Cláusula Ativa</FormLabel>
+                      <FormItem className="flex flex-col space-y-2">
+                        <FormLabel>Cláusula Ativa</FormLabel>
+                        <div className="flex-1 flex items-center justify-between rounded-lg border p-3">
+                          <span className="text-sm text-muted-foreground">Ativar cláusula</span>
                           <FormControl>
                             <Switch
                               checked={field.value}
@@ -281,7 +282,7 @@ export function SecurityClauseForm({
                       </FormItem>
                     )}
                   />
-              </div>
+                </div>
             </div>
           </form>
           <div className="flex justify-end gap-2 pt-4 border-t px-6 pb-6 flex-shrink-0">
