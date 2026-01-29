@@ -179,8 +179,9 @@ export function AgentTemplateForm({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col h-[calc(100vh-120px)]">
-            <ScrollArea className="flex-1 px-6">
-              <Tabs defaultValue="basic" className="w-full">
+            <ScrollArea className="flex-1 px-6 pr-4">
+              <div className="pb-4">
+                <Tabs defaultValue="basic" className="w-full overflow-hidden">
                 <TabsList className="grid w-full grid-cols-4 mb-4">
                   <TabsTrigger value="basic">Básico</TabsTrigger>
                   <TabsTrigger value="ai">Configuração IA</TabsTrigger>
@@ -188,7 +189,7 @@ export function AgentTemplateForm({
                   <TabsTrigger value="status">Status</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="basic" className="space-y-4 mt-0">
+                <TabsContent value="basic" className="space-y-4 mt-0 overflow-hidden">
                   <FormField
                     control={form.control}
                     name="name"
@@ -348,7 +349,7 @@ export function AgentTemplateForm({
                   />
                 </TabsContent>
 
-                <TabsContent value="ai" className="space-y-4 mt-0">
+                <TabsContent value="ai" className="space-y-4 mt-0 overflow-hidden">
                   <FormField
                     control={form.control}
                     name="model"
@@ -439,7 +440,7 @@ export function AgentTemplateForm({
                   />
                 </TabsContent>
 
-                <TabsContent value="features" className="space-y-4 mt-0">
+                <TabsContent value="features" className="space-y-4 mt-0 overflow-hidden">
                   <FormField
                     control={form.control}
                     name="feature_tags"
@@ -512,7 +513,7 @@ export function AgentTemplateForm({
                   )}
                 </TabsContent>
 
-                <TabsContent value="status" className="space-y-4 mt-0">
+                <TabsContent value="status" className="space-y-4 mt-0 overflow-hidden">
                   <FormField
                     control={form.control}
                     name="is_active"
@@ -572,7 +573,8 @@ export function AgentTemplateForm({
                     )}
                   />
                 </TabsContent>
-              </Tabs>
+                </Tabs>
+              </div>
             </ScrollArea>
 
             <div className="flex justify-end gap-2 p-6 border-t bg-background">
