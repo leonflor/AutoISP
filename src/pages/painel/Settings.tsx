@@ -6,14 +6,30 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useIspMembership } from '@/hooks/useIspMembership';
-import { Building2, Palette, Bell, Link, CheckCircle, XCircle } from 'lucide-react';
+import { useErpConfigs } from '@/hooks/painel/useErpConfigs';
+import { Building2, Palette, Bell, Link as LinkIcon, CheckCircle, XCircle, ChevronRight, Database, MessageSquare } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function SettingsPage() {
   const { membership } = useIspMembership();
+  const { activeConfigsCount } = useErpConfigs();
 
   const integrations = [
-    { name: 'WhatsApp Business', status: 'pendente', icon: '💬' },
-    { name: 'ERP (SGP/IXC)', status: 'pendente', icon: '📊' },
+    { 
+      name: 'WhatsApp Business', 
+      status: 'pendente' as const, 
+      icon: MessageSquare,
+      href: '/painel/whatsapp',
+      description: 'Comunicação via WhatsApp'
+    },
+    { 
+      name: 'ERP', 
+      status: activeConfigsCount > 0 ? 'configurado' as const : 'pendente' as const,
+      icon: Database,
+      href: '/painel/integracoes/erp',
+      description: 'IXC Soft, MK-Solutions e outros',
+      badge: activeConfigsCount > 0 ? `${activeConfigsCount} ativo${activeConfigsCount > 1 ? 's' : ''}` : null
+    },
   ];
 
   return (
@@ -38,7 +54,7 @@ export default function SettingsPage() {
             <span className="hidden sm:inline">Notificações</span>
           </TabsTrigger>
           <TabsTrigger value="integracoes" className="flex items-center gap-2">
-            <Link className="h-4 w-4" />
+            <LinkIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Integrações</span>
           </TabsTrigger>
         </TabsList>
@@ -150,7 +166,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Link className="h-5 w-5" />
+                <LinkIcon className="h-5 w-5" />
                 <CardTitle>Integrações</CardTitle>
               </div>
               <CardDescription>Status das conexões externas</CardDescription>
@@ -158,26 +174,42 @@ export default function SettingsPage() {
             <CardContent>
               <div className="space-y-3">
                 {integrations.map((integration) => (
-                  <div
+                  <Link
                     key={integration.name}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    to={integration.href}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{integration.icon}</span>
-                      <span className="font-medium">{integration.name}</span>
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <integration.icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{integration.name}</span>
+                          {integration.badge && (
+                            <Badge variant="outline" className="text-xs">
+                              {integration.badge}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{integration.description}</p>
+                      </div>
                     </div>
-                    {integration.status === 'configurado' ? (
-                      <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Configurado
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Pendente
-                      </Badge>
-                    )}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      {integration.status === 'configurado' ? (
+                        <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Configurado
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Pendente
+                        </Badge>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                  </Link>
                 ))}
               </div>
             </CardContent>

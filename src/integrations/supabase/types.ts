@@ -610,10 +610,16 @@ export type Database = {
         Row: {
           api_key_encrypted: string | null
           api_url: string | null
+          connected_at: string | null
           created_at: string | null
+          display_name: string | null
+          encryption_iv: string | null
           id: string
+          is_active: boolean | null
+          is_connected: boolean | null
           isp_id: string
           last_sync_at: string | null
+          masked_key: string | null
           password_encrypted: string | null
           provider: string
           sync_config: Json | null
@@ -624,10 +630,16 @@ export type Database = {
         Insert: {
           api_key_encrypted?: string | null
           api_url?: string | null
+          connected_at?: string | null
           created_at?: string | null
+          display_name?: string | null
+          encryption_iv?: string | null
           id?: string
+          is_active?: boolean | null
+          is_connected?: boolean | null
           isp_id: string
           last_sync_at?: string | null
+          masked_key?: string | null
           password_encrypted?: string | null
           provider: string
           sync_config?: Json | null
@@ -638,10 +650,16 @@ export type Database = {
         Update: {
           api_key_encrypted?: string | null
           api_url?: string | null
+          connected_at?: string | null
           created_at?: string | null
+          display_name?: string | null
+          encryption_iv?: string | null
           id?: string
+          is_active?: boolean | null
+          is_connected?: boolean | null
           isp_id?: string
           last_sync_at?: string | null
+          masked_key?: string | null
           password_encrypted?: string | null
           provider?: string
           sync_config?: Json | null
