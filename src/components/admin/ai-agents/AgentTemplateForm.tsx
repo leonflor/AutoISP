@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, AlertTriangle } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -19,6 +19,16 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +50,7 @@ import { PersonalizationTab } from './PersonalizationTab';
 import { TemplateAvatarUpload } from './TemplateAvatarUpload';
 import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS, DEFAULT_VOICE_TONES, DEFAULT_ESCALATION_OPTIONS } from './constants';
 import type { AiAgent } from '@/hooks/admin/useAiAgentTemplates';
+import { useTemplateUsage } from '@/hooks/admin/useAiAgentTemplates';
 
 const agentSchema = z.object({
   name: z.string().min(2, 'Nome é obrigatório'),
@@ -97,6 +108,11 @@ export function AgentTemplateForm({
   isSubmitting,
 }: AgentTemplateFormProps) {
   const [customFeature, setCustomFeature] = useState('');
+  const [showDeactivateAlert, setShowDeactivateAlert] = useState(false);
+  const [pendingData, setPendingData] = useState<AgentFormValues | null>(null);
+  
+  // Hook para verificar ISPs que usam este template
+  const { data: templateUsage } = useTemplateUsage(agent?.id);
   
   const form = useForm<AgentFormValues>({
     resolver: zodResolver(agentSchema),
@@ -185,7 +201,30 @@ export function AgentTemplateForm({
     if (data.scope === 'platform') {
       data.uses_knowledge_base = false;
     }
+    
+    // Verificar se está desativando um template com ISPs usando
+    const isDeactivating = agent?.is_active && !data.is_active;
+    
+    if (isDeactivating && templateUsage && templateUsage.count > 0) {
+      setPendingData(data);
+      setShowDeactivateAlert(true);
+      return;
+    }
+    
     onSubmit(data);
+  };
+
+  const handleConfirmDeactivate = () => {
+    if (pendingData) {
+      onSubmit(pendingData);
+      setShowDeactivateAlert(false);
+      setPendingData(null);
+    }
+  };
+
+  const handleCancelDeactivate = () => {
+    setShowDeactivateAlert(false);
+    setPendingData(null);
   };
 
   return (
@@ -623,6 +662,55 @@ export function AgentTemplateForm({
             </div>
           </form>
         </Form>
+
+        {/* Dialog de confirmação para desativar template com ISPs usando */}
+        <AlertDialog open={showDeactivateAlert} onOpenChange={setShowDeactivateAlert}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Confirmar Desativação
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    Este template está sendo utilizado por <strong>{templateUsage?.count || 0} ISP(s)</strong>.
+                  </p>
+                  <p>
+                    Ao desativar, os agentes desses ISPs deixarão de funcionar no chat até que o template seja reativado.
+                  </p>
+                  {templateUsage && templateUsage.isps.length > 0 && (
+                    <div className="mt-3">
+                      <p className="font-medium text-foreground mb-2">ISPs afetados:</p>
+                      <ul className="space-y-1 text-sm">
+                        {templateUsage.isps.slice(0, 5).map((isp) => (
+                          <li key={isp.id} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-destructive rounded-full" />
+                            {isp.name} ({isp.agentCount} agente{isp.agentCount > 1 ? 's' : ''})
+                          </li>
+                        ))}
+                        {templateUsage.isps.length > 5 && (
+                          <li className="text-muted-foreground">
+                            ... e mais {templateUsage.isps.length - 5} ISP(s)
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCancelDeactivate}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDeactivate}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Desativar Mesmo Assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );
