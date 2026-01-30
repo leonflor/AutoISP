@@ -246,6 +246,17 @@ const SupabaseStorageIntegration = () => {
                 </tr>
                 <tr>
                   <td className="py-3">
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">knowledge-docs</code>
+                  </td>
+                  <td className="py-3">
+                    <Badge variant="outline" className="bg-red-500/10 text-red-600">Não</Badge>
+                  </td>
+                  <td className="py-3">25MB</td>
+                  <td className="py-3 text-xs text-muted-foreground">application/pdf, text/plain, application/vnd.openxmlformats-*, application/vnd.oasis.opendocument.*</td>
+                  <td className="py-3 text-muted-foreground">Base RAG Documentos</td>
+                </tr>
+                <tr>
+                  <td className="py-3">
                     <code className="rounded bg-muted px-1.5 py-0.5 text-xs">public</code>
                   </td>
                   <td className="py-3">
