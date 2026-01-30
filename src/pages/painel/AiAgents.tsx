@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Bot, Zap, Plus } from "lucide-react";
+import { Bot, Zap, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIspAgents, CatalogTemplate, IspAgentWithTemplate, AgentActivationForm } from "@/hooks/painel/useIspAgents";
@@ -10,6 +11,7 @@ import { AgentCatalogCard } from "@/components/painel/ai/AgentCatalogCard";
 import { ActiveAgentCard } from "@/components/painel/ai/ActiveAgentCard";
 import { AgentActivationDialog } from "@/components/painel/ai/AgentActivationDialog";
 import { AgentConfigDialog } from "@/components/painel/ai/AgentConfigDialog";
+import { AgentTestDialog } from "@/components/painel/ai/AgentTestDialog";
 
 const AiAgentsPage = () => {
   const {
@@ -25,6 +27,10 @@ const AiAgentsPage = () => {
 
   const [activatingAgent, setActivatingAgent] = useState<CatalogTemplate | null>(null);
   const [configuringAgent, setConfiguringAgent] = useState<IspAgentWithTemplate | null>(null);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+
+  // Filter only enabled agents for testing
+  const enabledAgents = activeAgents?.filter((a) => a.is_enabled && a.ai_agents.is_active !== false) || [];
 
   const totalTokens = stats?.totalTokens || 0;
   const currentActiveCount = catalog?.currentActiveCount || 0;
@@ -96,6 +102,13 @@ const AiAgentsPage = () => {
               </span>
             </div>
           </Card>
+          <Button
+            onClick={() => setTestDialogOpen(true)}
+            disabled={enabledAgents.length === 0}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Testar Agente
+          </Button>
         </div>
       </div>
 
@@ -189,6 +202,13 @@ const AiAgentsPage = () => {
         onSave={handleUpdateConfig}
         onRemove={handleRemoveAgent}
         isLoading={updateAgent.isPending || deactivateAgent.isPending}
+      />
+
+      {/* Test Dialog */}
+      <AgentTestDialog
+        agents={enabledAgents}
+        open={testDialogOpen}
+        onOpenChange={setTestDialogOpen}
       />
     </div>
   );
