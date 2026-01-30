@@ -1,130 +1,263 @@
 
-# Atualizar Guia de Projeto com Correções e Implementações
+# Implementar Alertas de Desativacao de Templates de IA
 
 ## Objetivo
 
-Sincronizar a documentação do projeto com as implementações realizadas, incluindo:
-1. Correções de segurança pendentes identificadas pelo linter
-2. Base de conhecimento por documentos com RAG (embeddings vetoriais)
-3. Nova Edge Function `process-document`
-4. Novas tabelas e bucket de storage
+Adicionar duas melhorias para alertar sobre o impacto da desativacao de templates:
+
+1. **Admin**: Confirmacao com contagem de ISPs afetados ao desativar template
+2. **ISP**: Alerta visual no card quando template pai esta inativo
 
 ---
 
-## Correções de Seguranca Pendentes
+## Cenario 1: Admin Desativa Template
 
-Duas correções identificadas pelo linter do Supabase que devem ser documentadas:
+Quando um superadmin tenta salvar um template com `is_active = false` e existem ISPs utilizando:
 
-| Alerta | Descricao | Correcao |
-|--------|-----------|----------|
-| Extensao no schema public | A extensao `pgvector` esta instalada no schema `public`, o que pode expor funcoes publicamente | Mover extensao para schema dedicado `extensions` em migracao futura |
-| Leaked Password Protection | Configuracao do Supabase Auth que previne uso de senhas comprometidas | Ativar em Dashboard > Authentication > Settings > "Leaked Password Protection" |
-
----
-
-## Novas Tabelas Implementadas
-
-| Tabela | Descricao | Campos Principais |
-|--------|-----------|-------------------|
-| `knowledge_documents` | Metadados dos documentos enviados para a base de conhecimento | id, isp_agent_id, isp_id, name, original_filename, storage_path, size_bytes, mime_type, status, error_message, chunk_count, indexed_at |
-| `document_chunks` | Chunks de texto com embeddings vetoriais | id, document_id, isp_agent_id, isp_id, content, embedding (vector 768), metadata, chunk_index |
-
----
-
-## Novo Bucket de Storage
-
-| Bucket | Tipo | Descricao |
-|--------|------|-----------|
-| `knowledge-docs` | Privado | Armazena documentos PDF, TXT, DOCX, ODT para processamento de base de conhecimento |
+```text
++-----------------------------------------------------------+
+|  Confirmar Desativacao                                     |
++-----------------------------------------------------------+
+|                                                            |
+|  Este template esta sendo utilizado por 5 ISPs.            |
+|                                                            |
+|  Ao desativar, os agentes desses ISPs deixarao de          |
+|  funcionar no chat ate que o template seja reativado.      |
+|                                                            |
+|  ISPs afetados:                                            |
+|  - Provedor Net Sul (2 agentes)                            |
+|  - TurboNet (1 agente)                                     |
+|  - FibraMax (2 agentes)                                    |
+|                                                            |
+|                       [Cancelar]  [Desativar Mesmo Assim]  |
++-----------------------------------------------------------+
+```
 
 ---
 
-## Nova Edge Function
+## Cenario 2: Card do ISP com Template Inativo
 
-| Funcao | Descricao | Tecnologias |
-|--------|-----------|-------------|
-| `process-document` | Processa documentos de forma assincrona: extrai texto, divide em chunks, gera embeddings vetoriais | Lovable AI Gateway (embeddings 768d), pgvector, chunking com overlap |
+Quando o template pai (`ai_agents.is_active = false`), exibir alerta no card:
 
----
-
-## Campos Adicionados em Tabelas Existentes
-
-| Tabela | Campo | Tipo | Descricao |
-|--------|-------|------|-----------|
-| `ai_limits` | `max_documents_per_agent` | integer (default 5) | Limite de documentos por agente, controlado pelo plano |
-| `isp_agents` | `chunk_size` | integer (250-1000, default 500) | Tamanho configuravel do chunk em tokens |
-
----
-
-## RAG Implementado
-
-A busca no ai-chat agora utiliza busca hibrida:
-1. Gera embedding da pergunta do usuario
-2. Busca chunks similares em `document_chunks` (similarity > 0.7)
-3. Busca Q&A manual em `agent_knowledge_base`
-4. Combina resultados por relevancia no contexto do system prompt
+```text
++---------------------------------------+
+|  [!] Template desativado pelo admin   |  <- Badge vermelho
++---------------------------------------+
+|  Atendente Virtual                    |
+|  [Tipo] [Q&A]                         |
+|                                       |
+|  Descricao do agente...               |
+|                                       |
+|  [Configurar]  [Base Q&A]  [Chat X]   |  <- Chat desabilitado
++---------------------------------------+
+```
 
 ---
 
-## Secao Tecnica - Arquivos a Modificar
+## Fluxo de Validacao
 
-### 1. ImplementacaoTab.tsx
-
-Adicionar na lista de Edge Functions:
-- `process-document` - Processa documentos e gera embeddings vetoriais
-
-Atualizar Fase F5 checklist:
-- Base de conhecimento por documentos funcionando
-- Upload assincrono com status
-- RAG hibrido operacional
-
-### 2. SecurityOverviewSection.tsx
-
-Adicionar nova secao "Correcoes Pendentes" com:
-- Alerta sobre pgvector no schema public
-- Alerta sobre Leaked Password Protection desativado
-
-Atualizar Matriz de Segredos (nao requer novos segredos, usa Lovable AI Gateway interno)
-
-### 3. SupabaseStorageIntegration.tsx
-
-Documentar novo bucket:
-- `knowledge-docs` - Bucket privado para base de conhecimento RAG
-
-### 4. OpenAIIntegration.tsx
-
-Atualizar secao RAG:
-- Dimensoes: 768 (via Lovable AI Gateway)
-- Modelo embedding: interno Lovable
-- Tabela de chunks: `document_chunks`
-- Funcao de busca: `match_document_chunks`
-
-### 5. AgentesIAClienteFeatures.tsx
-
-Atualizar feature F-CLI-058 (Gerenciar Base de Conhecimento):
-- Adicionar suporte a upload assincrono
-- Status de processamento (pending, processing, indexed, error)
-- Limite por plano (`max_documents_per_agent`)
-- Chunk size configuravel
+```text
+Admin salva template
+        |
+        v
+  is_active mudou para false?
+        |
+     [Sim]
+        |
+        v
+  Buscar ISPs com isp_agents.agent_id = template.id
+        |
+        v
+  Quantidade > 0?
+        |
+     [Sim]
+        |
+        v
+  Exibir AlertDialog com contagem e lista
+        |
+        v
+  Admin confirma?
+        |
+     [Sim] --> Salvar
+     [Nao] --> Cancelar
+```
 
 ---
 
-## Novas Regras de Negocio a Documentar
+## Secao Tecnica
 
-| Codigo | Descricao |
-|--------|-----------|
-| RN-CLI-228a | Documentos sao processados de forma assincrona |
-| RN-CLI-228b | Status de processamento: pending → processing → indexed ou error |
-| RN-CLI-228c | Chunks com overlap de 10% para manter contexto |
-| RN-CLI-228d | Limite de 25MB por arquivo |
-| RN-CLI-228e | Formatos suportados: PDF, TXT, DOCX, ODT |
+### Hook para Verificar ISPs Afetados
+
+Novo hook `useTemplateUsage` para buscar ISPs que utilizam um template:
+
+```typescript
+export function useTemplateUsage(templateId: string | undefined) {
+  return useQuery({
+    queryKey: ['template-usage', templateId],
+    queryFn: async () => {
+      if (!templateId) return { count: 0, isps: [] };
+      
+      const { data, error } = await supabase
+        .from('isp_agents')
+        .select(`
+          id,
+          isp_id,
+          display_name,
+          isps!inner (id, name)
+        `)
+        .eq('agent_id', templateId);
+      
+      if (error) throw error;
+      
+      // Agrupar por ISP
+      const ispMap = new Map();
+      data?.forEach(agent => {
+        const ispId = agent.isp_id;
+        if (!ispMap.has(ispId)) {
+          ispMap.set(ispId, { 
+            name: agent.isps.name, 
+            agents: [] 
+          });
+        }
+        ispMap.get(ispId).agents.push(agent.display_name);
+      });
+      
+      return {
+        count: ispMap.size,
+        isps: Array.from(ispMap.entries()).map(([id, data]) => ({
+          id,
+          name: data.name,
+          agentCount: data.agents.length
+        }))
+      };
+    },
+    enabled: !!templateId
+  });
+}
+```
 
 ---
 
-## Ordem de Modificacao
+### Modificacoes em Arquivos
 
-1. `SecurityOverviewSection.tsx` - Adicionar secao de correcoes pendentes
-2. `ImplementacaoTab.tsx` - Adicionar process-document na lista de Edge Functions e atualizar checklist F5
-3. `SupabaseStorageIntegration.tsx` - Documentar bucket knowledge-docs
-4. `OpenAIIntegration.tsx` - Atualizar secao RAG com nova arquitetura
-5. `AgentesIAClienteFeatures.tsx` - Expandir regras da feature F-CLI-058
+| Arquivo | Modificacao |
+|---------|-------------|
+| `src/hooks/admin/useAiAgentTemplates.ts` | Adicionar hook `useTemplateUsage` |
+| `src/components/admin/ai-agents/AgentTemplateForm.tsx` | Adicionar estado para confirmacao + AlertDialog |
+| `src/components/painel/ai/ActiveAgentCard.tsx` | Adicionar badge de alerta quando `ai_agents.is_active = false` |
+| `src/hooks/painel/useIspAgents.ts` | Incluir `ai_agents.is_active` no select (se nao estiver) |
+
+---
+
+### AgentTemplateForm - Logica de Confirmacao
+
+```typescript
+// Estados adicionais
+const [showDeactivateAlert, setShowDeactivateAlert] = useState(false);
+const [pendingData, setPendingData] = useState<AgentFormValues | null>(null);
+
+// Verificar uso do template
+const { data: templateUsage } = useTemplateUsage(agent?.id);
+
+const handleSubmit = (data: AgentFormValues) => {
+  // Se esta desativando E tem ISPs usando
+  const isDeactivating = agent?.is_active && !data.is_active;
+  
+  if (isDeactivating && templateUsage && templateUsage.count > 0) {
+    setPendingData(data);
+    setShowDeactivateAlert(true);
+    return;
+  }
+  
+  onSubmit(data);
+};
+
+const handleConfirmDeactivate = () => {
+  if (pendingData) {
+    onSubmit(pendingData);
+    setShowDeactivateAlert(false);
+    setPendingData(null);
+  }
+};
+```
+
+---
+
+### ActiveAgentCard - Badge de Template Inativo
+
+```typescript
+// Verificar se template esta inativo
+const isTemplateInactive = !template.is_active;
+
+return (
+  <Card className={...}>
+    {/* Alerta de template inativo */}
+    {isTemplateInactive && (
+      <div className="absolute top-0 left-0 right-0 bg-destructive/10 
+                      border-b border-destructive px-3 py-1.5">
+        <div className="flex items-center gap-2 text-xs text-destructive">
+          <AlertTriangle className="h-3 w-3" />
+          Template desativado pelo administrador
+        </div>
+      </div>
+    )}
+    
+    {/* Desabilitar botao de chat quando template inativo */}
+    <Button
+      disabled={!agent.is_enabled || isTemplateInactive}
+      ...
+    >
+      Chat
+    </Button>
+  </Card>
+);
+```
+
+---
+
+### Verificar useIspAgents
+
+Confirmar que o JOIN com `ai_agents` inclui `is_active`:
+
+```typescript
+.select(`
+  *,
+  ai_agents!inner (
+    id, name, slug, type, description, avatar_url,
+    uses_knowledge_base, is_premium, system_prompt,
+    is_active  // <-- Garantir que este campo esta presente
+  )
+`)
+```
+
+---
+
+## Arquivos a Modificar
+
+1. `src/hooks/admin/useAiAgentTemplates.ts`
+   - Adicionar `useTemplateUsage` hook
+
+2. `src/components/admin/ai-agents/AgentTemplateForm.tsx`
+   - Importar `useTemplateUsage`
+   - Adicionar estados `showDeactivateAlert` e `pendingData`
+   - Modificar `handleSubmit` para verificar desativacao
+   - Adicionar `AlertDialog` de confirmacao
+
+3. `src/components/painel/ai/ActiveAgentCard.tsx`
+   - Importar `AlertTriangle`
+   - Adicionar verificacao `isTemplateInactive`
+   - Adicionar banner de alerta
+   - Desabilitar chat quando template inativo
+
+4. `src/hooks/painel/useIspAgents.ts`
+   - Verificar/adicionar `is_active` no select de `ai_agents`
+
+---
+
+## Ordem de Implementacao
+
+1. Adicionar `useTemplateUsage` hook
+2. Modificar `AgentTemplateForm` com confirmacao
+3. Verificar `useIspAgents` inclui `is_active`
+4. Modificar `ActiveAgentCard` com alerta visual
+5. Testar fluxo completo
