@@ -1,8 +1,9 @@
-import { Bot, Zap, MessageSquare, TrendingUp, Headphones, Settings, BookOpen, Power, PowerOff } from "lucide-react";
+import { Bot, Zap, MessageSquare, TrendingUp, Headphones, Settings, BookOpen, Power, PowerOff, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { IspAgentWithTemplate } from "@/hooks/painel/useIspAgents";
 import { useNavigate } from "react-router-dom";
 
@@ -30,14 +31,27 @@ export function ActiveAgentCard({
   const IconComponent = agentIcons[template.type] || Bot;
   const displayName = agent.display_name || template.name;
   const avatarUrl = agent.avatar_url || template.avatar_url;
+  
+  // Verificar se o template foi desativado pelo admin
+  const isTemplateInactive = template.is_active === false;
 
   return (
     <Card
       className={`flex flex-col h-full relative overflow-hidden transition-all hover:shadow-lg ${
-        agent.is_enabled ? "hover:border-primary/50" : "opacity-60 border-muted"
+        agent.is_enabled && !isTemplateInactive ? "hover:border-primary/50" : "opacity-60 border-muted"
       }`}
     >
-      <div className="absolute top-2 right-2 flex items-center gap-2">
+      {/* Alerta de template desativado pelo admin */}
+      {isTemplateInactive && (
+        <div className="absolute top-0 left-0 right-0 bg-destructive/10 border-b border-destructive px-3 py-1.5 z-10">
+          <div className="flex items-center gap-2 text-xs text-destructive font-medium">
+            <AlertTriangle className="h-3 w-3" />
+            Template desativado pelo administrador
+          </div>
+        </div>
+      )}
+
+      <div className={`absolute ${isTemplateInactive ? 'top-9' : 'top-2'} right-2 flex items-center gap-2`}>
         {template.is_premium && (
           <Badge variant="secondary" className="gap-1">
             <Zap className="h-3 w-3" />
@@ -121,8 +135,9 @@ export function ActiveAgentCard({
           <Button
             size="sm"
             className="flex-1"
-            disabled={!agent.is_enabled}
+            disabled={!agent.is_enabled || isTemplateInactive}
             onClick={() => navigate(`/painel/chat?agent=${template.slug}`)}
+            title={isTemplateInactive ? "Template desativado pelo administrador" : undefined}
           >
             <MessageSquare className="h-4 w-4 mr-2" />
             Chat

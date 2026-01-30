@@ -3,6 +3,62 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
+// Hook para verificar ISPs que usam um template
+export interface TemplateUsageIsp {
+  id: string;
+  name: string;
+  agentCount: number;
+}
+
+export interface TemplateUsage {
+  count: number;
+  isps: TemplateUsageIsp[];
+}
+
+export function useTemplateUsage(templateId: string | undefined) {
+  return useQuery({
+    queryKey: ['template-usage', templateId],
+    queryFn: async (): Promise<TemplateUsage> => {
+      if (!templateId) return { count: 0, isps: [] };
+
+      const { data, error } = await supabase
+        .from('isp_agents')
+        .select(`
+          id,
+          isp_id,
+          display_name,
+          isps!inner (id, name)
+        `)
+        .eq('agent_id', templateId);
+
+      if (error) throw error;
+
+      // Agrupar por ISP
+      const ispMap = new Map<string, { name: string; agents: string[] }>();
+      data?.forEach((agent: any) => {
+        const ispId = agent.isp_id;
+        if (!ispMap.has(ispId)) {
+          ispMap.set(ispId, {
+            name: agent.isps.name,
+            agents: [],
+          });
+        }
+        ispMap.get(ispId)!.agents.push(agent.display_name || 'Sem nome');
+      });
+
+      return {
+        count: ispMap.size,
+        isps: Array.from(ispMap.entries()).map(([id, data]) => ({
+          id,
+          name: data.name,
+          agentCount: data.agents.length,
+        })),
+      };
+    },
+    enabled: !!templateId,
+  });
+}
+
 export type AiAgent = Tables<'ai_agents'>;
 export type AiAgentInsert = TablesInsert<'ai_agents'>;
 export type AiAgentUpdate = TablesUpdate<'ai_agents'>;

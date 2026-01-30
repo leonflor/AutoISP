@@ -48,7 +48,13 @@ export function useIspAgents() {
         .from("isp_agents")
         .select(`
           *,
-          ai_agents!inner (*)
+          ai_agents!inner (
+            id, name, slug, type, description, avatar_url,
+            uses_knowledge_base, is_premium, system_prompt,
+            model, temperature, max_tokens, feature_tags,
+            voice_tones, escalation_options, scope,
+            is_active
+          )
         `)
         .eq("isp_id", membership!.ispId)
         .order("created_at", { ascending: false });
