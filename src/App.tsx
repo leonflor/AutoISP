@@ -49,6 +49,7 @@ const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
 const AiAgentsPage = lazy(() => import("./pages/admin/AiAgents"));
 const AiSecurityPage = lazy(() => import("./pages/admin/AiSecurity"));
+const AiProcessingLogsPage = lazy(() => import("./pages/admin/AiProcessingLogs"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 
 const queryClient = new QueryClient({
@@ -95,6 +96,7 @@ const App = () => (
                 <Route path="tickets" element={<SupportTickets />} />
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
                 <Route path="ai-agents" element={<AiAgentsPage />} />
+                <Route path="ai-logs" element={<AiProcessingLogsPage />} />
                 <Route path="ai-security" element={<AiSecurityPage />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />

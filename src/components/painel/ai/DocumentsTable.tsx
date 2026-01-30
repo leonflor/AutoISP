@@ -1,5 +1,6 @@
-import { FileText, Trash2, RefreshCw, FileWarning, Database } from "lucide-react";
+import { FileText, Trash2, RefreshCw, FileWarning, Database, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -19,6 +20,20 @@ import { DocumentStatusBadge } from "./DocumentStatusBadge";
 import type { KnowledgeDocument } from "@/hooks/painel/useDocumentKnowledge";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Helper to parse error code from error_message
+function parseErrorCode(errorMessage: string | null): { code: string; message: string } | null {
+  if (!errorMessage) return null;
+  
+  // Format: "ERR_XXXX_XXX - Message here"
+  const match = errorMessage.match(/^(ERR_[A-Z0-9_]+)\s*-\s*(.+)$/);
+  if (match) {
+    return { code: match[1], message: match[2] };
+  }
+  
+  // Legacy format (no code)
+  return { code: "ERR_UNKNOWN", message: errorMessage };
+}
 
 interface DocumentsTableProps {
   documents: KnowledgeDocument[] | undefined;
@@ -117,16 +132,29 @@ export function DocumentsTable({
                 {formatBytes(doc.size_bytes)}
               </TableCell>
               <TableCell>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <DocumentStatusBadge status={doc.status} />
-                  </TooltipTrigger>
-                  {doc.error_message && (
-                    <TooltipContent>
-                      <p className="max-w-xs">{doc.error_message}</p>
-                    </TooltipContent>
+                <div className="flex items-center gap-2">
+                  <DocumentStatusBadge status={doc.status} />
+                  {doc.status === "error" && doc.error_message && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 cursor-help">
+                          <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 text-destructive border-destructive/50">
+                            {parseErrorCode(doc.error_message)?.code || "ERR"}
+                          </Badge>
+                          <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-medium text-destructive mb-1">
+                          {parseErrorCode(doc.error_message)?.code}
+                        </p>
+                        <p className="text-sm">
+                          {parseErrorCode(doc.error_message)?.message}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
-                </Tooltip>
+                </div>
               </TableCell>
               <TableCell className="text-center">
                 <div className="flex items-center justify-center gap-1 text-sm">

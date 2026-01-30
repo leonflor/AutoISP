@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Bot, Shield } from 'lucide-react';
+import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Bot, Shield, FileWarning } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,6 +55,7 @@ const menuItems: MenuItem[] = [
     icon: Bot,
     submenu: [
       { title: 'Templates de Agentes', url: '/admin/ai-agents', icon: Bot },
+      { title: 'Logs de Processamento', url: '/admin/ai-logs', icon: FileWarning },
       { title: 'Cláusulas LGPD', url: '/admin/ai-security', icon: Shield },
     ]
   },

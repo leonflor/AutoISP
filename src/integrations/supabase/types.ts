@@ -548,6 +548,64 @@ export type Database = {
           },
         ]
       }
+      document_processing_logs: {
+        Row: {
+          created_at: string | null
+          document_id: string | null
+          error_code: string
+          error_details: Json | null
+          error_message: string
+          id: string
+          isp_agent_id: string | null
+          isp_id: string
+          processing_step: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_id?: string | null
+          error_code: string
+          error_details?: Json | null
+          error_message: string
+          id?: string
+          isp_agent_id?: string | null
+          isp_id: string
+          processing_step: string
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string | null
+          error_code?: string
+          error_details?: Json | null
+          error_message?: string
+          id?: string
+          isp_agent_id?: string | null
+          isp_id?: string
+          processing_step?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_processing_logs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_processing_logs_isp_agent_id_fkey"
+            columns: ["isp_agent_id"]
+            isOneToOne: false
+            referencedRelation: "isp_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_processing_logs_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       erp_configs: {
         Row: {
           api_key_encrypted: string | null
