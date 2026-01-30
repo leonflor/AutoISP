@@ -53,12 +53,42 @@ interface KnowledgeItem {
   category: string | null;
 }
 
+interface DocumentChunk {
+  content: string;
+  similarity: number;
+}
+
+// Generate embedding for query
+async function generateQueryEmbedding(query: string, apiKey: string): Promise<number[]> {
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: "text-embedding-3-small",
+      input: query.slice(0, 2000),
+      dimensions: 768
+    })
+  });
+  
+  if (!response.ok) {
+    console.warn("Failed to generate embedding for RAG");
+    return [];
+  }
+  
+  const data = await response.json();
+  return data.data[0].embedding;
+}
+
 // Build the final system prompt with all layers
 function buildSystemPrompt(
   template: IspAgentWithTemplate["ai_agents"],
   ispAgent: IspAgentWithTemplate,
   securityClauses: SecurityClause[],
   knowledgeBase: KnowledgeItem[],
+  documentChunks: DocumentChunk[],
   ispName: string
 ): string {
   const parts: string[] = [];
@@ -73,16 +103,25 @@ function buildSystemPrompt(
     parts.push(`\nAdote o seguinte tom de voz em suas respostas: ${ispAgent.voice_tone}`);
   }
 
-  // 3. Knowledge base context (if available)
+  // 3. Document chunks context (RAG - higher priority)
+  if (documentChunks.length > 0) {
+    const chunksSection = documentChunks
+      .map((chunk, i) => `[Trecho ${i + 1} - relevância ${(chunk.similarity * 100).toFixed(0)}%]\n${chunk.content}`)
+      .join("\n\n");
+    
+    parts.push(`\n## Documentos Relevantes\nUse estes trechos de documentos para responder:\n\n${chunksSection}`);
+  }
+
+  // 4. Knowledge base Q&A context
   if (knowledgeBase.length > 0) {
     const kbSection = knowledgeBase
       .map((item) => `P: ${item.question}\nR: ${item.answer}`)
       .join("\n\n");
     
-    parts.push(`\n## Base de Conhecimento Disponível\nUse as seguintes informações para responder perguntas dos usuários:\n\n${kbSection}`);
+    parts.push(`\n## Perguntas Frequentes\n${kbSection}`);
   }
 
-  // 4. Security clauses (always injected)
+  // 5. Security clauses (always injected)
   if (securityClauses.length > 0) {
     const clausesText = securityClauses
       .map((c) => `- ${c.content}`)
@@ -91,7 +130,7 @@ function buildSystemPrompt(
     parts.push(`\n## REGRAS OBRIGATÓRIAS DE SEGURANÇA\nVocê DEVE seguir estas regras em todas as interações:\n${clausesText}`);
   }
 
-  // 5. Context anchoring (prevent cross-tenant data leakage)
+  // 6. Context anchoring (prevent cross-tenant data leakage)
   const contextAnchor = `\n## Contexto Atual\n- Provedor: ${ispName}\n- Data: ${new Date().toLocaleDateString("pt-BR")}\n- Agente: ${ispAgent.display_name || template.name}`;
   parts.push(contextAnchor);
 
@@ -258,7 +297,10 @@ Deno.serve(async (req) => {
 
     // Fetch knowledge base if enabled for this agent
     let knowledgeBase: KnowledgeItem[] = [];
+    let documentChunks: DocumentChunk[] = [];
+    
     if (template.uses_knowledge_base) {
+      // Fetch Q&A knowledge base
       const { data: kbItems } = await supabaseAdmin
         .from("agent_knowledge_base")
         .select("question, answer, category")
@@ -267,6 +309,32 @@ Deno.serve(async (req) => {
         .order("sort_order");
       
       knowledgeBase = kbItems || [];
+      
+      // RAG: Search document chunks if available
+      const lastUserMessage = body.messages.filter(m => m.role === "user").pop();
+      if (lastUserMessage && LOVABLE_API_KEY) {
+        try {
+          const queryEmbedding = await generateQueryEmbedding(lastUserMessage.content, LOVABLE_API_KEY);
+          
+          if (queryEmbedding.length > 0) {
+            const { data: chunks } = await supabaseAdmin.rpc("match_document_chunks", {
+              query_embedding: `[${queryEmbedding.join(",")}]`,
+              match_isp_agent_id: ispAgent.id,
+              match_threshold: 0.7,
+              match_count: 5
+            });
+            
+            if (chunks && chunks.length > 0) {
+              documentChunks = chunks.map((c: { content: string; similarity: number }) => ({
+                content: c.content,
+                similarity: c.similarity
+              }));
+            }
+          }
+        } catch (ragError) {
+          console.warn("RAG search failed:", ragError);
+        }
+      }
     }
 
     // Check AI usage limits
@@ -309,16 +377,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build complete system prompt with all layers
+    // Build complete system prompt with all layers (hybrid RAG)
     const systemPrompt = buildSystemPrompt(
       template,
       ispAgent,
       securityClauses || [],
       knowledgeBase,
+      documentChunks,
       ispName
     );
 
-    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length} items, Security=${securityClauses?.length || 0} clauses`);
+    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length} Q&A, Docs=${documentChunks.length} chunks, Security=${securityClauses?.length || 0} clauses`);
 
     // Build messages with enriched system prompt
     const messages: ChatMessage[] = [

@@ -144,6 +144,7 @@ export type Database = {
           id: string
           is_enabled: boolean | null
           max_agents_active: number | null
+          max_documents_per_agent: number | null
           monthly_limit: number | null
           plan_id: string
           updated_at: string | null
@@ -155,6 +156,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean | null
           max_agents_active?: number | null
+          max_documents_per_agent?: number | null
           monthly_limit?: number | null
           plan_id: string
           updated_at?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean | null
           max_agents_active?: number | null
+          max_documents_per_agent?: number | null
           monthly_limit?: number | null
           plan_id?: string
           updated_at?: string | null
@@ -501,6 +504,50 @@ export type Database = {
           },
         ]
       }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string | null
+          document_id: string
+          embedding: string | null
+          id: string
+          isp_agent_id: string
+          isp_id: string
+          metadata: Json | null
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string | null
+          document_id: string
+          embedding?: string | null
+          id?: string
+          isp_agent_id: string
+          isp_id: string
+          metadata?: Json | null
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string | null
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          isp_agent_id?: string
+          isp_id?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       erp_configs: {
         Row: {
           api_key_encrypted: string | null
@@ -793,6 +840,7 @@ export type Database = {
           additional_prompt: string | null
           agent_id: string
           avatar_url: string | null
+          chunk_size: number | null
           created_at: string | null
           display_name: string | null
           escalation_config: Json | null
@@ -806,6 +854,7 @@ export type Database = {
           additional_prompt?: string | null
           agent_id: string
           avatar_url?: string | null
+          chunk_size?: number | null
           created_at?: string | null
           display_name?: string | null
           escalation_config?: Json | null
@@ -819,6 +868,7 @@ export type Database = {
           additional_prompt?: string | null
           agent_id?: string
           avatar_url?: string | null
+          chunk_size?: number | null
           created_at?: string | null
           display_name?: string | null
           escalation_config?: Json | null
@@ -930,6 +980,72 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      knowledge_documents: {
+        Row: {
+          chunk_count: number | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          indexed_at: string | null
+          isp_agent_id: string
+          isp_id: string
+          mime_type: string
+          name: string
+          original_filename: string
+          size_bytes: number
+          status: string | null
+          storage_path: string
+          updated_at: string | null
+        }
+        Insert: {
+          chunk_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          indexed_at?: string | null
+          isp_agent_id: string
+          isp_id: string
+          mime_type: string
+          name: string
+          original_filename: string
+          size_bytes: number
+          status?: string | null
+          storage_path: string
+          updated_at?: string | null
+        }
+        Update: {
+          chunk_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          indexed_at?: string | null
+          isp_agent_id?: string
+          isp_id?: string
+          mime_type?: string
+          name?: string
+          original_filename?: string
+          size_bytes?: number
+          status?: string | null
+          storage_path?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_documents_isp_agent_id_fkey"
+            columns: ["isp_agent_id"]
+            isOneToOne: false
+            referencedRelation: "isp_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_documents_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
@@ -1602,6 +1718,19 @@ export type Database = {
       is_isp_member: {
         Args: { _isp_id: string; _user_id: string }
         Returns: boolean
+      }
+      match_document_chunks: {
+        Args: {
+          match_count?: number
+          match_isp_agent_id: string
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          id: string
+          similarity: number
+        }[]
       }
     }
     Enums: {
