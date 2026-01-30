@@ -21,6 +21,130 @@ interface DocumentRecord {
   } | null;
 }
 
+// ============= ERROR CODE MAPPING =============
+const ERROR_CODES = {
+  DOCUMENT_NOT_FOUND: { 
+    code: "ERR_DOC_001", 
+    message: "Documento não encontrado. Tente reenviar.", 
+    step: "download" 
+  },
+  DOWNLOAD_FAILED: { 
+    code: "ERR_DOC_002", 
+    message: "Falha ao baixar arquivo. Tente reenviar.", 
+    step: "download" 
+  },
+  EXTRACT_FAILED: { 
+    code: "ERR_DOC_003", 
+    message: "Não foi possível extrair texto do documento.", 
+    step: "extract" 
+  },
+  CONTENT_TOO_SHORT: { 
+    code: "ERR_DOC_004", 
+    message: "Conteúdo insuficiente no documento.", 
+    step: "extract" 
+  },
+  CHUNK_FAILED: { 
+    code: "ERR_CHUNK_001", 
+    message: "Erro ao dividir documento em blocos.", 
+    step: "chunk" 
+  },
+  EMBEDDING_FAILED: { 
+    code: "ERR_EMBED_001", 
+    message: "Falha na geração de embeddings. Serviço temporariamente indisponível.", 
+    step: "embed" 
+  },
+  EMBEDDING_BAD_REQUEST: { 
+    code: "ERR_EMBED_002", 
+    message: "Conteúdo do documento não suportado para embeddings.", 
+    step: "embed" 
+  },
+  INSERT_FAILED: { 
+    code: "ERR_DB_001", 
+    message: "Erro ao salvar dados processados.", 
+    step: "insert" 
+  },
+  UNKNOWN: { 
+    code: "ERR_UNKNOWN", 
+    message: "Erro inesperado. Contate o suporte.", 
+    step: "unknown" 
+  },
+} as const;
+
+type ErrorCodeKey = keyof typeof ERROR_CODES;
+
+interface ErrorInfo {
+  code: string;
+  message: string;
+  step: string;
+}
+
+// Map raw error message to error code
+function mapErrorToCode(error: Error, currentStep: string): ErrorInfo {
+  const msg = error.message.toLowerCase();
+  
+  if (msg.includes("not found") || msg.includes("não encontrado")) {
+    return ERROR_CODES.DOCUMENT_NOT_FOUND;
+  }
+  if (msg.includes("download") || msg.includes("baixar")) {
+    return ERROR_CODES.DOWNLOAD_FAILED;
+  }
+  if (msg.includes("extract") || msg.includes("extrair")) {
+    return ERROR_CODES.EXTRACT_FAILED;
+  }
+  if (msg.includes("sufficient text") || msg.includes("insuficiente")) {
+    return ERROR_CODES.CONTENT_TOO_SHORT;
+  }
+  if (msg.includes("chunk") || msg.includes("dividir")) {
+    return ERROR_CODES.CHUNK_FAILED;
+  }
+  if (msg.includes("embedding") && msg.includes("bad request")) {
+    return ERROR_CODES.EMBEDDING_BAD_REQUEST;
+  }
+  if (msg.includes("embedding")) {
+    return ERROR_CODES.EMBEDDING_FAILED;
+  }
+  if (msg.includes("insert") || msg.includes("salvar")) {
+    return ERROR_CODES.INSERT_FAILED;
+  }
+  
+  // Return error with current step context
+  return {
+    code: ERROR_CODES.UNKNOWN.code,
+    message: ERROR_CODES.UNKNOWN.message,
+    step: currentStep
+  };
+}
+
+// Log error to processing logs table
+async function logProcessingError(
+  supabaseAdmin: SupabaseClient,
+  documentId: string,
+  ispId: string,
+  ispAgentId: string,
+  errorInfo: ErrorInfo,
+  originalError: Error,
+  context?: Record<string, unknown>
+) {
+  try {
+    await supabaseAdmin.from("document_processing_logs").insert({
+      document_id: documentId,
+      isp_id: ispId,
+      isp_agent_id: ispAgentId,
+      error_code: errorInfo.code,
+      error_message: errorInfo.message,
+      error_details: {
+        original_error: originalError.message,
+        stack: originalError.stack?.split("\n").slice(0, 5),
+        step_context: context || {}
+      },
+      processing_step: errorInfo.step
+    });
+    console.log(`📝 Error logged: ${errorInfo.code} at step ${errorInfo.step}`);
+  } catch (logError) {
+    console.error("Failed to log processing error:", logError);
+  }
+}
+
 // Simple text chunker with overlap
 function chunkText(text: string, chunkSize: number, overlapPercent: number = 0.1): string[] {
   const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -123,14 +247,19 @@ async function processDocumentBackground(
 ) {
   console.log(`📄 Starting background processing for document: ${documentId}`);
   
+  let doc: DocumentRecord | null = null;
+  let currentStep = "init";
+  
   try {
     // Update status to processing
+    currentStep = "update_status";
     await supabaseAdmin
       .from("knowledge_documents")
       .update({ status: "processing", updated_at: new Date().toISOString() } as Record<string, unknown>)
       .eq("id", documentId);
     
     // Get document details
+    currentStep = "fetch_document";
     const { data: docData, error: docError } = await supabaseAdmin
       .from("knowledge_documents")
       .select("*, isp_agents(chunk_size)")
@@ -141,9 +270,10 @@ async function processDocumentBackground(
       throw new Error(`Document not found: ${docError?.message}`);
     }
     
-    const doc = docData as unknown as DocumentRecord;
+    doc = docData as unknown as DocumentRecord;
     
     // Download file from storage
+    currentStep = "download";
     const { data: fileData, error: downloadError } = await supabaseAdmin
       .storage
       .from("knowledge-docs")
@@ -157,6 +287,7 @@ async function processDocumentBackground(
     console.log(`📥 Downloaded file: ${doc.original_filename}, size: ${content.length} bytes`);
     
     // Extract text
+    currentStep = "extract";
     const extractedText = await extractText(content, doc.mime_type);
     console.log(`📝 Extracted text length: ${extractedText.length} chars`);
     
@@ -168,10 +299,12 @@ async function processDocumentBackground(
     const chunkSize = doc.isp_agents?.chunk_size || 500;
     
     // Chunk the text
+    currentStep = "chunk";
     const chunks = chunkText(extractedText, chunkSize, 0.1);
     console.log(`🔪 Created ${chunks.length} chunks with size ~${chunkSize} words`);
     
     // Process each chunk
+    currentStep = "embed";
     const chunkRecords: Record<string, unknown>[] = [];
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -199,6 +332,7 @@ async function processDocumentBackground(
     }
     
     // Insert all chunks
+    currentStep = "insert";
     const { error: insertError } = await supabaseAdmin
       .from("document_chunks")
       .insert(chunkRecords as Record<string, unknown>[]);
@@ -214,6 +348,7 @@ async function processDocumentBackground(
         status: "indexed",
         chunk_count: chunks.length,
         indexed_at: new Date().toISOString(),
+        error_message: null,
         updated_at: new Date().toISOString()
       } as Record<string, unknown>)
       .eq("id", documentId);
@@ -221,14 +356,34 @@ async function processDocumentBackground(
     console.log(`✅ Document processed successfully: ${chunks.length} chunks indexed`);
     
   } catch (error) {
-    console.error(`❌ Error processing document:`, error);
+    console.error(`❌ Error processing document at step ${currentStep}:`, error);
     
-    // Update document with error status
+    const err = error instanceof Error ? error : new Error("Unknown error");
+    const errorInfo = mapErrorToCode(err, currentStep);
+    
+    // Log detailed error for admin visibility
+    if (doc) {
+      await logProcessingError(
+        supabaseAdmin,
+        documentId,
+        doc.isp_id,
+        ispAgentId,
+        errorInfo,
+        err,
+        {
+          step: currentStep,
+          filename: doc.original_filename,
+          mime_type: doc.mime_type
+        }
+      );
+    }
+    
+    // Update document with friendly error message (code + message)
     await supabaseAdmin
       .from("knowledge_documents")
       .update({
         status: "error",
-        error_message: error instanceof Error ? error.message : "Unknown error",
+        error_message: `${errorInfo.code} - ${errorInfo.message}`,
         updated_at: new Date().toISOString()
       } as Record<string, unknown>)
       .eq("id", documentId);
@@ -304,7 +459,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Validation error", message: "Campos obrigatórios: document_id, isp_agent_id" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    );
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
