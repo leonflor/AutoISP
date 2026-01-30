@@ -80,6 +80,7 @@ const ImplementacaoTab = () => {
     "save-integration",
     "send-email",
     "invite-admin",
+    "process-document",
   ];
 
   return (
@@ -594,7 +595,7 @@ const ImplementacaoTab = () => {
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Agentes IA</p>
-                      {["Chat streaming", "Consumo registrado", "Limite respeitado"].map((item) => (
+                      {["Chat streaming", "Consumo registrado", "Limite respeitado", "Upload documentos KB", "RAG híbrido operacional", "Status processamento OK"].map((item) => (
                         <div key={item} className="flex items-center gap-2">
                           <Checkbox id={`f5-${item}`} />
                           <label htmlFor={`f5-${item}`} className="text-xs text-muted-foreground">{item}</label>

@@ -334,18 +334,42 @@ const OpenAIIntegration = () => {
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 mb-4">
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                    <strong>✓ Implementado:</strong> RAG híbrido operacional com busca semântica em documentos + Q&A manual.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-4">
                   <div className="rounded-lg bg-muted/50 p-3">
                     <h4 className="text-sm font-medium">Vector Store</h4>
                     <p className="text-sm text-muted-foreground">Supabase + pgvector</p>
                   </div>
                   <div className="rounded-lg bg-muted/50 p-3">
-                    <h4 className="text-sm font-medium">Embedding Model</h4>
-                    <p className="text-sm text-muted-foreground">text-embedding-3-small</p>
+                    <h4 className="text-sm font-medium">Embedding</h4>
+                    <p className="text-sm text-muted-foreground">Lovable AI Gateway</p>
                   </div>
                   <div className="rounded-lg bg-muted/50 p-3">
                     <h4 className="text-sm font-medium">Dimensões</h4>
-                    <p className="text-sm text-muted-foreground">1536</p>
+                    <p className="text-sm text-muted-foreground">768</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/50 p-3">
+                    <h4 className="text-sm font-medium">Threshold</h4>
+                    <p className="text-sm text-muted-foreground">similarity &gt; 0.7</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-lg border border-border p-3">
+                    <h4 className="text-sm font-medium mb-2">Tabelas</h4>
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      <li><code className="rounded bg-muted px-1">knowledge_documents</code> — Metadados dos documentos</li>
+                      <li><code className="rounded bg-muted px-1">document_chunks</code> — Chunks com embeddings</li>
+                      <li><code className="rounded bg-muted px-1">agent_knowledge_base</code> — Q&A manual</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-lg border border-border p-3">
+                    <h4 className="text-sm font-medium mb-2">Função de Busca</h4>
+                    <code className="text-xs bg-muted px-2 py-1 rounded block">match_document_chunks(query_embedding, isp_agent_id, threshold, limit)</code>
+                    <p className="mt-2 text-xs text-muted-foreground">Retorna chunks ordenados por similaridade coseno</p>
                   </div>
                 </div>
                 <div>

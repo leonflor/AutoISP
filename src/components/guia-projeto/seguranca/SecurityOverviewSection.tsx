@@ -312,6 +312,64 @@ const SecurityOverviewSection = () => {
         </CardContent>
       </Card>
 
+      {/* Correções Pendentes */}
+      <Card className="border-amber-500/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Correções Pendentes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Alertas identificados pelo linter do Supabase que devem ser corrigidos em manutenção futura.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/20">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">Extensão no Schema Public</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      A extensão <code className="rounded bg-muted px-1 py-0.5">pgvector</code> está instalada no schema <code className="rounded bg-muted px-1 py-0.5">public</code>, 
+                      o que pode expor funções publicamente.
+                    </p>
+                    <div className="mt-2 rounded bg-muted/50 p-2">
+                      <p className="text-xs font-medium text-foreground">Correção:</p>
+                      <p className="text-xs text-muted-foreground">
+                        Mover extensão para schema dedicado <code className="rounded bg-background px-1 py-0.5">extensions</code> em migração futura.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/20">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">Leaked Password Protection</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Configuração do Supabase Auth que previne uso de senhas comprometidas está desativada.
+                    </p>
+                    <div className="mt-2 rounded bg-muted/50 p-2">
+                      <p className="text-xs font-medium text-foreground">Correção:</p>
+                      <p className="text-xs text-muted-foreground">
+                        Ativar em Dashboard → Authentication → Settings → "Leaked Password Protection".
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Políticas de Retenção */}
       <Card>
         <CardHeader className="pb-3">
