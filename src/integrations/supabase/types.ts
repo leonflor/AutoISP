@@ -1525,6 +1525,7 @@ export type Database = {
           api_url: string | null
           connected_at: string | null
           created_at: string | null
+          encryption_iv: string | null
           id: string
           instance_name: string | null
           is_connected: boolean | null
@@ -1540,6 +1541,7 @@ export type Database = {
           api_url?: string | null
           connected_at?: string | null
           created_at?: string | null
+          encryption_iv?: string | null
           id?: string
           instance_name?: string | null
           is_connected?: boolean | null
@@ -1555,6 +1557,7 @@ export type Database = {
           api_url?: string | null
           connected_at?: string | null
           created_at?: string | null
+          encryption_iv?: string | null
           id?: string
           instance_name?: string | null
           is_connected?: boolean | null

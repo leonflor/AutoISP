@@ -5,6 +5,34 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ============= Decryption Functions =============
+
+async function deriveKey(masterKey: string): Promise<CryptoKey> {
+  const keyMaterial = new TextEncoder().encode(masterKey);
+  const keyData = keyMaterial.slice(0, 32);
+  return await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    "AES-GCM",
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function decrypt(ciphertext: string, iv: string, masterKey: string): Promise<string> {
+  const key = await deriveKey(masterKey);
+  const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+  const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: ivBytes },
+    key,
+    ciphertextBytes
+  );
+  
+  return new TextDecoder().decode(decrypted);
+}
+
 // Rate limiting: Track message counts per phone number
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 30; // Max messages per window
@@ -621,11 +649,43 @@ async function processWithAI(
 
 async function sendWhatsAppMessage(config: any, to: string, text: string): Promise<boolean> {
   try {
-    const accessToken = config.api_key_encrypted; // In production, decrypt this
     const phoneNumberId = config.instance_name; // Using instance_name as phone_number_id
 
-    if (!accessToken || !phoneNumberId) {
+    if (!config.api_key_encrypted || !phoneNumberId) {
       console.error("WhatsApp config missing access token or phone number ID");
+      return false;
+    }
+
+    // Decrypt the API key
+    const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY");
+    if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
+      console.error("ENCRYPTION_KEY not configured or too short");
+      return false;
+    }
+
+    let accessToken: string;
+    
+    // Check if encryption_iv exists (encrypted key)
+    if (config.encryption_iv) {
+      try {
+        accessToken = await decrypt(
+          config.api_key_encrypted,
+          config.encryption_iv,
+          ENCRYPTION_KEY
+        );
+        console.log("WhatsApp API key decrypted successfully");
+      } catch (decryptError) {
+        console.error("Failed to decrypt WhatsApp API key:", decryptError);
+        return false;
+      }
+    } else {
+      // Fallback: key might not be encrypted yet (legacy data)
+      console.warn("WhatsApp API key not encrypted (missing encryption_iv). Using raw value.");
+      accessToken = config.api_key_encrypted;
+    }
+
+    if (!accessToken) {
+      console.error("WhatsApp access token is empty after decryption");
       return false;
     }
 
