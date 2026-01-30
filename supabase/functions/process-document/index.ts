@@ -21,6 +21,14 @@ interface DocumentRecord {
   } | null;
 }
 
+interface OpenAIConfigValue {
+  api_key_encrypted?: string;
+  encryption_iv?: string;
+  default_model?: string;
+  masked_key?: string;
+  configured?: boolean;
+}
+
 // ============= ERROR CODE MAPPING =============
 const ERROR_CODES = {
   DOCUMENT_NOT_FOUND: { 
@@ -58,6 +66,16 @@ const ERROR_CODES = {
     message: "Conteúdo do documento não suportado para embeddings.", 
     step: "embed" 
   },
+  OPENAI_NOT_CONFIGURED: { 
+    code: "ERR_EMBED_003", 
+    message: "Integração OpenAI não configurada. Contate o administrador.", 
+    step: "embed" 
+  },
+  OPENAI_RATE_LIMIT: { 
+    code: "ERR_EMBED_004", 
+    message: "Limite de requisições excedido. Tente novamente em alguns minutos.", 
+    step: "embed" 
+  },
   INSERT_FAILED: { 
     code: "ERR_DB_001", 
     message: "Erro ao salvar dados processados.", 
@@ -78,6 +96,53 @@ interface ErrorInfo {
   step: string;
 }
 
+// ============= ENCRYPTION HELPERS =============
+async function deriveKey(masterKey: string): Promise<CryptoKey> {
+  const keyMaterial = new TextEncoder().encode(masterKey);
+  const keyData = keyMaterial.slice(0, 32);
+  return await crypto.subtle.importKey("raw", keyData, "AES-GCM", false, ["decrypt"]);
+}
+
+async function decrypt(ciphertext: string, iv: string, masterKey: string): Promise<string> {
+  const key = await deriveKey(masterKey);
+  const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+  const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivBytes }, key, ciphertextBytes);
+  return new TextDecoder().decode(decrypted);
+}
+
+// Get OpenAI API key from platform config
+async function getOpenAIKey(supabaseAdmin: SupabaseClient): Promise<string> {
+  const masterKey = Deno.env.get("ENCRYPTION_KEY");
+  if (!masterKey) {
+    throw new Error("ENCRYPTION_KEY not configured");
+  }
+
+  const { data: config, error } = await supabaseAdmin
+    .from("platform_config")
+    .select("value")
+    .eq("key", "integration_openai")
+    .single();
+
+  if (error || !config) {
+    console.error("Failed to fetch OpenAI config:", error);
+    throw new Error("OpenAI config not found");
+  }
+
+  const value = config.value as OpenAIConfigValue;
+  
+  if (!value?.api_key_encrypted || !value?.encryption_iv) {
+    throw new Error("OpenAI not configured. Configure via admin panel.");
+  }
+
+  try {
+    return await decrypt(value.api_key_encrypted, value.encryption_iv, masterKey);
+  } catch (decryptError) {
+    console.error("Failed to decrypt OpenAI key:", decryptError);
+    throw new Error("Failed to decrypt OpenAI key");
+  }
+}
+
 // Map raw error message to error code
 function mapErrorToCode(error: Error, currentStep: string): ErrorInfo {
   const msg = error.message.toLowerCase();
@@ -96,6 +161,12 @@ function mapErrorToCode(error: Error, currentStep: string): ErrorInfo {
   }
   if (msg.includes("chunk") || msg.includes("dividir")) {
     return ERROR_CODES.CHUNK_FAILED;
+  }
+  if (msg.includes("openai not configured") || msg.includes("configure via admin")) {
+    return ERROR_CODES.OPENAI_NOT_CONFIGURED;
+  }
+  if (msg.includes("rate limit") || msg.includes("429")) {
+    return ERROR_CODES.OPENAI_RATE_LIMIT;
   }
   if (msg.includes("embedding") && msg.includes("bad request")) {
     return ERROR_CODES.EMBEDDING_BAD_REQUEST;
@@ -214,9 +285,9 @@ async function extractText(content: Uint8Array, mimeType: string): Promise<strin
   return decoder.decode(content).slice(0, 50000);
 }
 
-// Generate embedding using Lovable AI Gateway
+// Generate embedding using OpenAI API directly
 async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+  const response = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -230,8 +301,13 @@ async function generateEmbedding(text: string, apiKey: string): Promise<number[]
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Embedding error: ${error.error?.message || response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    
+    if (response.status === 429) {
+      throw new Error("Rate limit exceeded (429)");
+    }
+    
+    throw new Error(`Embedding error: ${errorData.error?.message || response.statusText}`);
   }
   
   const data = await response.json();
@@ -408,19 +484,6 @@ Deno.serve(async (req) => {
     );
   }
   
-  // Check API key
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.warn("⚠️ LOVABLE_API_KEY not configured");
-    return new Response(
-      JSON.stringify({
-        error: "SERVICE_NOT_CONFIGURED",
-        message: "Gateway de IA não configurado para embeddings."
-      }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-  
   // Validate JWT
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -464,6 +527,22 @@ Deno.serve(async (req) => {
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
+    // Get OpenAI API key from platform config
+    let openaiKey: string;
+    try {
+      openaiKey = await getOpenAIKey(supabaseAdmin);
+      console.log("🔑 OpenAI key retrieved from platform config");
+    } catch (keyError) {
+      console.error("Failed to get OpenAI key:", keyError);
+      return new Response(
+        JSON.stringify({
+          error: "SERVICE_NOT_CONFIGURED",
+          message: "Integração OpenAI não configurada. Configure via painel admin."
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     // Verify user has access to the document
     const { data: docData, error: docError } = await supabaseAdmin
       .from("knowledge_documents")
@@ -499,7 +578,7 @@ Deno.serve(async (req) => {
     
     // Start background processing
     EdgeRuntime.waitUntil(
-      processDocumentBackground(body.document_id, body.isp_agent_id, supabaseAdmin, LOVABLE_API_KEY)
+      processDocumentBackground(body.document_id, body.isp_agent_id, supabaseAdmin, openaiKey)
     );
     
     console.log(`🚀 Document processing started in background: ${body.document_id}`);
