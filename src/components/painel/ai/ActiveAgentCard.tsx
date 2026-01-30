@@ -131,17 +131,6 @@ export function ActiveAgentCard({
               Base Q&A
             </Button>
           )}
-          
-          <Button
-            size="sm"
-            className="flex-1"
-            disabled={!agent.is_enabled || isTemplateInactive}
-            onClick={() => navigate(`/painel/chat?agent=${template.slug}`)}
-            title={isTemplateInactive ? "Template desativado pelo administrador" : undefined}
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Chat
-          </Button>
         </div>
       </CardContent>
     </Card>
