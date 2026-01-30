@@ -5,6 +5,139 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limiting: Track message counts per phone number
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 30; // Max messages per window
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+
+function checkRateLimit(phoneNumber: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(phoneNumber);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(phoneNumber, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    console.warn(`Rate limit exceeded for phone: ${phoneNumber.slice(-4)}`);
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
+// Cleanup old rate limit entries periodically
+function cleanupRateLimits() {
+  const now = Date.now();
+  for (const [key, value] of rateLimitMap.entries()) {
+    if (now > value.resetAt) {
+      rateLimitMap.delete(key);
+    }
+  }
+}
+
+// Verify Meta/WhatsApp webhook signature (HMAC-SHA256)
+async function verifyWebhookSignature(
+  payload: string,
+  signature: string | null,
+  appSecret: string
+): Promise<boolean> {
+  if (!signature || !appSecret) {
+    console.warn("Missing signature or app secret for verification");
+    return false;
+  }
+
+  // Signature format: sha256=<hash>
+  const expectedPrefix = "sha256=";
+  if (!signature.startsWith(expectedPrefix)) {
+    console.warn("Invalid signature format");
+    return false;
+  }
+
+  const providedHash = signature.slice(expectedPrefix.length);
+
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(appSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+
+    const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+    const computedHash = Array.from(new Uint8Array(signatureBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Constant-time comparison to prevent timing attacks
+    if (computedHash.length !== providedHash.length) {
+      return false;
+    }
+
+    let result = 0;
+    for (let i = 0; i < computedHash.length; i++) {
+      result |= computedHash.charCodeAt(i) ^ providedHash.charCodeAt(i);
+    }
+
+    return result === 0;
+  } catch (error) {
+    console.error("Signature verification error:", error);
+    return false;
+  }
+}
+
+// Sanitize and validate phone number format
+function sanitizePhoneNumber(phone: string): string | null {
+  // Remove any non-digit characters
+  const cleaned = phone.replace(/\D/g, "");
+
+  // Validate length (international phone numbers are typically 7-15 digits)
+  if (cleaned.length < 7 || cleaned.length > 15) {
+    return null;
+  }
+
+  return cleaned;
+}
+
+// Sanitize message content to prevent injection
+function sanitizeMessageContent(content: string, maxLength: number = 4096): string {
+  if (!content || typeof content !== "string") {
+    return "";
+  }
+
+  // Trim and limit length
+  let sanitized = content.trim().slice(0, maxLength);
+
+  // Remove null bytes and other control characters (except newlines/tabs)
+  sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+
+  return sanitized;
+}
+
+// Validate webhook payload structure
+function validatePayloadStructure(payload: unknown): payload is WhatsAppWebhookPayload {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  const p = payload as Record<string, unknown>;
+
+  if (typeof p.object !== "string") {
+    return false;
+  }
+
+  if (!Array.isArray(p.entry)) {
+    return false;
+  }
+
+  // Basic structure validation passed
+  return true;
+}
+
 interface WhatsAppMessage {
   from: string;
   id: string;
@@ -65,8 +198,12 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const WHATSAPP_VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN");
+  const WHATSAPP_APP_SECRET = Deno.env.get("WHATSAPP_APP_SECRET");
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Cleanup old rate limit entries
+  cleanupRateLimits();
 
   try {
     const url = new URL(req.url);
@@ -77,7 +214,7 @@ Deno.serve(async (req) => {
       const token = url.searchParams.get("hub.verify_token");
       const challenge = url.searchParams.get("hub.challenge");
 
-      console.log("Webhook verification request:", { mode, token: token?.substring(0, 5) + "..." });
+      console.log("Webhook verification request:", { mode, tokenPresent: !!token });
 
       if (!WHATSAPP_VERIFY_TOKEN) {
         console.error("WHATSAPP_VERIFY_TOKEN not configured");
@@ -95,27 +232,72 @@ Deno.serve(async (req) => {
 
     // POST - Receive Messages
     if (req.method === "POST") {
-      const payload: WhatsAppWebhookPayload = await req.json();
+      // Read raw body for signature verification
+      const rawBody = await req.text();
 
-      console.log("Received webhook payload:", JSON.stringify(payload, null, 2).substring(0, 500));
+      // Verify webhook signature if app secret is configured
+      if (WHATSAPP_APP_SECRET) {
+        const signature = req.headers.get("x-hub-signature-256");
+        const isValid = await verifyWebhookSignature(rawBody, signature, WHATSAPP_APP_SECRET);
 
-      // Log the webhook
+        if (!isValid) {
+          console.error("Invalid webhook signature");
+          await supabase.from("webhook_logs").insert({
+            provider: "whatsapp",
+            event_type: "security_error",
+            direction: "incoming",
+            payload: { error: "Invalid signature", signaturePresent: !!signature },
+            error_message: "Webhook signature verification failed",
+          });
+          // Return 401 for invalid signatures
+          return new Response(JSON.stringify({ error: "Invalid signature" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        console.warn("WHATSAPP_APP_SECRET not configured - signature verification skipped");
+      }
+
+      // Parse and validate payload
+      let payload: unknown;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        console.error("Invalid JSON payload");
+        return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!validatePayloadStructure(payload)) {
+        console.error("Invalid payload structure");
+        return new Response(JSON.stringify({ error: "Invalid payload structure" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const validatedPayload = payload as WhatsAppWebhookPayload;
+
+      // Log the webhook (sanitize before logging)
       await supabase.from("webhook_logs").insert({
         provider: "whatsapp",
         event_type: "incoming_message",
         direction: "incoming",
-        payload: payload,
+        payload: validatedPayload,
       });
 
-      // Process only message events
-      if (payload.object !== "whatsapp_business_account") {
+      // Process only whatsapp_business_account events
+      if (validatedPayload.object !== "whatsapp_business_account") {
         return new Response(JSON.stringify({ status: "ignored" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      for (const entry of payload.entry) {
+      for (const entry of validatedPayload.entry) {
         for (const change of entry.changes) {
           if (change.field !== "messages") continue;
 
@@ -146,10 +328,25 @@ Deno.serve(async (req) => {
           const ispId = whatsappConfig.isp_id;
 
           for (const message of messages) {
-            const senderPhone = message.from;
-            const senderName = contacts.find((c) => c.wa_id === senderPhone)?.profile?.name || "Desconhecido";
+            // Validate and sanitize sender phone
+            const senderPhone = sanitizePhoneNumber(message.from);
+            if (!senderPhone) {
+              console.warn("Invalid sender phone number format");
+              continue;
+            }
 
-            console.log(`Processing message from ${senderName} (${senderPhone})`);
+            // Check rate limit
+            if (!checkRateLimit(senderPhone)) {
+              console.warn(`Rate limited: ${senderPhone.slice(-4)}`);
+              continue;
+            }
+
+            const senderName = sanitizeMessageContent(
+              contacts.find((c) => c.wa_id === message.from)?.profile?.name || "Desconhecido",
+              100
+            );
+
+            console.log(`Processing message from ${senderName} (${senderPhone.slice(-4)})`);
 
             // Try to find subscriber by phone
             const { data: subscriber } = await supabase
@@ -200,16 +397,16 @@ Deno.serve(async (req) => {
               conversation = newConversation;
             }
 
-            // Extract message content
+            // Extract and sanitize message content
             let messageContent = "";
             let messageType = message.type;
 
             switch (message.type) {
               case "text":
-                messageContent = message.text?.body || "";
+                messageContent = sanitizeMessageContent(message.text?.body || "");
                 break;
               case "image":
-                messageContent = message.image?.caption || "[Imagem recebida]";
+                messageContent = sanitizeMessageContent(message.image?.caption || "[Imagem recebida]");
                 messageType = "image";
                 break;
               case "audio":
@@ -217,22 +414,31 @@ Deno.serve(async (req) => {
                 messageType = "audio";
                 break;
               case "document":
-                messageContent = `[Documento: ${message.document?.filename || "arquivo"}]`;
+                messageContent = sanitizeMessageContent(
+                  `[Documento: ${message.document?.filename || "arquivo"}]`
+                );
                 messageType = "document";
                 break;
               case "interactive":
                 if (message.interactive?.button_reply) {
-                  messageContent = message.interactive.button_reply.title;
+                  messageContent = sanitizeMessageContent(message.interactive.button_reply.title);
                 } else if (message.interactive?.list_reply) {
-                  messageContent = message.interactive.list_reply.title;
+                  messageContent = sanitizeMessageContent(message.interactive.list_reply.title);
                 }
                 break;
               default:
-                messageContent = `[${message.type}]`;
+                messageContent = `[${sanitizeMessageContent(message.type, 50)}]`;
+            }
+
+            // Skip empty messages
+            if (!messageContent.trim()) {
+              console.log("Skipping empty message");
+              continue;
             }
 
             // Add message to conversation
-            const existingMessages: ConversationMessage[] = (conversation.messages as ConversationMessage[]) || [];
+            const existingMessages: ConversationMessage[] =
+              (conversation.messages as ConversationMessage[]) || [];
             const newMessage: ConversationMessage = {
               role: "user",
               content: messageContent,
@@ -273,12 +479,12 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Webhook error:", error);
 
-    // Log error
+    // Log error (avoid logging sensitive data)
     await supabase.from("webhook_logs").insert({
       provider: "whatsapp",
       event_type: "error",
       direction: "incoming",
-      payload: { error: error instanceof Error ? error.message : "Unknown error" },
+      payload: { error: "Internal processing error" },
       error_message: error instanceof Error ? error.message : "Unknown error",
     });
 
@@ -300,12 +506,12 @@ async function processWithAI(
 ) {
   try {
     // Find active AI agent for this ISP (type "atendente")
-    const { data: ispSubscription } = await supabase
+    const { data: ispSubscription } = (await supabase
       .from("subscriptions")
       .select("plan_id")
       .eq("isp_id", ispId)
       .eq("status", "ativa")
-      .single() as { data: { plan_id: string } | null };
+      .single()) as { data: { plan_id: string } | null };
 
     if (!ispSubscription) {
       console.log("No active subscription for ISP");
@@ -313,13 +519,13 @@ async function processWithAI(
     }
 
     // Get AI limits for the plan
-    const { data: aiLimit } = await supabase
+    const { data: aiLimit } = (await supabase
       .from("ai_limits")
       .select("*, ai_agents(*)")
       .eq("plan_id", ispSubscription.plan_id)
       .eq("is_enabled", true)
       .eq("ai_agents.type", "atendente")
-      .single() as { data: any };
+      .single()) as { data: any };
 
     if (!aiLimit || !aiLimit.ai_agents) {
       console.log("No AI agent available for this ISP");
@@ -391,9 +597,9 @@ async function processWithAI(
 
     await (supabase as any)
       .from("conversations")
-      .update({ 
+      .update({
         messages: [...messages, aiConversationMessage],
-        agent_id: agent.id 
+        agent_id: agent.id,
       })
       .eq("id", conversation.id);
 
@@ -403,7 +609,7 @@ async function processWithAI(
     console.log("AI response sent successfully");
   } catch (error) {
     console.error("Error processing with AI:", error);
-    
+
     // Send fallback message
     await sendWhatsAppMessage(
       whatsappConfig,
@@ -413,11 +619,7 @@ async function processWithAI(
   }
 }
 
-async function sendWhatsAppMessage(
-  config: any,
-  to: string,
-  text: string
-): Promise<boolean> {
+async function sendWhatsAppMessage(config: any, to: string, text: string): Promise<boolean> {
   try {
     const accessToken = config.api_key_encrypted; // In production, decrypt this
     const phoneNumberId = config.instance_name; // Using instance_name as phone_number_id
@@ -430,32 +632,29 @@ async function sendWhatsAppMessage(
     // Split long messages (WhatsApp limit is 4096 chars)
     const maxLength = 4000;
     const messageParts = [];
-    
+
     for (let i = 0; i < text.length; i += maxLength) {
       messageParts.push(text.substring(i, i + maxLength));
     }
 
     for (const part of messageParts) {
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
+      const response = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: to,
+          type: "text",
+          text: {
+            preview_url: false,
+            body: part,
           },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "text",
-            text: { 
-              preview_url: false,
-              body: part 
-            },
-          }),
-        }
-      );
+        }),
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
