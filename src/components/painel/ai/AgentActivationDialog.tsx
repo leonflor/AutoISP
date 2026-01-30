@@ -254,7 +254,7 @@ export function AgentActivationDialog({
                       value={form.watch("avatar_url") || ""}
                       onChange={(url) => form.setValue("avatar_url", url, { shouldDirty: true })}
                       ispId={membership?.ispId || ""}
-                      defaultAvatar={defaultAvatar}
+                      defaultAvatar={agent?.avatar_url || defaultAvatar}
                     />
                   </div>
 
