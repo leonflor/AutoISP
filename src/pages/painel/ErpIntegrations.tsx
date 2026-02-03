@@ -9,6 +9,7 @@ import { useErpConfigs, ErpConfig, ErpProvider } from '@/hooks/painel/useErpConf
 import { ErpProviderCard, ErpProviderInfo } from '@/components/painel/erp/ErpProviderCard';
 import { IxcConfigDialog } from '@/components/painel/erp/IxcConfigDialog';
 import { MkConfigDialog } from '@/components/painel/erp/MkConfigDialog';
+import { SgpConfigDialog } from '@/components/painel/erp/SgpConfigDialog';
 
 const ERP_PROVIDERS: ErpProviderInfo[] = [
   {
@@ -28,9 +29,9 @@ const ERP_PROVIDERS: ErpProviderInfo[] = [
   {
     provider: 'sgp',
     name: 'SGP',
-    description: 'Sistema Gerencial de Provedores (em breve)',
-    docsUrl: 'https://docs.sgp.com.br/',
-    authType: 'user_pass',
+    description: 'Sistema Gerencial de Provedores',
+    docsUrl: 'https://sgp.net.br/',
+    authType: 'token',
   },
   {
     provider: 'hubsoft',
@@ -57,8 +58,8 @@ export default function ErpIntegrations() {
   }, [configs]);
 
   const handleConfigure = (provider: ErpProvider) => {
-    // Only allow IXC and MK for now
-    if (provider === 'sgp' || provider === 'hubsoft') {
+    // Only Hubsoft is "em breve" now
+    if (provider === 'hubsoft') {
       return;
     }
     setConfigDialog({ provider, isOpen: true });
@@ -129,7 +130,7 @@ export default function ErpIntegrations() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {ERP_PROVIDERS.map((provider) => {
-            const isComingSoon = provider.provider === 'sgp' || provider.provider === 'hubsoft';
+            const isComingSoon = provider.provider === 'hubsoft';
             
             return (
               <div key={provider.provider} className={isComingSoon ? 'opacity-60' : ''}>
@@ -162,6 +163,14 @@ export default function ErpIntegrations() {
         <MkConfigDialog
           open={configDialog.isOpen}
           config={configByProvider?.mk_solutions}
+          onClose={handleCloseDialog}
+        />
+      )}
+
+      {configDialog?.provider === 'sgp' && (
+        <SgpConfigDialog
+          open={configDialog.isOpen}
+          config={configByProvider?.sgp}
           onClose={handleCloseDialog}
         />
       )}
