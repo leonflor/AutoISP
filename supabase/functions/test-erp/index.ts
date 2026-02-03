@@ -189,6 +189,63 @@ async function testMkConnection(
   }
 }
 
+// Test SGP connection
+async function testSgpConnection(
+  apiUrl: string,
+  token: string
+): Promise<TestResult> {
+  try {
+    console.log(`[SGP] Testing connection to: ${apiUrl}`);
+
+    const response = await fetch(`${apiUrl}/api/clientes`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    console.log(`[SGP] Response status: ${response.status}`);
+
+    if (response.status === 401) {
+      return {
+        success: false,
+        message: "Token inválido ou expirado. Gere um novo no SGP.",
+      };
+    }
+
+    if (response.status === 403) {
+      return {
+        success: false,
+        message: "Acesso negado. Verifique as permissões do token.",
+      };
+    }
+
+    if (response.status === 404) {
+      return {
+        success: false,
+        message: "Endpoint não encontrado. Verifique a URL do servidor.",
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        message: `Erro HTTP ${response.status}`,
+      };
+    }
+
+    return { success: true, message: "Conexão SGP estabelecida com sucesso" };
+  } catch (error) {
+    console.error("[SGP] Error:", error);
+
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Erro de conexão",
+    };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -306,7 +363,7 @@ Deno.serve(async (req) => {
           encryptionKey
         );
 
-        if (body.provider === "ixc") {
+        if (body.provider === "ixc" || body.provider === "sgp") {
           credentials.token = decrypted;
         } else {
           credentials.api_key = decrypted;
@@ -346,6 +403,19 @@ Deno.serve(async (req) => {
           credentials.username,
           credentials.api_key
         );
+        break;
+
+      case "sgp":
+        if (!credentials.token) {
+          return new Response(
+            JSON.stringify({ error: "Token não configurado" }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        result = await testSgpConnection(apiUrl, credentials.token);
         break;
 
       default:
