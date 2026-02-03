@@ -1,196 +1,141 @@
 
 
-# Adicionar Integração SGP (Autenticação por Token)
+# Melhorias na Página de Integração ERP
 
 ## Objetivo
 
-Habilitar a integração com o SGP (Sistema Gerencial de Provedores) usando autenticação por **token**, seguindo o mesmo padrão da integração IXC Soft.
+Implementar três ajustes na página de integração ERP:
+1. Adicionar botão "Testar" para verificar conexão dos ERPs configurados
+2. Colocar os cards em linha (horizontal)
+3. Remover a caixa "Como funciona?"
 
 ---
-
-## Arquivos a Criar
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `src/components/painel/erp/SgpConfigDialog.tsx` | Modal de configuração do SGP (baseado no IxcConfigDialog) |
 
 ## Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/painel/ErpIntegrations.tsx` | Habilitar provider SGP e adicionar dialog |
-| `supabase/functions/save-erp-config/index.ts` | Adicionar case SGP com testSgpConnection |
-| `supabase/functions/test-erp/index.ts` | Adicionar case SGP no switch |
+| `src/components/painel/erp/ErpProviderCard.tsx` | Adicionar botão "Testar" e prop `onTest` |
+| `src/pages/painel/ErpIntegrations.tsx` | Remover info card, ajustar grid para linha, passar `onTest` |
 
 ---
 
 ## Seção Técnica
 
-### Credenciais SGP
+### ErpProviderCard.tsx
 
-O SGP utiliza autenticação por token, similar ao IXC:
-
-```typescript
-interface SgpCredentials {
-  token: string;  // Token de acesso gerado no SGP
-}
-```
-
-### Componente SgpConfigDialog.tsx
-
-Baseado no IxcConfigDialog com ajustes para SGP:
-
-- Campos: URL do servidor e Token
-- Instruções específicas de como gerar token no SGP
-- Link para documentação em sgp.net.br
+Adicionar prop `onTest` e `isTestingConnection` para o botão de teste:
 
 ```typescript
-const formSchema = z.object({
-  api_url: z.string().url('URL inválida').min(1, 'URL é obrigatória'),
-  token: z.string().min(1, 'Token é obrigatório'),
-});
-
-// Instruções no Collapsible:
-// 1. Acesse o SGP > Configurações > API/Integrações
-// 2. Gere um novo token de acesso
-// 3. Copie o token gerado
-// 4. Cole no campo acima
-```
-
-### Atualização em ErpIntegrations.tsx
-
-```typescript
-// Atualizar metadata do SGP
-{
-  provider: 'sgp',
-  name: 'SGP',
-  description: 'Sistema Gerencial de Provedores',
-  docsUrl: 'https://sgp.net.br/',
-  authType: 'token',  // Alterado de 'user_pass' para 'token'
+interface ErpProviderCardProps {
+  provider: ErpProviderInfo;
+  config?: ErpConfig;
+  onConfigure: () => void;
+  onTest?: () => void;           // Nova prop
+  isTestingConnection?: boolean;  // Nova prop
 }
 
-// Remover SGP dos "em breve" e adicionar dialog
-{configDialog?.provider === 'sgp' && (
-  <SgpConfigDialog
-    open={configDialog.isOpen}
-    config={configByProvider?.sgp}
-    onClose={() => setConfigDialog(null)}
-  />
+// No JSX, adicionar botão "Testar" quando configurado:
+{isConfigured && (
+  <>
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={onTest}
+      disabled={isTestingConnection}
+      title="Testar conexão"
+    >
+      {isTestingConnection ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <RefreshCw className="h-4 w-4" />
+      )}
+    </Button>
+    <Button variant="outline" size="icon" asChild>
+      <a href={provider.docsUrl} ...>
+        <ExternalLink className="h-4 w-4" />
+      </a>
+    </Button>
+  </>
 )}
 ```
 
-### Função testSgpConnection (Edge Functions)
+### ErpIntegrations.tsx
+
+1. **Remover info card** - Deletar linhas 100-113 (Card "Como funciona?")
+
+2. **Ajustar grid para linha** - Mudar de `grid-cols-3` para `grid-cols-4` ou usar `flex`:
 
 ```typescript
-async function testSgpConnection(
-  apiUrl: string,
-  token: string
-): Promise<TestResult> {
-  try {
-    console.log(`[SGP] Testing connection to: ${apiUrl}`);
+// De:
+<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 
-    // SGP usa Bearer token ou header customizado
-    const response = await fetch(`${apiUrl}/api/clientes`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    console.log(`[SGP] Response status: ${response.status}`);
-
-    if (response.status === 401) {
-      return {
-        success: false,
-        message: 'Token inválido ou expirado. Gere um novo no SGP.',
-      };
-    }
-
-    if (response.status === 403) {
-      return {
-        success: false,
-        message: 'Acesso negado. Verifique as permissões do token.',
-      };
-    }
-
-    if (response.status === 404) {
-      return {
-        success: false,
-        message: 'Endpoint não encontrado. Verifique a URL do servidor.',
-      };
-    }
-
-    if (!response.ok) {
-      return {
-        success: false,
-        message: `Erro HTTP ${response.status}`,
-      };
-    }
-
-    return {
-      success: true,
-      message: 'Conexão SGP estabelecida com sucesso',
-    };
-  } catch (error) {
-    console.error('[SGP] Error:', error);
-
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Erro de conexão',
-    };
-  }
-}
+// Para (4 colunas em telas grandes):
+<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
 ```
 
-### Atualização do Switch em save-erp-config
+3. **Passar handlers de teste** - Usar `testConnection` do hook:
 
 ```typescript
-case "sgp":
-  if (!body.credentials.token) {
-    return new Response(
-      JSON.stringify({ error: "Token é obrigatório para SGP" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-  testResult = await testSgpConnection(body.api_url, body.credentials.token);
-  keyToEncrypt = body.credentials.token;
-  break;
-```
+const { configs, isLoading, activeConfigsCount, testConnection } = useErpConfigs();
 
-### Atualização do Switch em test-erp
-
-```typescript
-case "sgp":
-  if (!credentials.token) {
-    return new Response(
-      JSON.stringify({ error: "Token não configurado" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+// No card:
+<ErpProviderCard
+  provider={provider}
+  config={configByProvider?.[provider.provider]}
+  onConfigure={() => handleConfigure(provider.provider)}
+  onTest={() => testConnection.mutate(provider.provider)}
+  isTestingConnection={
+    testConnection.isPending && 
+    testConnection.variables === provider.provider
   }
-  result = await testSgpConnection(apiUrl, credentials.token);
-  break;
+/>
 ```
 
 ---
 
-## Tratamento de Erros SGP
+## Resultado Visual
 
-| Código | Cenário | Mensagem |
-|--------|---------|----------|
-| 401 | Token inválido | Token inválido ou expirado. Gere um novo no SGP. |
-| 403 | Sem permissão | Acesso negado. Verifique as permissões do token. |
-| 404 | URL incorreta | Endpoint não encontrado. Verifique a URL do servidor. |
-| Timeout | Servidor offline | Não foi possível conectar. Verifique se o servidor está online. |
+```text
+Antes:
++--------------------------------------------------+
+| ← Integração ERP                     [1 ativo]   |
++--------------------------------------------------+
+| +----------------------------------------------+ |
+| | Como funciona?                               | |
+| | • Múltiplos ERPs simultaneamente             | |
+| | • Credenciais seguras                        | |
+| +----------------------------------------------+ |
+|                                                  |
+| +----------+  +----------+  +----------+         |
+| | IXC Soft |  | MK-Sol.. |  | SGP      |         |
+| +----------+  +----------+  +----------+         |
+| +----------+                                     |
+| | Hubsoft  |                                     |
+| +----------+                                     |
++--------------------------------------------------+
+
+Depois:
++--------------------------------------------------+
+| ← Integração ERP                     [1 ativo]   |
++--------------------------------------------------+
+|                                                  |
+| +----------+  +----------+  +----------+  +----+ |
+| | IXC Soft |  | MK-Sol.. |  | SGP      |  |Hub | |
+| | [Config] |  | [Editar] |  | [Config] |  |soft| |
+| |    [🔄]  |  |  [🔄]    |  |          |  |    | |
+| +----------+  +----------+  +----------+  +----+ |
+|                                                  |
++--------------------------------------------------+
+```
 
 ---
 
 ## Ordem de Implementação
 
-1. Criar `SgpConfigDialog.tsx` (baseado no IxcConfigDialog)
-2. Atualizar `ErpIntegrations.tsx` para habilitar SGP
-3. Adicionar `testSgpConnection` em `save-erp-config`
-4. Adicionar case SGP em `test-erp`
-5. Deploy das Edge Functions
-6. Testar fluxo completo
+1. Atualizar `ErpProviderCard.tsx` com props `onTest` e `isTestingConnection`
+2. Adicionar botão "Testar" no card quando configurado
+3. Remover info card de `ErpIntegrations.tsx`
+4. Ajustar grid para 4 colunas
+5. Passar handlers de teste para os cards
 
