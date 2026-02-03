@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Circle, Settings, Plus, ExternalLink, Link, RefreshCw } from 'lucide-react';
+import { CheckCircle, Circle, Settings, Plus, ExternalLink, Link, RefreshCw, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ErpConfig, ErpProvider } from '@/hooks/painel/useErpConfigs';
@@ -18,9 +18,11 @@ interface ErpProviderCardProps {
   provider: ErpProviderInfo;
   config?: ErpConfig;
   onConfigure: () => void;
+  onTest?: () => void;
+  isTestingConnection?: boolean;
 }
 
-export function ErpProviderCard({ provider, config, onConfigure }: ErpProviderCardProps) {
+export function ErpProviderCard({ provider, config, onConfigure, onTest, isTestingConnection }: ErpProviderCardProps) {
   const isConfigured = config?.is_connected;
 
   return (
@@ -93,11 +95,26 @@ export function ErpProviderCard({ provider, config, onConfigure }: ErpProviderCa
           </Button>
 
           {isConfigured && (
-            <Button variant="outline" size="icon" asChild>
-              <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onTest}
+                disabled={isTestingConnection}
+                title="Testar conexão"
+              >
+                {isTestingConnection ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+              <Button variant="outline" size="icon" asChild>
+                <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            </>
           )}
         </div>
       </CardContent>

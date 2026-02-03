@@ -43,7 +43,7 @@ const ERP_PROVIDERS: ErpProviderInfo[] = [
 ];
 
 export default function ErpIntegrations() {
-  const { configs, isLoading, activeConfigsCount } = useErpConfigs();
+  const { configs, isLoading, activeConfigsCount, testConnection } = useErpConfigs();
   const [configDialog, setConfigDialog] = useState<{
     provider: ErpProvider;
     isOpen: boolean;
@@ -97,24 +97,9 @@ export default function ErpIntegrations() {
         )}
       </div>
 
-      {/* Info Card */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Como funciona?</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          <ul className="list-disc list-inside space-y-1">
-            <li>Você pode conectar <strong>múltiplos ERPs</strong> simultaneamente</li>
-            <li>Cada ERP mantém suas próprias credenciais de forma segura</li>
-            <li>As credenciais são criptografadas e nunca expostas</li>
-            <li>Use o botão "Testar" para verificar a conexão a qualquer momento</li>
-          </ul>
-        </CardContent>
-      </Card>
-
       {/* Providers Grid */}
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
               <CardHeader>
@@ -128,7 +113,7 @@ export default function ErpIntegrations() {
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {ERP_PROVIDERS.map((provider) => {
             const isComingSoon = provider.provider === 'hubsoft';
             
@@ -138,6 +123,11 @@ export default function ErpIntegrations() {
                   provider={provider}
                   config={configByProvider?.[provider.provider]}
                   onConfigure={() => handleConfigure(provider.provider)}
+                  onTest={() => testConnection.mutate(provider.provider)}
+                  isTestingConnection={
+                    testConnection.isPending && 
+                    testConnection.variables === provider.provider
+                  }
                 />
                 {isComingSoon && (
                   <p className="text-center text-xs text-muted-foreground mt-2">
