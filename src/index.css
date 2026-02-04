@@ -114,3 +114,128 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Optical Fiber Ray Animations */
+@keyframes ray-travel {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes ray-travel-reverse {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes packet-travel {
+  0% {
+    left: -5%;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    left: 105%;
+    opacity: 0;
+  }
+}
+
+@keyframes packet-travel-reverse {
+  0% {
+    right: -5%;
+    left: auto;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    right: 105%;
+    left: auto;
+    opacity: 0;
+  }
+}
+
+/* Ray animations with different durations */
+.animate-ray-1 {
+  animation: ray-travel 4s ease-in-out infinite;
+}
+.animate-ray-2 {
+  animation: ray-travel 5s ease-in-out infinite 0.5s;
+}
+.animate-ray-3 {
+  animation: ray-travel 3.5s ease-in-out infinite 1s;
+}
+.animate-ray-4 {
+  animation: ray-travel 6s ease-in-out infinite 1.5s;
+}
+.animate-ray-5 {
+  animation: ray-travel 4.5s ease-in-out infinite 2s;
+}
+
+.animate-ray-reverse-1 {
+  animation: ray-travel-reverse 5s ease-in-out infinite 0.3s;
+}
+.animate-ray-reverse-2 {
+  animation: ray-travel-reverse 4s ease-in-out infinite 1.2s;
+}
+.animate-ray-reverse-3 {
+  animation: ray-travel-reverse 6s ease-in-out infinite 2.5s;
+}
+
+/* Packet animations */
+.animate-packet-1 {
+  animation: packet-travel 4s linear infinite;
+}
+.animate-packet-2 {
+  animation: packet-travel 5s linear infinite 0.5s;
+}
+.animate-packet-3 {
+  animation: packet-travel 3.5s linear infinite 1s;
+}
+.animate-packet-4 {
+  animation: packet-travel 6s linear infinite 1.5s;
+}
+.animate-packet-5 {
+  animation: packet-travel 4.5s linear infinite 2s;
+}
+
+.animate-packet-reverse-1 {
+  animation: packet-travel-reverse 5s linear infinite 0.3s;
+}
+.animate-packet-reverse-2 {
+  animation: packet-travel-reverse 4s linear infinite 1.2s;
+}
+.animate-packet-reverse-3 {
+  animation: packet-travel-reverse 6s linear infinite 2.5s;
+}
