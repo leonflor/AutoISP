@@ -78,7 +78,7 @@ export const Hero = () => {
           </div>
 
           {/* Hero Image - Robot - Positioned at bottom of hero */}
-          <div className="relative flex items-end justify-center lg:-ml-24 self-end">
+          <div className="relative flex items-end justify-center lg:-ml-48 self-end">
             <img 
               src={heroRobot} 
               alt="AutoISP Robot - Automação inteligente para provedores"
