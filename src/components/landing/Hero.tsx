@@ -9,7 +9,7 @@ export const Hero = () => {
   const { data: activeIspsCount = 0 } = useActiveIspsCount();
   return (
     <section 
-      className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden"
+      className="relative pt-20 pb-12 md:pt-24 md:pb-16 overflow-hidden"
       aria-labelledby="hero-heading"
     >
       {/* Background Gradient */}
