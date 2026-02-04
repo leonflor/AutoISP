@@ -15,26 +15,56 @@ export const Hero = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 z-0" />
       
       {/* Optical Fiber Network Animation - Behind all content */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        {/* Fiber paths - visible lines */}
-        <div className="absolute top-[15%] left-0 w-full h-[2px] bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30 opacity-60" />
-        <div className="absolute top-[30%] left-0 w-full h-[2px] bg-gradient-to-r from-cyan-400/25 via-cyan-400/45 to-cyan-400/25 opacity-60" />
-        <div className="absolute top-[45%] left-0 w-full h-[3px] bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 opacity-60" />
-        <div className="absolute top-[60%] left-0 w-full h-[2px] bg-gradient-to-r from-accent/25 via-accent/45 to-accent/25 opacity-60" />
-        <div className="absolute top-[75%] left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500/30 via-cyan-500/50 to-cyan-500/30 opacity-60" />
-        <div className="absolute top-[90%] left-0 w-full h-[2px] bg-gradient-to-r from-accent/20 via-accent/40 to-accent/20 opacity-60" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-50">
+        {/* Diagonal fiber lines with data packets - Lines appear with the glow */}
         
-        {/* Data packets traveling left to right */}
-        <div className="data-packet data-packet-blue" style={{ top: '15%' }} />
-        <div className="data-packet data-packet-cyan" style={{ top: '30%', animationDelay: '0.3s' }} />
-        <div className="data-packet data-packet-blue-lg" style={{ top: '45%', animationDelay: '0.6s' }} />
-        <div className="data-packet data-packet-cyan" style={{ top: '75%', animationDelay: '0.9s' }} />
+        {/* Line 1: Top-left to bottom-right (blue) */}
+        <div className="fiber-line fiber-line-1">
+          <div className="fiber-trail fiber-trail-blue" />
+          <div className="fiber-glow fiber-glow-blue" />
+        </div>
         
-        {/* Data packets traveling right to left */}
-        <div className="data-packet-reverse data-packet-orange" style={{ top: '60%' }} />
-        <div className="data-packet-reverse data-packet-orange" style={{ top: '90%', animationDelay: '0.4s' }} />
-        <div className="data-packet-reverse data-packet-yellow" style={{ top: '30%', animationDelay: '0.7s' }} />
-        <div className="data-packet-reverse data-packet-orange-lg" style={{ top: '45%', animationDelay: '1s' }} />
+        {/* Line 2: Top-right to bottom-left (orange) */}
+        <div className="fiber-line fiber-line-2">
+          <div className="fiber-trail fiber-trail-orange" />
+          <div className="fiber-glow fiber-glow-orange" />
+        </div>
+        
+        {/* Line 3: Horizontal with angle (cyan) */}
+        <div className="fiber-line fiber-line-3">
+          <div className="fiber-trail fiber-trail-cyan" />
+          <div className="fiber-glow fiber-glow-cyan" />
+        </div>
+        
+        {/* Line 4: Steep diagonal (blue) */}
+        <div className="fiber-line fiber-line-4">
+          <div className="fiber-trail fiber-trail-blue" />
+          <div className="fiber-glow fiber-glow-blue" />
+        </div>
+        
+        {/* Line 5: Reverse diagonal (orange) */}
+        <div className="fiber-line fiber-line-5">
+          <div className="fiber-trail fiber-trail-orange" />
+          <div className="fiber-glow fiber-glow-orange" />
+        </div>
+        
+        {/* Line 6: Shallow angle (cyan) */}
+        <div className="fiber-line fiber-line-6">
+          <div className="fiber-trail fiber-trail-cyan" />
+          <div className="fiber-glow fiber-glow-cyan" />
+        </div>
+        
+        {/* Line 7: Cross pattern (blue) */}
+        <div className="fiber-line fiber-line-7">
+          <div className="fiber-trail fiber-trail-blue" />
+          <div className="fiber-glow fiber-glow-blue" />
+        </div>
+        
+        {/* Line 8: Reverse cross (orange) */}
+        <div className="fiber-line fiber-line-8">
+          <div className="fiber-trail fiber-trail-orange" />
+          <div className="fiber-glow fiber-glow-orange" />
+        </div>
       </div>
       
       {/* Grid Pattern */}
