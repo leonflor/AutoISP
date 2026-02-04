@@ -131,7 +131,7 @@ All colors MUST be HSL.
 }
 
 .animate-float {
-  animation: float 5s ease-in-out infinite;
+  animation: float 8s ease-in-out infinite;
 }
 
 /* Fiber Optic Animation System */
