@@ -120,7 +120,7 @@ export const Hero = () => {
       />
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-8 items-center">
+        <div className="grid lg:grid-cols-2 gap-6 items-center">
           {/* Content */}
           <div className="text-center lg:text-left">
             {/* Badge */}
@@ -172,7 +172,7 @@ export const Hero = () => {
           </div>
 
           {/* Hero Image - Robot - Positioned closer to title */}
-          <div className="relative flex items-center justify-center lg:-ml-12">
+          <div className="relative flex items-center justify-center lg:-ml-10">
             <img 
               src={heroRobot} 
               alt="AutoISP Robot - Automação inteligente para provedores"
