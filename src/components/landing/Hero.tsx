@@ -172,20 +172,12 @@ export const Hero = () => {
           </div>
 
           {/* Hero Image - Robot */}
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex items-center justify-center lg:-mt-16">
             <img 
               src={heroRobot} 
               alt="AutoISP Robot - Automação inteligente para provedores"
-              className="w-full max-w-md lg:max-w-lg xl:max-w-xl h-auto object-contain drop-shadow-2xl"
+              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl scale-[1.3]"
             />
-            
-            {/* Floating Elements */}
-            <div className="absolute top-4 right-4 bg-card rounded-lg px-3 py-2 shadow-lg border border-border">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-xs font-medium">Online 24/7</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
