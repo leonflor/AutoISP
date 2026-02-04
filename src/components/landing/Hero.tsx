@@ -171,12 +171,12 @@ export const Hero = () => {
             </div>
           </div>
 
-          {/* Hero Image - Robot - Positioned closer to title */}
-          <div className="relative flex items-center justify-center lg:-ml-12">
+          {/* Hero Image - Robot - Positioned at bottom of hero */}
+          <div className="relative flex items-end justify-center lg:-ml-12 self-end">
             <img 
               src={heroRobot} 
               alt="AutoISP Robot - Automação inteligente para provedores"
-              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl scale-[1.3]"
+              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl scale-[1.3] translate-y-16"
             />
           </div>
         </div>
