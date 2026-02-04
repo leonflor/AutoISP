@@ -77,11 +77,12 @@ export const Hero = () => {
           </div>
 
           {/* Hero Image - Robot - Positioned closer to title */}
-          <div className="relative flex items-center justify-center lg:-ml-20">
+          {/* gap-2 (8px) entre colunas | lg:-ml-20 (margem negativa esquerda) */}
+          <div className="relative flex items-end justify-center lg:-ml-20">
             <img 
               src={heroRobot} 
               alt="AutoISP Robot - Automação inteligente para provedores"
-              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl scale-[0.78]"
+              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl"
             />
           </div>
         </div>
