@@ -115,106 +115,238 @@ All colors MUST be HSL.
   }
 }
 
-/* Data Packet Styles */
-.data-packet,
-.data-packet-reverse {
+/* Fiber Optic Animation System */
+.fiber-line {
   position: absolute;
+  width: 200%;
+  height: 2px;
+  transform-origin: left center;
+}
+
+/* Different angles for crossing lines */
+.fiber-line-1 {
+  top: 10%;
+  left: -20%;
+  transform: rotate(15deg);
+  animation: fiber-shift 12s ease-in-out infinite;
+}
+
+.fiber-line-2 {
+  top: 80%;
+  left: -20%;
+  transform: rotate(-20deg);
+  animation: fiber-shift 10s ease-in-out infinite 1s;
+}
+
+.fiber-line-3 {
+  top: 40%;
+  left: -20%;
+  transform: rotate(8deg);
+  animation: fiber-shift 14s ease-in-out infinite 2s;
+}
+
+.fiber-line-4 {
+  top: 5%;
+  left: -20%;
+  transform: rotate(25deg);
+  animation: fiber-shift 11s ease-in-out infinite 0.5s;
+}
+
+.fiber-line-5 {
+  top: 95%;
+  left: -20%;
+  transform: rotate(-15deg);
+  animation: fiber-shift 13s ease-in-out infinite 1.5s;
+}
+
+.fiber-line-6 {
+  top: 60%;
+  left: -20%;
+  transform: rotate(5deg);
+  animation: fiber-shift 9s ease-in-out infinite 2.5s;
+}
+
+.fiber-line-7 {
+  top: 25%;
+  left: -20%;
+  transform: rotate(18deg);
+  animation: fiber-shift 15s ease-in-out infinite 0.8s;
+}
+
+.fiber-line-8 {
+  top: 70%;
+  left: -20%;
+  transform: rotate(-10deg);
+  animation: fiber-shift 11s ease-in-out infinite 1.8s;
+}
+
+/* Fiber trail - the line that appears behind the glow */
+.fiber-trail {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0;
+}
+
+.fiber-trail-blue {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    hsl(var(--primary) / 0.6) 50%, 
+    transparent 100%
+  );
+  animation: trail-appear-blue 2.5s ease-out infinite;
+}
+
+.fiber-trail-cyan {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    hsl(187 85% 53% / 0.5) 50%, 
+    transparent 100%
+  );
+  animation: trail-appear-cyan 2.5s ease-out infinite 0.8s;
+}
+
+.fiber-trail-orange {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    hsl(var(--accent) / 0.5) 50%, 
+    transparent 100%
+  );
+  animation: trail-appear-orange 2.5s ease-out infinite 0.4s;
+}
+
+/* Fiber glow - the moving data packet */
+.fiber-glow {
+  position: absolute;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  pointer-events: none;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.data-packet {
-  animation: packet-left-to-right 2s linear infinite;
+.fiber-glow-blue {
+  background: radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%);
+  box-shadow: 
+    0 0 15px hsl(var(--primary)),
+    0 0 30px hsl(var(--primary) / 0.6),
+    0 0 45px hsl(var(--primary) / 0.3);
+  animation: glow-travel 2.5s ease-in-out infinite;
 }
 
-.data-packet-reverse {
-  animation: packet-right-to-left 2s linear infinite;
+.fiber-glow-cyan {
+  background: radial-gradient(circle, hsl(187 85% 53%) 0%, transparent 70%);
+  box-shadow: 
+    0 0 15px hsl(187 85% 53%),
+    0 0 30px hsl(187 85% 53% / 0.6),
+    0 0 45px hsl(187 85% 53% / 0.3);
+  animation: glow-travel 2.5s ease-in-out infinite 0.8s;
 }
 
-/* Blue packets */
-.data-packet-blue {
-  width: 8px;
-  height: 8px;
-  background: hsl(var(--primary));
-  box-shadow: 0 0 12px hsl(var(--primary)), 0 0 24px hsl(var(--primary) / 0.6), 0 0 36px hsl(var(--primary) / 0.3);
+.fiber-glow-orange {
+  background: radial-gradient(circle, hsl(var(--accent)) 0%, transparent 70%);
+  box-shadow: 
+    0 0 15px hsl(var(--accent)),
+    0 0 30px hsl(var(--accent) / 0.6),
+    0 0 45px hsl(var(--accent) / 0.3);
+  animation: glow-travel 2.5s ease-in-out infinite 0.4s;
 }
 
-.data-packet-blue-lg {
-  width: 12px;
-  height: 12px;
-  background: hsl(var(--primary));
-  box-shadow: 0 0 16px hsl(var(--primary)), 0 0 32px hsl(var(--primary) / 0.6), 0 0 48px hsl(var(--primary) / 0.3);
-}
-
-/* Cyan packets */
-.data-packet-cyan {
-  width: 6px;
-  height: 6px;
-  background: hsl(187 85% 53%);
-  box-shadow: 0 0 10px hsl(187 85% 53%), 0 0 20px hsl(187 85% 53% / 0.6), 0 0 30px hsl(187 85% 53% / 0.3);
-}
-
-/* Orange packets */
-.data-packet-orange {
-  width: 8px;
-  height: 8px;
-  background: hsl(var(--accent));
-  box-shadow: 0 0 12px hsl(var(--accent)), 0 0 24px hsl(var(--accent) / 0.6), 0 0 36px hsl(var(--accent) / 0.3);
-}
-
-.data-packet-orange-lg {
-  width: 10px;
-  height: 10px;
-  background: hsl(var(--accent));
-  box-shadow: 0 0 14px hsl(var(--accent)), 0 0 28px hsl(var(--accent) / 0.6), 0 0 42px hsl(var(--accent) / 0.3);
-}
-
-/* Yellow packets */
-.data-packet-yellow {
-  width: 6px;
-  height: 6px;
-  background: hsl(48 96% 53%);
-  box-shadow: 0 0 10px hsl(48 96% 53%), 0 0 20px hsl(48 96% 53% / 0.6), 0 0 30px hsl(48 96% 53% / 0.3);
-}
-
-/* Fast packet animations - left to right */
-@keyframes packet-left-to-right {
+/* Trail appears as glow passes */
+@keyframes trail-appear-blue {
   0% {
-    left: -2%;
     opacity: 0;
-    transform: translateY(-50%);
+    clip-path: inset(0 100% 0 0);
   }
-  5% {
-    opacity: 0.9;
+  20% {
+    opacity: 0.8;
+    clip-path: inset(0 80% 0 0);
   }
-  95% {
-    opacity: 0.9;
+  50% {
+    opacity: 0.6;
+    clip-path: inset(0 40% 0 0);
+  }
+  80% {
+    opacity: 0.3;
+    clip-path: inset(0 0 0 20%);
   }
   100% {
-    left: 102%;
     opacity: 0;
-    transform: translateY(-50%);
+    clip-path: inset(0 0 0 100%);
   }
 }
 
-/* Fast packet animations - right to left */
-@keyframes packet-right-to-left {
+@keyframes trail-appear-cyan {
   0% {
-    right: -2%;
-    left: auto;
     opacity: 0;
-    transform: translateY(-50%);
+    clip-path: inset(0 100% 0 0);
   }
-  5% {
-    opacity: 0.9;
+  20% {
+    opacity: 0.7;
+    clip-path: inset(0 80% 0 0);
   }
-  95% {
-    opacity: 0.9;
+  50% {
+    opacity: 0.5;
+    clip-path: inset(0 40% 0 0);
+  }
+  80% {
+    opacity: 0.25;
+    clip-path: inset(0 0 0 20%);
   }
   100% {
-    right: 102%;
-    left: auto;
     opacity: 0;
-    transform: translateY(-50%);
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+@keyframes trail-appear-orange {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  20% {
+    opacity: 0.7;
+    clip-path: inset(0 80% 0 0);
+  }
+  50% {
+    opacity: 0.5;
+    clip-path: inset(0 40% 0 0);
+  }
+  80% {
+    opacity: 0.25;
+    clip-path: inset(0 0 0 20%);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+/* Glow travels along the fiber */
+@keyframes glow-travel {
+  0% {
+    left: -5%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: 105%;
+    opacity: 0;
+  }
+}
+
+/* Subtle line position shift */
+@keyframes fiber-shift {
+  0%, 100% {
+    transform: rotate(var(--base-angle, 15deg)) translateY(0);
+  }
+  50% {
+    transform: rotate(var(--base-angle, 15deg)) translateY(10px);
   }
 }
