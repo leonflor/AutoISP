@@ -14,36 +14,78 @@ export const Hero = () => {
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       
-      {/* Optical Fiber Rays - Animated Data Transfer */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Primary rays - Blue tones */}
-        <div className="absolute top-[20%] left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent animate-ray-1" />
-        <div className="absolute top-[35%] left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent animate-ray-2" />
-        <div className="absolute top-[50%] left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-ray-3" />
-        <div className="absolute top-[65%] left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-300/60 to-transparent animate-ray-4" />
-        <div className="absolute top-[80%] left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent animate-ray-5" />
+      {/* Data Web Animation - Spider web pattern with flowing particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-60">
+        {/* Floating data particles - scattered across the screen */}
+        {/* Row 1 */}
+        <div className="particle particle-blue-1" style={{ top: '8%', left: '5%' }} />
+        <div className="particle particle-cyan-1" style={{ top: '12%', left: '20%' }} />
+        <div className="particle particle-orange-1" style={{ top: '5%', left: '35%' }} />
+        <div className="particle particle-blue-2" style={{ top: '15%', left: '50%' }} />
+        <div className="particle particle-cyan-2" style={{ top: '10%', left: '65%' }} />
+        <div className="particle particle-orange-2" style={{ top: '18%', left: '80%' }} />
+        <div className="particle particle-blue-3" style={{ top: '6%', left: '92%' }} />
         
-        {/* Accent rays - Orange/Yellow tones */}
-        <div className="absolute top-[25%] left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-accent/50 to-transparent animate-ray-reverse-1" />
-        <div className="absolute top-[45%] left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-orange-400/40 to-transparent animate-ray-reverse-2" />
-        <div className="absolute top-[70%] left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-yellow-400/30 to-transparent animate-ray-reverse-3" />
+        {/* Row 2 */}
+        <div className="particle particle-cyan-3" style={{ top: '25%', left: '10%' }} />
+        <div className="particle particle-orange-3" style={{ top: '30%', left: '25%' }} />
+        <div className="particle particle-blue-4" style={{ top: '22%', left: '42%' }} />
+        <div className="particle particle-cyan-4" style={{ top: '28%', left: '58%' }} />
+        <div className="particle particle-orange-4" style={{ top: '32%', left: '75%' }} />
+        <div className="particle particle-blue-5" style={{ top: '26%', left: '88%' }} />
         
-        {/* Data packets - glowing dots traveling along rays */}
-        <div className="absolute top-[20%] w-3 h-3 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)),0_0_20px_hsl(var(--primary)/0.5)] animate-packet-1" />
-        <div className="absolute top-[35%] w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee,0_0_16px_#22d3ee80] animate-packet-2" />
-        <div className="absolute top-[50%] w-4 h-4 rounded-full bg-primary/80 shadow-[0_0_12px_hsl(var(--primary)),0_0_24px_hsl(var(--primary)/0.5)] animate-packet-3" />
-        <div className="absolute top-[65%] w-2 h-2 rounded-full bg-blue-300 shadow-[0_0_8px_#93c5fd,0_0_16px_#93c5fd80] animate-packet-4" />
-        <div className="absolute top-[80%] w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_10px_#06b6d4,0_0_20px_#06b6d480] animate-packet-5" />
+        {/* Row 3 */}
+        <div className="particle particle-orange-5" style={{ top: '42%', left: '8%' }} />
+        <div className="particle particle-blue-6" style={{ top: '48%', left: '22%' }} />
+        <div className="particle particle-cyan-5" style={{ top: '45%', left: '38%' }} />
+        <div className="particle particle-orange-6" style={{ top: '50%', left: '55%' }} />
+        <div className="particle particle-blue-7" style={{ top: '44%', left: '70%' }} />
+        <div className="particle particle-cyan-6" style={{ top: '52%', left: '85%' }} />
         
-        {/* Reverse packets */}
-        <div className="absolute top-[25%] w-2 h-2 rounded-full bg-accent shadow-[0_0_8px_hsl(var(--accent)),0_0_16px_hsl(var(--accent)/0.5)] animate-packet-reverse-1" />
-        <div className="absolute top-[45%] w-3 h-3 rounded-full bg-orange-400 shadow-[0_0_10px_#fb923c,0_0_20px_#fb923c80] animate-packet-reverse-2" />
-        <div className="absolute top-[70%] w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15,0_0_16px_#facc1580] animate-packet-reverse-3" />
+        {/* Row 4 */}
+        <div className="particle particle-blue-8" style={{ top: '62%', left: '12%' }} />
+        <div className="particle particle-orange-7" style={{ top: '68%', left: '28%' }} />
+        <div className="particle particle-cyan-7" style={{ top: '65%', left: '45%' }} />
+        <div className="particle particle-blue-9" style={{ top: '70%', left: '62%' }} />
+        <div className="particle particle-orange-8" style={{ top: '64%', left: '78%' }} />
+        <div className="particle particle-cyan-8" style={{ top: '72%', left: '95%' }} />
+        
+        {/* Row 5 */}
+        <div className="particle particle-cyan-9" style={{ top: '82%', left: '6%' }} />
+        <div className="particle particle-blue-10" style={{ top: '88%', left: '18%' }} />
+        <div className="particle particle-orange-9" style={{ top: '85%', left: '32%' }} />
+        <div className="particle particle-cyan-10" style={{ top: '90%', left: '48%' }} />
+        <div className="particle particle-blue-11" style={{ top: '84%', left: '65%' }} />
+        <div className="particle particle-orange-10" style={{ top: '92%', left: '82%' }} />
+        
+        {/* Connection lines - subtle web structure */}
+        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lineGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="lineGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0" />
+              <stop offset="50%" stopColor="hsl(var(--accent))" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* Diagonal lines creating web effect */}
+          <line x1="0%" y1="20%" x2="100%" y2="60%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse" />
+          <line x1="0%" y1="50%" x2="100%" y2="30%" stroke="url(#lineGradient2)" strokeWidth="1" className="animate-line-pulse-delay" />
+          <line x1="0%" y1="80%" x2="100%" y2="40%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse-delay-2" />
+          <line x1="100%" y1="10%" x2="0%" y2="70%" stroke="url(#lineGradient2)" strokeWidth="1" className="animate-line-pulse" />
+          <line x1="100%" y1="50%" x2="0%" y2="90%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse-delay" />
+          <line x1="20%" y1="0%" x2="80%" y2="100%" stroke="url(#lineGradient2)" strokeWidth="1" className="animate-line-pulse-delay-2" />
+          <line x1="60%" y1="0%" x2="40%" y2="100%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse" />
+        </svg>
       </div>
       
       {/* Grid Pattern */}
       <div 
-        className="absolute inset-0 opacity-20"
+        className="absolute inset-0 opacity-15"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.15) 1px, transparent 0)`,
           backgroundSize: '40px 40px',
