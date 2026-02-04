@@ -81,7 +81,7 @@ export const Hero = () => {
             <img 
               src={heroRobot} 
               alt="AutoISP Robot - Automação inteligente para provedores"
-              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl scale-[1.3]"
+              className="w-full max-w-lg lg:max-w-xl xl:max-w-2xl h-auto object-contain drop-shadow-2xl scale-[0.78]"
             />
           </div>
         </div>
