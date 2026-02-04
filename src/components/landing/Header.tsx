@@ -38,7 +38,7 @@ export const Header = () => {
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         isScrolled
           ? 'bg-background shadow-md border-b border-border'
-          : 'bg-background/70 backdrop-blur-sm'
+          : 'bg-background/85 backdrop-blur-sm shadow-sm'
       )}
     >
       <div className="container mx-auto px-4">
