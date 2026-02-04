@@ -55,9 +55,9 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 222 84% 5%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 217 91% 60%;
-    /* Metallic Header */
-    --header-metallic: 215 25% 27%;
-    --header-metallic-light: 215 20% 35%;
+    /* Metallic Header - Gold/Beige tone */
+    --header-metallic: 45 30% 75%;
+    --header-metallic-light: 45 25% 80%;
   }
 
   .dark {
@@ -104,9 +104,9 @@ All colors MUST be HSL.
     --sidebar-accent: 217 33% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
-    /* Metallic Header */
-    --header-metallic: 215 25% 27%;
-    --header-metallic-light: 215 20% 35%;
+    /* Metallic Header - Gold/Beige tone */
+    --header-metallic: 45 30% 75%;
+    --header-metallic-light: 45 25% 80%;
   }
 }
 
