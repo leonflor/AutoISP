@@ -60,6 +60,10 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        header: {
+          metallic: "hsl(var(--header-metallic))",
+          "metallic-light": "hsl(var(--header-metallic-light))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

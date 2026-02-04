@@ -55,6 +55,9 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 222 84% 5%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 217 91% 60%;
+    /* Metallic Header */
+    --header-metallic: 215 25% 27%;
+    --header-metallic-light: 215 20% 35%;
   }
 
   .dark {
@@ -101,7 +104,9 @@ All colors MUST be HSL.
     --sidebar-accent: 217 33% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    /* Metallic Header */
+    --header-metallic: 215 25% 27%;
+    --header-metallic-light: 215 20% 35%;
   }
 }
 
@@ -113,6 +118,20 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(16px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
 
 /* Fiber Optic Animation System */
