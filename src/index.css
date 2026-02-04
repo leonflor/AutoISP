@@ -123,10 +123,10 @@ All colors MUST be HSL.
 /* Floating Animation */
 @keyframes float {
   0%, 100% {
-    transform: scale(1.54) translateY(16px);
+    transform: scale(1.39) translateY(16px);
   }
   50% {
-    transform: scale(1.54) translateY(10px);
+    transform: scale(1.39) translateY(10px);
   }
 }
 
