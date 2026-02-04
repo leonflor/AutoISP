@@ -126,12 +126,12 @@ All colors MUST be HSL.
     transform: scale(1.76) translateY(16px);
   }
   50% {
-    transform: scale(1.76) translateY(8px);
+    transform: scale(1.76) translateY(10px);
   }
 }
 
 .animate-float {
-  animation: float 3s ease-in-out infinite;
+  animation: float 5s ease-in-out infinite;
 }
 
 /* Fiber Optic Animation System */
