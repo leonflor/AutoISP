@@ -15,7 +15,7 @@ export const Hero = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 z-0" />
       
       {/* Optical Fiber Network Animation - Behind all content */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-30">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-[1] opacity-30">
         {/* Diagonal fiber lines with data packets */}
         
         {/* Line 1: Diagonal down-right (blue) */}
