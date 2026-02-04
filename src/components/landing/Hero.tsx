@@ -3,6 +3,7 @@ import { ArrowRight, Play, Users, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useActiveIspsCount } from '@/hooks/useActiveIspsCount';
+import heroRobot from '@/assets/hero-robot.png';
 
 export const Hero = () => {
   const { data: activeIspsCount = 0 } = useActiveIspsCount();
@@ -170,72 +171,19 @@ export const Hero = () => {
             </div>
           </div>
 
-          {/* Hero Image/Illustration */}
-          <div className="relative">
-            <div className="relative bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl p-8 border border-border shadow-2xl">
-              {/* Mock Dashboard */}
-              <div className="bg-card rounded-xl overflow-hidden border border-border">
-                {/* Header */}
-                <div className="bg-primary/5 px-4 py-3 border-b border-border flex items-center gap-2">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-destructive/60" />
-                    <div className="w-3 h-3 rounded-full bg-accent/60" />
-                    <div className="w-3 h-3 rounded-full bg-primary/60" />
-                  </div>
-                  <span className="text-xs text-muted-foreground ml-2">AutoISP Dashboard</span>
-                </div>
-                
-                {/* Content */}
-                <div className="p-4 space-y-4">
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-primary/5 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-primary">247</div>
-                      <div className="text-xs text-muted-foreground">Atendimentos</div>
-                    </div>
-                    <div className="bg-accent/5 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-accent">89%</div>
-                      <div className="text-xs text-muted-foreground">Resolvidos IA</div>
-                    </div>
-                    <div className="bg-secondary rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-foreground">1.2k</div>
-                      <div className="text-xs text-muted-foreground">Assinantes</div>
-                    </div>
-                  </div>
-
-                  {/* Chat Preview */}
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-medium text-primary">AI</span>
-                      </div>
-                      <div className="bg-secondary rounded-lg px-3 py-2 text-sm">
-                        Olá! Como posso ajudar hoje?
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2 justify-end">
-                      <div className="bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm">
-                        Minha internet está lenta
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-medium text-primary">AI</span>
-                      </div>
-                      <div className="bg-secondary rounded-lg px-3 py-2 text-sm">
-                        Identifiquei uma instabilidade na sua região. Resolvendo automaticamente...
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Floating Elements */}
-              <div className="absolute -top-4 -right-4 bg-card rounded-lg px-3 py-2 shadow-lg border border-border">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs font-medium">Online 24/7</span>
-                </div>
+          {/* Hero Image - Robot */}
+          <div className="relative flex items-center justify-center">
+            <img 
+              src={heroRobot} 
+              alt="AutoISP Robot - Automação inteligente para provedores"
+              className="w-full max-w-md lg:max-w-lg xl:max-w-xl h-auto object-contain drop-shadow-2xl"
+            />
+            
+            {/* Floating Elements */}
+            <div className="absolute top-4 right-4 bg-card rounded-lg px-3 py-2 shadow-lg border border-border">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs font-medium">Online 24/7</span>
               </div>
             </div>
           </div>
