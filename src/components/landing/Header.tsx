@@ -37,18 +37,18 @@ export const Header = () => {
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         isScrolled
-          ? 'bg-gradient-to-r from-header-metallic via-header-metallic-light to-header-metallic backdrop-blur-md shadow-lg border-b border-border/30'
-          : 'bg-gradient-to-r from-header-metallic/80 via-header-metallic-light/80 to-header-metallic/80 backdrop-blur-sm'
+          ? 'bg-background/95 backdrop-blur-md shadow-sm border-b border-border'
+          : 'bg-transparent'
       )}
     >
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20">
-              <Wifi className="h-5 w-5 text-white" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+              <Wifi className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-white">AutoISP</span>
+            <span className="text-xl font-bold text-foreground">AutoISP</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -57,7 +57,7 @@ export const Header = () => {
               <button
                 key={link.href}
                 onClick={() => scrollToSection(link.href)}
-                className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 {link.label}
               </button>
@@ -76,7 +76,7 @@ export const Header = () => {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 rounded-lg"
+            className="md:hidden p-2 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
             aria-expanded={isMobileMenuOpen}
@@ -90,7 +90,7 @@ export const Header = () => {
         {isMobileMenuOpen && (
           <nav 
             id="mobile-menu"
-            className="md:hidden py-4 border-t border-white/20 bg-header-metallic"
+            className="md:hidden py-4 border-t border-border bg-background"
             aria-label="Menu de navegação mobile"
           >
             <div className="flex flex-col gap-2">
@@ -98,16 +98,16 @@ export const Header = () => {
                 <button
                   key={link.href}
                   onClick={() => scrollToSection(link.href)}
-                  className="px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors text-left"
                 >
                   {link.label}
                 </button>
               ))}
-              <div className="flex flex-col gap-2 px-4 pt-4 border-t border-white/20 mt-2">
-                <Button variant="outline" asChild className="w-full border-white/30 text-white hover:bg-white/10">
+              <div className="flex flex-col gap-2 px-4 pt-4 border-t border-border mt-2">
+                <Button variant="outline" asChild className="w-full">
                   <Link to="/auth">Entrar</Link>
                 </Button>
-                <Button asChild className="w-full bg-white text-header-metallic hover:bg-white/90">
+                <Button asChild className="w-full">
                   <Link to="/auth?mode=signup">Testar Grátis</Link>
                 </Button>
               </div>
