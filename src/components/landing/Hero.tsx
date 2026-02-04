@@ -12,87 +12,41 @@ export const Hero = () => {
       aria-labelledby="hero-heading"
     >
       {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 z-0" />
       
-      {/* Data Web Animation - Spider web pattern with flowing particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-60">
-        {/* Floating data particles - scattered across the screen */}
-        {/* Row 1 */}
-        <div className="particle particle-blue-1" style={{ top: '8%', left: '5%' }} />
-        <div className="particle particle-cyan-1" style={{ top: '12%', left: '20%' }} />
-        <div className="particle particle-orange-1" style={{ top: '5%', left: '35%' }} />
-        <div className="particle particle-blue-2" style={{ top: '15%', left: '50%' }} />
-        <div className="particle particle-cyan-2" style={{ top: '10%', left: '65%' }} />
-        <div className="particle particle-orange-2" style={{ top: '18%', left: '80%' }} />
-        <div className="particle particle-blue-3" style={{ top: '6%', left: '92%' }} />
+      {/* Optical Fiber Network Animation - Behind all content */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Fiber paths - visible lines */}
+        <div className="absolute top-[15%] left-0 w-full h-[2px] bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30 opacity-60" />
+        <div className="absolute top-[30%] left-0 w-full h-[2px] bg-gradient-to-r from-cyan-400/25 via-cyan-400/45 to-cyan-400/25 opacity-60" />
+        <div className="absolute top-[45%] left-0 w-full h-[3px] bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 opacity-60" />
+        <div className="absolute top-[60%] left-0 w-full h-[2px] bg-gradient-to-r from-accent/25 via-accent/45 to-accent/25 opacity-60" />
+        <div className="absolute top-[75%] left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500/30 via-cyan-500/50 to-cyan-500/30 opacity-60" />
+        <div className="absolute top-[90%] left-0 w-full h-[2px] bg-gradient-to-r from-accent/20 via-accent/40 to-accent/20 opacity-60" />
         
-        {/* Row 2 */}
-        <div className="particle particle-cyan-3" style={{ top: '25%', left: '10%' }} />
-        <div className="particle particle-orange-3" style={{ top: '30%', left: '25%' }} />
-        <div className="particle particle-blue-4" style={{ top: '22%', left: '42%' }} />
-        <div className="particle particle-cyan-4" style={{ top: '28%', left: '58%' }} />
-        <div className="particle particle-orange-4" style={{ top: '32%', left: '75%' }} />
-        <div className="particle particle-blue-5" style={{ top: '26%', left: '88%' }} />
+        {/* Data packets traveling left to right */}
+        <div className="data-packet data-packet-blue" style={{ top: '15%' }} />
+        <div className="data-packet data-packet-cyan" style={{ top: '30%', animationDelay: '0.3s' }} />
+        <div className="data-packet data-packet-blue-lg" style={{ top: '45%', animationDelay: '0.6s' }} />
+        <div className="data-packet data-packet-cyan" style={{ top: '75%', animationDelay: '0.9s' }} />
         
-        {/* Row 3 */}
-        <div className="particle particle-orange-5" style={{ top: '42%', left: '8%' }} />
-        <div className="particle particle-blue-6" style={{ top: '48%', left: '22%' }} />
-        <div className="particle particle-cyan-5" style={{ top: '45%', left: '38%' }} />
-        <div className="particle particle-orange-6" style={{ top: '50%', left: '55%' }} />
-        <div className="particle particle-blue-7" style={{ top: '44%', left: '70%' }} />
-        <div className="particle particle-cyan-6" style={{ top: '52%', left: '85%' }} />
-        
-        {/* Row 4 */}
-        <div className="particle particle-blue-8" style={{ top: '62%', left: '12%' }} />
-        <div className="particle particle-orange-7" style={{ top: '68%', left: '28%' }} />
-        <div className="particle particle-cyan-7" style={{ top: '65%', left: '45%' }} />
-        <div className="particle particle-blue-9" style={{ top: '70%', left: '62%' }} />
-        <div className="particle particle-orange-8" style={{ top: '64%', left: '78%' }} />
-        <div className="particle particle-cyan-8" style={{ top: '72%', left: '95%' }} />
-        
-        {/* Row 5 */}
-        <div className="particle particle-cyan-9" style={{ top: '82%', left: '6%' }} />
-        <div className="particle particle-blue-10" style={{ top: '88%', left: '18%' }} />
-        <div className="particle particle-orange-9" style={{ top: '85%', left: '32%' }} />
-        <div className="particle particle-cyan-10" style={{ top: '90%', left: '48%' }} />
-        <div className="particle particle-blue-11" style={{ top: '84%', left: '65%' }} />
-        <div className="particle particle-orange-10" style={{ top: '92%', left: '82%' }} />
-        
-        {/* Connection lines - subtle web structure */}
-        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="lineGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="lineGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0" />
-              <stop offset="50%" stopColor="hsl(var(--accent))" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {/* Diagonal lines creating web effect */}
-          <line x1="0%" y1="20%" x2="100%" y2="60%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse" />
-          <line x1="0%" y1="50%" x2="100%" y2="30%" stroke="url(#lineGradient2)" strokeWidth="1" className="animate-line-pulse-delay" />
-          <line x1="0%" y1="80%" x2="100%" y2="40%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse-delay-2" />
-          <line x1="100%" y1="10%" x2="0%" y2="70%" stroke="url(#lineGradient2)" strokeWidth="1" className="animate-line-pulse" />
-          <line x1="100%" y1="50%" x2="0%" y2="90%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse-delay" />
-          <line x1="20%" y1="0%" x2="80%" y2="100%" stroke="url(#lineGradient2)" strokeWidth="1" className="animate-line-pulse-delay-2" />
-          <line x1="60%" y1="0%" x2="40%" y2="100%" stroke="url(#lineGradient1)" strokeWidth="1" className="animate-line-pulse" />
-        </svg>
+        {/* Data packets traveling right to left */}
+        <div className="data-packet-reverse data-packet-orange" style={{ top: '60%' }} />
+        <div className="data-packet-reverse data-packet-orange" style={{ top: '90%', animationDelay: '0.4s' }} />
+        <div className="data-packet-reverse data-packet-yellow" style={{ top: '30%', animationDelay: '0.7s' }} />
+        <div className="data-packet-reverse data-packet-orange-lg" style={{ top: '45%', animationDelay: '1s' }} />
       </div>
       
       {/* Grid Pattern */}
       <div 
-        className="absolute inset-0 opacity-15"
+        className="absolute inset-0 opacity-10 z-0"
         style={{
           backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.15) 1px, transparent 0)`,
           backgroundSize: '40px 40px',
         }}
       />
 
-      <div className="container mx-auto px-4 relative">
+      <div className="container mx-auto px-4 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Content */}
           <div className="text-center lg:text-left">
