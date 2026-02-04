@@ -115,437 +115,112 @@ All colors MUST be HSL.
   }
 }
 
-/* Fiber Optic Animation System */
-.fiber-line {
+/* Radial Power Animation System - Emanating from Robot */
+.radial-center {
   position: absolute;
-  width: 200%;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1px;
+  height: 1px;
+}
+
+.radial-ray {
+  position: absolute;
+  width: 150vw;
   height: 2px;
   transform-origin: left center;
+  left: 0;
+  top: 0;
 }
 
-/* Different angles for crossing lines */
-.fiber-line-1 {
-  top: 10%;
-  left: -20%;
-  transform: rotate(15deg);
-}
+/* Ray angles - 16 rays spread around 360 degrees */
+.radial-ray-1  { transform: rotate(0deg); }
+.radial-ray-2  { transform: rotate(22.5deg); }
+.radial-ray-3  { transform: rotate(45deg); }
+.radial-ray-4  { transform: rotate(67.5deg); }
+.radial-ray-5  { transform: rotate(90deg); }
+.radial-ray-6  { transform: rotate(112.5deg); }
+.radial-ray-7  { transform: rotate(135deg); }
+.radial-ray-8  { transform: rotate(157.5deg); }
+.radial-ray-9  { transform: rotate(180deg); }
+.radial-ray-10 { transform: rotate(202.5deg); }
+.radial-ray-11 { transform: rotate(225deg); }
+.radial-ray-12 { transform: rotate(247.5deg); }
+.radial-ray-13 { transform: rotate(270deg); }
+.radial-ray-14 { transform: rotate(292.5deg); }
+.radial-ray-15 { transform: rotate(315deg); }
+.radial-ray-16 { transform: rotate(337.5deg); }
 
-.fiber-line-2 {
-  top: 80%;
-  left: -20%;
-  transform: rotate(-20deg);
-}
-
-.fiber-line-3 {
-  top: 40%;
-  left: -20%;
-  transform: rotate(8deg);
-}
-
-.fiber-line-4 {
-  top: 5%;
-  left: -20%;
-  transform: rotate(30deg);
-}
-
-.fiber-line-5 {
-  top: 95%;
-  left: -20%;
-  transform: rotate(-25deg);
-}
-
-.fiber-line-6 {
-  top: 60%;
-  left: -20%;
-  transform: rotate(5deg);
-}
-
-.fiber-line-7 {
-  top: 25%;
-  left: -20%;
-  transform: rotate(22deg);
-}
-
-.fiber-line-8 {
-  top: 70%;
-  left: -20%;
-  transform: rotate(-12deg);
-}
-
-/* Reverse direction lines */
-.fiber-line-reverse-1 {
-  top: 30%;
-  right: -20%;
-  left: auto;
-  transform: rotate(-18deg);
-  transform-origin: right center;
-}
-
-.fiber-line-reverse-2 {
-  top: 55%;
-  right: -20%;
-  left: auto;
-  transform: rotate(12deg);
-  transform-origin: right center;
-}
-
-.fiber-line-reverse-3 {
-  top: 85%;
-  right: -20%;
-  left: auto;
-  transform: rotate(-8deg);
-  transform-origin: right center;
-}
-
-/* Vertical lines */
-.fiber-line-vertical {
+/* Ray glow - the data packet traveling outward */
+.ray-glow {
   position: absolute;
-  width: 2px;
-  height: 200%;
-  transform-origin: center bottom;
-}
-
-.fiber-line-v1 {
-  left: 15%;
-  bottom: -20%;
-  transform: rotate(5deg);
-}
-
-.fiber-line-v2 {
-  left: 35%;
-  bottom: -20%;
-  transform: rotate(-3deg);
-}
-
-.fiber-line-v3 {
-  left: 55%;
-  bottom: -20%;
-  transform: rotate(8deg);
-}
-
-.fiber-line-v4 {
-  left: 75%;
-  bottom: -20%;
-  transform: rotate(-5deg);
-}
-
-.fiber-line-v5 {
-  left: 90%;
-  bottom: -20%;
-  transform: rotate(3deg);
-}
-
-/* Vertical trail */
-.fiber-trail-vertical {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 2px;
-  opacity: 0;
-}
-
-.fiber-line-v1 .fiber-trail-vertical {
-  animation: trail-vertical 4.5s ease-out infinite;
-}
-
-.fiber-line-v2 .fiber-trail-vertical {
-  animation: trail-vertical 2.8s ease-out infinite 0.3s;
-}
-
-.fiber-line-v3 .fiber-trail-vertical {
-  animation: trail-vertical 3.6s ease-out infinite 0.6s;
-}
-
-.fiber-line-v4 .fiber-trail-vertical {
-  animation: trail-vertical 2.2s ease-out infinite 0.9s;
-}
-
-.fiber-line-v5 .fiber-trail-vertical {
-  animation: trail-vertical 5.5s ease-out infinite 1.2s;
-}
-
-/* Vertical glow */
-.fiber-glow-vertical {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.fiber-line-v1 .fiber-glow-vertical {
-  animation: glow-travel-vertical 4.5s ease-in-out infinite;
-}
-
-.fiber-line-v2 .fiber-glow-vertical {
-  animation: glow-travel-vertical 2.8s ease-in-out infinite 0.3s;
-}
-
-.fiber-line-v3 .fiber-glow-vertical {
-  animation: glow-travel-vertical 3.6s ease-in-out infinite 0.6s;
-}
-
-.fiber-line-v4 .fiber-glow-vertical {
-  animation: glow-travel-vertical 2.2s ease-in-out infinite 0.9s;
-}
-
-.fiber-line-v5 .fiber-glow-vertical {
-  animation: glow-travel-vertical 5.5s ease-in-out infinite 1.2s;
-}
-
-/* Fiber trail - the line that appears behind the glow */
-.fiber-trail {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 2px;
-  opacity: 0;
-}
-
-.fiber-trail-blue {
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    hsl(var(--primary) / 0.8) 50%, 
-    transparent 100%
-  );
-}
-
-.fiber-trail-cyan {
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    hsl(187 85% 53% / 0.7) 50%, 
-    transparent 100%
-  );
-}
-
-.fiber-trail-orange {
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    hsl(var(--accent) / 0.7) 50%, 
-    transparent 100%
-  );
-}
-
-/* Vertical trail gradients */
-.fiber-line-vertical .fiber-trail-blue {
-  background: linear-gradient(0deg, 
-    transparent 0%, 
-    hsl(var(--primary) / 0.8) 50%, 
-    transparent 100%
-  );
-}
-
-.fiber-line-vertical .fiber-trail-cyan {
-  background: linear-gradient(0deg, 
-    transparent 0%, 
-    hsl(187 85% 53% / 0.7) 50%, 
-    transparent 100%
-  );
-}
-
-.fiber-line-vertical .fiber-trail-orange {
-  background: linear-gradient(0deg, 
-    transparent 0%, 
-    hsl(var(--accent) / 0.7) 50%, 
-    transparent 100%
-  );
-}
-
-/* Assign animations to horizontal trails - varied speeds */
-.fiber-line-1 .fiber-trail { animation: trail-appear 3.5s ease-out infinite; }
-.fiber-line-2 .fiber-trail { animation: trail-appear 2s ease-out infinite 0.2s; }
-.fiber-line-3 .fiber-trail { animation: trail-appear 4.2s ease-out infinite 0.4s; }
-.fiber-line-4 .fiber-trail { animation: trail-appear 1.8s ease-out infinite 0.6s; }
-.fiber-line-5 .fiber-trail { animation: trail-appear 5s ease-out infinite 0.8s; }
-.fiber-line-6 .fiber-trail { animation: trail-appear 2.2s ease-out infinite 1s; }
-.fiber-line-7 .fiber-trail { animation: trail-appear 3.8s ease-out infinite 1.2s; }
-.fiber-line-8 .fiber-trail { animation: trail-appear 1.6s ease-out infinite 1.4s; }
-
-/* Reverse trails */
-.fiber-trail-reverse {
-  animation-name: trail-appear-reverse !important;
-}
-
-.fiber-line-reverse-1 .fiber-trail { animation: trail-appear-reverse 4s ease-out infinite 0.5s; }
-.fiber-line-reverse-2 .fiber-trail { animation: trail-appear-reverse 2.5s ease-out infinite 0.8s; }
-.fiber-line-reverse-3 .fiber-trail { animation: trail-appear-reverse 3.2s ease-out infinite 1.1s; }
-
-/* Fiber glow - the moving data packet */
-.fiber-glow {
-  position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   top: 50%;
   transform: translateY(-50%);
+  left: 0;
 }
 
-.fiber-glow-blue {
+.ray-glow-blue {
   background: radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%);
   box-shadow: 
-    0 0 10px hsl(var(--primary)),
-    0 0 20px hsl(var(--primary) / 0.5),
-    0 0 30px hsl(var(--primary) / 0.2);
+    0 0 15px hsl(var(--primary)),
+    0 0 30px hsl(var(--primary) / 0.5),
+    0 0 45px hsl(var(--primary) / 0.2);
 }
 
-.fiber-glow-cyan {
+.ray-glow-cyan {
   background: radial-gradient(circle, hsl(187 85% 53%) 0%, transparent 70%);
   box-shadow: 
-    0 0 10px hsl(187 85% 53%),
-    0 0 20px hsl(187 85% 53% / 0.5),
-    0 0 30px hsl(187 85% 53% / 0.2);
+    0 0 15px hsl(187 85% 53%),
+    0 0 30px hsl(187 85% 53% / 0.5),
+    0 0 45px hsl(187 85% 53% / 0.2);
 }
 
-.fiber-glow-orange {
+.ray-glow-orange {
   background: radial-gradient(circle, hsl(var(--accent)) 0%, transparent 70%);
   box-shadow: 
-    0 0 10px hsl(var(--accent)),
-    0 0 20px hsl(var(--accent) / 0.5),
-    0 0 30px hsl(var(--accent) / 0.2);
+    0 0 15px hsl(var(--accent)),
+    0 0 30px hsl(var(--accent) / 0.5),
+    0 0 45px hsl(var(--accent) / 0.2);
 }
 
-/* Assign animations to horizontal glows - varied speeds */
-.fiber-line-1 .fiber-glow { animation: glow-travel 3.5s ease-in-out infinite; }
-.fiber-line-2 .fiber-glow { animation: glow-travel 2s ease-in-out infinite 0.2s; }
-.fiber-line-3 .fiber-glow { animation: glow-travel 4.2s ease-in-out infinite 0.4s; }
-.fiber-line-4 .fiber-glow { animation: glow-travel 1.8s ease-in-out infinite 0.6s; }
-.fiber-line-5 .fiber-glow { animation: glow-travel 5s ease-in-out infinite 0.8s; }
-.fiber-line-6 .fiber-glow { animation: glow-travel 2.2s ease-in-out infinite 1s; }
-.fiber-line-7 .fiber-glow { animation: glow-travel 3.8s ease-in-out infinite 1.2s; }
-.fiber-line-8 .fiber-glow { animation: glow-travel 1.6s ease-in-out infinite 1.4s; }
+/* Animations - rays traveling outward from center */
+.radial-ray-1  .ray-glow { animation: ray-travel 3.0s ease-out infinite 0.0s; }
+.radial-ray-2  .ray-glow { animation: ray-travel 2.5s ease-out infinite 0.3s; }
+.radial-ray-3  .ray-glow { animation: ray-travel 3.5s ease-out infinite 0.1s; }
+.radial-ray-4  .ray-glow { animation: ray-travel 2.8s ease-out infinite 0.5s; }
+.radial-ray-5  .ray-glow { animation: ray-travel 3.2s ease-out infinite 0.2s; }
+.radial-ray-6  .ray-glow { animation: ray-travel 2.6s ease-out infinite 0.7s; }
+.radial-ray-7  .ray-glow { animation: ray-travel 3.8s ease-out infinite 0.4s; }
+.radial-ray-8  .ray-glow { animation: ray-travel 2.4s ease-out infinite 0.9s; }
+.radial-ray-9  .ray-glow { animation: ray-travel 3.0s ease-out infinite 0.6s; }
+.radial-ray-10 .ray-glow { animation: ray-travel 2.7s ease-out infinite 1.1s; }
+.radial-ray-11 .ray-glow { animation: ray-travel 3.4s ease-out infinite 0.8s; }
+.radial-ray-12 .ray-glow { animation: ray-travel 2.3s ease-out infinite 1.3s; }
+.radial-ray-13 .ray-glow { animation: ray-travel 3.1s ease-out infinite 1.0s; }
+.radial-ray-14 .ray-glow { animation: ray-travel 2.9s ease-out infinite 1.5s; }
+.radial-ray-15 .ray-glow { animation: ray-travel 3.6s ease-out infinite 1.2s; }
+.radial-ray-16 .ray-glow { animation: ray-travel 2.2s ease-out infinite 1.4s; }
 
-/* Reverse glows */
-.fiber-glow-reverse {
-  animation-name: glow-travel-reverse !important;
-}
-
-.fiber-line-reverse-1 .fiber-glow { animation: glow-travel-reverse 4s ease-in-out infinite 0.5s; }
-.fiber-line-reverse-2 .fiber-glow { animation: glow-travel-reverse 2.5s ease-in-out infinite 0.8s; }
-.fiber-line-reverse-3 .fiber-glow { animation: glow-travel-reverse 3.2s ease-in-out infinite 1.1s; }
-
-/* Trail animation - left to right */
-@keyframes trail-appear {
+@keyframes ray-travel {
   0% {
+    left: 0;
     opacity: 0;
-    clip-path: inset(0 100% 0 0);
+    transform: translateY(-50%) scale(0.5);
   }
-  15% {
-    opacity: 0.9;
-    clip-path: inset(0 85% 0 0);
+  5% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
   }
-  50% {
-    opacity: 0.7;
-    clip-path: inset(0 40% 0 0);
-  }
-  85% {
-    opacity: 0.3;
-    clip-path: inset(0 0 0 15%);
+  70% {
+    opacity: 0.8;
   }
   100% {
+    left: 100%;
     opacity: 0;
-    clip-path: inset(0 0 0 100%);
-  }
-}
-
-/* Trail animation - right to left */
-@keyframes trail-appear-reverse {
-  0% {
-    opacity: 0;
-    clip-path: inset(0 0 0 100%);
-  }
-  15% {
-    opacity: 0.9;
-    clip-path: inset(0 0 0 85%);
-  }
-  50% {
-    opacity: 0.7;
-    clip-path: inset(0 40% 0 0);
-  }
-  85% {
-    opacity: 0.3;
-    clip-path: inset(0 85% 0 0);
-  }
-  100% {
-    opacity: 0;
-    clip-path: inset(0 100% 0 0);
-  }
-}
-
-/* Trail animation - bottom to top */
-@keyframes trail-vertical {
-  0% {
-    opacity: 0;
-    clip-path: inset(100% 0 0 0);
-  }
-  15% {
-    opacity: 0.9;
-    clip-path: inset(85% 0 0 0);
-  }
-  50% {
-    opacity: 0.7;
-    clip-path: inset(40% 0 0 0);
-  }
-  85% {
-    opacity: 0.3;
-    clip-path: inset(0 0 15% 0);
-  }
-  100% {
-    opacity: 0;
-    clip-path: inset(0 0 100% 0);
-  }
-}
-
-/* Glow travels along the fiber - left to right */
-@keyframes glow-travel {
-  0% {
-    left: -3%;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    left: 103%;
-    opacity: 0;
-  }
-}
-
-/* Glow travels - right to left */
-@keyframes glow-travel-reverse {
-  0% {
-    left: 103%;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    left: -3%;
-    opacity: 0;
-  }
-}
-
-/* Glow travels - bottom to top */
-@keyframes glow-travel-vertical {
-  0% {
-    bottom: -3%;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    bottom: 103%;
-    opacity: 0;
+    transform: translateY(-50%) scale(0.3);
   }
 }
