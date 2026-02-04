@@ -267,8 +267,8 @@ All colors MUST be HSL.
 /* Vertical glow */
 .fiber-glow-vertical {
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   left: 50%;
   transform: translateX(-50%);
@@ -374,8 +374,8 @@ All colors MUST be HSL.
 /* Fiber glow - the moving data packet */
 .fiber-glow {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   top: 50%;
   transform: translateY(-50%);
