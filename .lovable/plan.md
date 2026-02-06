@@ -1,31 +1,30 @@
 
+# Adicionar URL da Documentacao da API do SGP no Guia do Projeto
 
-# Corrigir Rota de Validacao do SGP para `/api/ura/clientes`
+## Alteracao
 
-## Problema
+No arquivo `src/components/guia-projeto/integracoes/ERPIntegration.tsx`, na tabela de ERPs Suportados (linha 94), substituir o badge generico "Disponivel" do SGP por um link clicavel apontando para a documentacao oficial:
 
-As Edge Functions `save-erp-config` e `test-erp` usam a rota `/api/clientes` para validar a conexao com o SGP, mas a rota correta e `/api/ura/clientes`.
-
-## Alteracoes
-
-### 1. `supabase/functions/save-erp-config/index.ts`
-
-Na funcao `testSgpConnection`, alterar a URL de teste:
-
-```text
-// De:
-const testUrl = `${baseUrl}/api/clientes`;
-// Para:
-const testUrl = `${baseUrl}/api/ura/clientes`;
+**De:**
+```
+<Badge className="bg-green-500/10 text-green-600">Disponível</Badge>
 ```
 
-### 2. `supabase/functions/test-erp/index.ts`
+**Para:**
+Um link externo com o texto "bookstack.sgp.net.br" apontando para `https://bookstack.sgp.net.br/books`, com icone de link externo. O badge tera estilo clicavel e abrira em nova aba.
 
-Na funcao que testa SGP, aplicar a mesma correcao:
-- Adicionar normalizacao de URL (remover `/api` duplicado, como ja feito em `save-erp-config`)
-- Alterar a rota de `/api/clientes` para `/api/ura/clientes`
+## Secao Tecnica
 
-### Requer redeploy das duas Edge Functions
+### Arquivo: `src/components/guia-projeto/integracoes/ERPIntegration.tsx`
+
+1. Adicionar `ExternalLink` aos imports do lucide-react (linha 17-30)
+2. Linha 94 — substituir o badge estatico por:
+```tsx
+<a href="https://bookstack.sgp.net.br/books" target="_blank" rel="noopener noreferrer">
+  <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 cursor-pointer gap-1">
+    Docs API <ExternalLink className="h-3 w-3" />
+  </Badge>
+</a>
+```
 
 Sem alteracao de banco. Sem novas dependencias.
-
