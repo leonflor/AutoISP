@@ -77,7 +77,7 @@ export function ActiveAgentCard({
       <CardHeader>
         <div className="flex items-center gap-3">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={avatarUrl || undefined} alt={displayName} />
+            <AvatarImage src={avatarUrl || undefined} alt={templateName} />
             <AvatarFallback className="bg-primary/10">
               <IconComponent className="h-6 w-6 text-primary" />
             </AvatarFallback>
