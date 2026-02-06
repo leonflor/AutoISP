@@ -57,7 +57,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!isMounted) return;
         
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(prev => {
+          const newUser = session?.user ?? null;
+          if (prev?.id === newUser?.id) return prev;
+          return newUser;
+        });
 
         // Fire-and-forget - não afeta loading
         if (session?.user) {
