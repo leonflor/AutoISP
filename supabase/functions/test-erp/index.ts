@@ -30,6 +30,9 @@ async function decrypt(
   keyBase64: string
 ): Promise<string> {
   const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
+  if (keyBytes.length !== 32) {
+    throw new Error(`ENCRYPTION_KEY inválida: esperado 32 bytes, recebido ${keyBytes.length}. Gere com: openssl rand -base64 32`);
+  }
   const key = await crypto.subtle.importKey(
     "raw",
     keyBytes,
