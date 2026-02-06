@@ -5,43 +5,74 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useSubscribers } from '@/hooks/painel/useSubscribers';
-import { Search, Users, UserCheck, UserX, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useErpClients } from '@/hooks/painel/useErpClients';
+import { Search, Users, UserCheck, UserX, Wifi, WifiOff, RefreshCw, AlertTriangle, Database } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
   suspenso: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
   cancelado: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
-  inadimplente: 'bg-red-500/10 text-red-600 border-red-500/20',
+  bloqueado: 'bg-red-500/10 text-red-600 border-red-500/20',
+  desconhecido: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
+};
+
+const providerColors: Record<string, string> = {
+  ixc: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  sgp: 'bg-green-500/10 text-green-600 border-green-500/20',
+  mk_solutions: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+};
+
+const providerLabels: Record<string, string> = {
+  ixc: 'IXC Soft',
+  sgp: 'SGP',
+  mk_solutions: 'MK-Solutions',
 };
 
 export default function SubscribersPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [provider, setProvider] = useState('');
   const [page, setPage] = useState(1);
+  const { toast } = useToast();
 
-  const { subscribers, loading, stats, total, totalPages, refetch } = useSubscribers({
+  const { clients, loading, error, errors, stats, total, totalPages, refetch } = useErpClients({
     search,
     status,
+    provider,
     page,
-    limit: 10,
+    limit: 15,
   });
+
+  const handleRefresh = async () => {
+    await refetch();
+    toast({ title: 'Dados atualizados', description: 'Lista de clientes sincronizada com os ERPs.' });
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Assinantes</h1>
-          <p className="text-muted-foreground">Gerencie os assinantes do seu provedor</p>
+          <p className="text-muted-foreground">Clientes de todas as integrações ERP</p>
         </div>
-        <Button variant="outline" onClick={refetch}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Sincronizar ERP
+        <Button variant="outline" onClick={handleRefresh} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Atualizar
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      {errors.length > 0 && (
+        <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+          <div className="flex items-center gap-2 text-sm text-yellow-600">
+            <AlertTriangle className="h-4 w-4" />
+            <span>Falha parcial: {errors.map(e => `${e.provider} (${e.message})`).join(', ')}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -71,11 +102,20 @@ export default function SubscribersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Inadimplentes</CardTitle>
+            <CardTitle className="text-sm font-medium">Bloqueados</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.inadimplentes}</div>
+            <div className="text-2xl font-bold text-red-600">{stats.bloqueados}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Conectados</CardTitle>
+            <Wifi className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.conectados}</div>
           </CardContent>
         </Card>
       </div>
@@ -86,13 +126,24 @@ export default function SubscribersPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome, CPF, contrato..."
+                placeholder="Buscar por nome, CPF/CNPJ ou login..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 className="pl-10"
               />
             </div>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={provider} onValueChange={(v) => { setProvider(v); setPage(1); }}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Todas integrações" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="ixc">IXC Soft</SelectItem>
+                <SelectItem value="sgp">SGP</SelectItem>
+                <SelectItem value="mk_solutions">MK-Solutions</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Todos os status" />
               </SelectTrigger>
@@ -100,7 +151,7 @@ export default function SubscribersPage() {
                 <SelectItem value="">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="suspenso">Suspensos</SelectItem>
-                <SelectItem value="inadimplente">Inadimplentes</SelectItem>
+                <SelectItem value="bloqueado">Bloqueados</SelectItem>
                 <SelectItem value="cancelado">Cancelados</SelectItem>
               </SelectContent>
             </Select>
@@ -113,44 +164,74 @@ export default function SubscribersPage() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+              <p className="text-muted-foreground">{error}</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+                Tentar novamente
+              </Button>
+            </div>
+          ) : clients.length === 0 && !search && !status && !provider ? (
+            <div className="text-center py-12">
+              <Database className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <h3 className="font-medium mb-1">Nenhum cliente encontrado</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure uma integração ERP em Integrações &gt; ERP para importar seus clientes.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => window.location.href = '/painel/integracoes/erp'}>
+                Configurar ERP
+              </Button>
+            </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Contrato</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {subscribers.map((sub) => (
-                    <TableRow key={sub.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{sub.name}</p>
-                          <p className="text-sm text-muted-foreground">{sub.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{sub.contract}</TableCell>
-                      <TableCell>{sub.plan}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={statusColors[sub.status]}>
-                          {sub.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        R$ {sub.monthlyValue.toFixed(2)}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Integração</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>CPF/CNPJ</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Plano</TableHead>
+                      <TableHead>Login</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Conexão</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {subscribers.length === 0 && (
+                  </TableHeader>
+                  <TableBody>
+                    {clients.map((client, idx) => (
+                      <TableRow key={`${client.provider}-${client.erp_id}-${idx}`}>
+                        <TableCell>
+                          <Badge variant="outline" className={providerColors[client.provider] || ''}>
+                            {providerLabels[client.provider] || client.provider_name}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{client.nome}</TableCell>
+                        <TableCell className="text-muted-foreground">{client.cpf_cnpj || '—'}</TableCell>
+                        <TableCell className="text-muted-foreground">{client.data_vencimento || '—'}</TableCell>
+                        <TableCell className="text-muted-foreground">{client.plano || '—'}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{client.login || '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusColors[client.status_contrato] || statusColors.desconhecido}>
+                            {client.status_contrato}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {client.conectado ? (
+                            <Wifi className="h-4 w-4 text-green-500 mx-auto" />
+                          ) : (
+                            <WifiOff className="h-4 w-4 text-muted-foreground mx-auto" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {clients.length === 0 && (search || status || provider) && (
                 <p className="text-center py-8 text-muted-foreground">
-                  Nenhum assinante encontrado
+                  Nenhum cliente encontrado com os filtros aplicados
                 </p>
               )}
               {totalPages > 1 && (
@@ -164,7 +245,7 @@ export default function SubscribersPage() {
                     Anterior
                   </Button>
                   <span className="py-2 px-4 text-sm">
-                    Página {page} de {totalPages}
+                    Página {page} de {totalPages} ({total} clientes)
                   </span>
                   <Button
                     variant="outline"
