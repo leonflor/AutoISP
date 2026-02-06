@@ -121,7 +121,7 @@ export function AgentTestDialog({
   const [tokensUsed, setTokensUsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -134,9 +134,7 @@ export function AgentTestDialog({
   }, [open, initialAgentId, agents]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const currentAgent = agents.find((a) => a.id === selectedAgentId);
@@ -239,9 +237,12 @@ export function AgentTestDialog({
           try {
             const parsed = JSON.parse(jsonStr);
 
-            // Check if this is the sources event
+            // Check if this is the sources+usage event
             if (parsed.sources) {
               messageSources = parsed.sources;
+              if (parsed.usage?.total_tokens) {
+                setTokensUsed(prev => prev + parsed.usage.total_tokens);
+              }
               continue;
             }
 
@@ -366,7 +367,7 @@ export function AgentTestDialog({
         </div>
 
         {/* Messages Area */}
-        <ScrollArea ref={scrollRef} className="flex-1 py-4 min-h-0">
+        <ScrollArea className="flex-1 py-4 min-h-0">
           <div className="space-y-4 pr-4">
             {messages.length === 0 && currentAgent && (
               <Card className="bg-muted/50 border-dashed">
@@ -469,6 +470,7 @@ export function AgentTestDialog({
                 </Card>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 

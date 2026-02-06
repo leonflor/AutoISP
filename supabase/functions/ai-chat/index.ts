@@ -559,8 +559,8 @@ Deno.serve(async (req) => {
               }
             }
 
-            // Send sources event before DONE
-            const sourcesEvent = `data: ${JSON.stringify({ sources })}\n\n`;
+            // Send sources + usage event before DONE
+            const sourcesEvent = `data: ${JSON.stringify({ sources, usage: { total_tokens: totalTokens, prompt_tokens: promptTokens, completion_tokens: completionTokens } })}\n\n`;
             controller.enqueue(encoder.encode(sourcesEvent));
 
             // Send DONE
