@@ -1,93 +1,91 @@
 
-# Corrigir Erro "Invalid key length" na Criptografia AES-256-GCM
+# Lista de Clientes ERP na Pagina de Assinantes
 
-## Diagnostico
+## Objetivo
+Substituir os dados mock da pagina de assinantes por dados reais buscados de todas as integracoes ERP configuradas (IXC, SGP, MK-Solutions). Cada cliente exibira: nome, CPF/CNPJ, data de vencimento, plano, login, status do contrato, status de conexao e qual ERP ele pertence.
 
-Os logs da Edge Function `save-erp-config` revelam a causa raiz:
+## Arquitetura
 
-```
-21:14:19 INFO [SGP] Response status: 200         <-- conexao OK!
-21:14:19 ERROR Error: DataError: Invalid key length  <-- crash ao criptografar
-```
+A solucao envolve:
+1. Uma nova Edge Function `fetch-erp-clients` que busca clientes de todos os ERPs conectados
+2. Um novo hook `useErpClients` para consumir essa Edge Function
+3. Atualizacao da pagina `Subscribers.tsx` para usar os dados reais
 
-O teste de conexao com o SGP funciona quando as credenciais estao corretas (retorno 200). Porem, ao tentar salvar, a funcao `encrypt()` falha porque a `ENCRYPTION_KEY` armazenada nos Secrets nao tem o tamanho correto.
+## Detalhes Tecnicos
 
-**AES-256-GCM exige uma chave de exatamente 32 bytes (256 bits).** Quando codificada em base64, isso resulta em uma string de 44 caracteres. A chave atual provavelmente tem um tamanho diferente.
+### 1. Edge Function: `supabase/functions/fetch-erp-clients/index.ts`
 
-## Solucao
+Responsabilidades:
+- Receber requisicao autenticada do usuario
+- Buscar todas as `erp_configs` ativas e conectadas do ISP
+- Para cada config, descriptografar credenciais e chamar a API do ERP correspondente
+- Buscar lista de clientes com dados de contrato/conexao
+- Normalizar os dados em um formato unificado
+- Retornar array consolidado com campo `provider` identificando a origem
 
-### 1. Gerar uma nova ENCRYPTION_KEY valida
+Endpoints por ERP:
+- **IXC**: `POST /webservice/v1/cliente` (listar) + `POST /webservice/v1/cliente_contrato` para contratos
+- **SGP**: `POST /api/ura/clientes` com parametros de busca
+- **MK**: `POST /mk/WSMKIntegracaoGeral.rule` com `funcao=listarClientes`
 
-Uma chave AES-256 valida em base64 pode ser gerada assim (em qualquer terminal):
-
-```bash
-openssl rand -base64 32
-```
-
-Isso produz uma string de 44 caracteres, como por exemplo:
-`k7G2qH8xNmP3rT5vB9wY1zA4cE6fI0jK2lM4nO6pQ8=`
-
-### 2. Atualizar o Secret no projeto
-
-Acessar as configuracoes do projeto e atualizar o valor de `ENCRYPTION_KEY` com a nova chave gerada.
-
-### 3. Adicionar validacao no codigo da Edge Function
-
-Alterar `supabase/functions/save-erp-config/index.ts` para validar o tamanho da chave antes de tentar criptografar, retornando um erro claro caso esteja incorreta:
-
+Formato de retorno unificado:
 ```typescript
-// Na funcao encrypt(), antes do importKey:
-const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
-if (keyBytes.length !== 32) {
-  throw new Error(`ENCRYPTION_KEY invalida: esperado 32 bytes, recebido ${keyBytes.length}`);
+interface ErpClient {
+  erp_id: string;
+  provider: 'ixc' | 'mk_solutions' | 'sgp';
+  provider_name: string; // "IXC Soft", "SGP", "MK-Solutions"
+  nome: string;
+  cpf_cnpj: string;
+  data_vencimento: string | null;
+  plano: string | null;
+  login: string | null;
+  status_contrato: string; // ativo, suspenso, cancelado, bloqueado
+  conectado: boolean;
 }
 ```
 
-E no handler principal, ao verificar a `ENCRYPTION_KEY`:
+Parametros aceitos via query/body:
+- `search` (opcional): filtro por nome ou CPF
+- `page` e `limit` para paginacao
 
-```typescript
-const encryptionKey = Deno.env.get("ENCRYPTION_KEY");
-if (!encryptionKey) {
-  // ... erro existente
-}
+### 2. Hook: `src/hooks/painel/useErpClients.ts`
 
-// Validar tamanho da chave
-try {
-  const keyBytes = Uint8Array.from(atob(encryptionKey), (c) => c.charCodeAt(0));
-  if (keyBytes.length !== 32) {
-    console.error(`ENCRYPTION_KEY has ${keyBytes.length} bytes, expected 32`);
-    return new Response(
-      JSON.stringify({ error: "Chave de criptografia com tamanho invalido. Contate o administrador." }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-} catch {
-  return new Response(
-    JSON.stringify({ error: "Chave de criptografia mal formatada" }),
-    { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
-```
+- Usa `useQuery` do TanStack Query para chamar `fetch-erp-clients`
+- Recebe filtros de busca, status e paginacao
+- Retorna lista tipada de `ErpClient[]`, loading, error e stats
 
-### 4. Aplicar a mesma validacao em `test-erp/index.ts`
+### 3. Pagina: `src/pages/painel/Subscribers.tsx`
 
-Se essa funcao tambem usa criptografia, aplicar a mesma validacao.
+Alteracoes:
+- Remover uso do hook mock `useSubscribers`
+- Usar o novo `useErpClients`
+- Adicionar coluna "Integracao" com Badge colorido por provider
+- Colunas: Integracao | Nome | CPF/CNPJ | Vencimento | Plano | Login | Status Contrato | Conectado
+- Status de conexao exibido com icone verde/vermelho (circulo)
+- Filtro por integracao (Select com os ERPs ativos)
+- Manter cards de estatisticas no topo
+- Estado vazio: mensagem orientando a configurar integracao ERP
 
-### 5. Re-deploy das Edge Functions
+### 4. Cores dos providers (Badge)
 
-Redeployar `save-erp-config` e `test-erp` apos as alteracoes.
-
-## Sobre o erro 403 do SGP
-
-Nos logs mais recentes, o SGP retornou `403 Forbidden`. Isso indica que as credenciais (token/app) estao incorretas ou sem permissao. Isso e um problema de configuracao no SGP, nao no codigo. A mensagem de erro ja e exibida corretamente no modal ("Acesso negado. Verifique as permissoes do token.").
-
-## Resumo
-
-| Item | Acao |
+| Provider | Cor |
 |---|---|
-| `ENCRYPTION_KEY` (Secret) | Gerar nova chave com `openssl rand -base64 32` e atualizar |
-| `save-erp-config/index.ts` | Validar tamanho da chave antes de criptografar |
-| `test-erp/index.ts` | Mesma validacao (se aplicavel) |
-| Deploy | Re-deploy das funcoes |
+| IXC Soft | Azul |
+| SGP | Verde |
+| MK-Solutions | Roxo |
 
-Sem alteracao de banco. Sem novas dependencias.
+## Arquivos
+
+| Arquivo | Acao |
+|---|---|
+| `supabase/functions/fetch-erp-clients/index.ts` | Criar - Edge Function para buscar clientes |
+| `src/hooks/painel/useErpClients.ts` | Criar - Hook para consumir a Edge Function |
+| `src/pages/painel/Subscribers.tsx` | Alterar - Usar dados reais do ERP |
+
+## Consideracoes
+
+- A Edge Function reutiliza o padrao de descriptografia ja existente em `test-erp`
+- Se nenhum ERP estiver configurado, retorna array vazio com mensagem amigavel
+- Erros de um ERP nao bloqueiam os demais (cada um e processado independentemente)
+- A resposta inclui um campo `errors` com falhas parciais por provider
+- Paginacao e feita no frontend inicialmente (os ERPs retornam listas completas)
