@@ -1,129 +1,100 @@
 
-# Implementar "Testar Agente" com Iteracao Real (Streaming + RAG + Fontes)
+# Corrigir Scroll e Contagem de Tokens no Chat de Teste
 
-## Objetivo
+## Problema 1: Scroll nao funciona
 
-Fazer o botao "Testar Agente" funcionar de verdade: o ISP envia uma mensagem, o agente responde usando a base de conhecimento (Q&A + documentos RAG), com efeito de digitacao (streaming) e exibindo as fontes consultadas abaixo de cada resposta.
+O componente `ScrollArea` (Radix UI) envolve o conteudo em um viewport interno. O `ref={scrollRef}` esta no elemento externo, mas o scrollbar pertence ao viewport filho. Por isso, `scrollRef.current.scrollTop = scrollRef.current.scrollHeight` nao tem efeito.
 
-## Problema Atual
+**Solucao:** Usar um elemento `div` "ancora" no final da lista de mensagens e chamar `scrollIntoView()` nele sempre que as mensagens mudarem. Isso funciona independente da estrutura interna do ScrollArea.
 
-O frontend (`AgentTestDialog.tsx`) envia o payload em formato **incompativel** com o que a Edge Function `ai-chat` espera:
+## Problema 2: Contador de tokens sempre em 0
 
-```text
-Frontend envia:          Backend espera:
-  message                  messages[] (array OpenAI format)
-  agentId                  isp_id
-  ispAgentId               isp_agent_id
-  ispId                    stream (boolean)
-  conversationHistory
-```
+O estado `tokensUsed` (linha 121) e exibido na UI (linha 364), mas **nunca e atualizado**. O backend envia os dados de uso em dois lugares:
+- No ultimo chunk SSE do OpenAI (campo `usage` — coletado internamente pelo backend)
+- **Nao e reenviado ao frontend** — o backend apenas loga no `ai_usage`
 
-Alem disso, a resposta do backend retorna `data.message` mas o frontend le `data.response`. E nao ha suporte a streaming nem exibicao de fontes.
+**De onde vem a informacao de tokens:**
+1. A OpenAI retorna `usage` no ultimo chunk do stream quando `stream_options: { include_usage: true }` esta ativo
+2. O campo contem: `prompt_tokens` (tokens do system prompt + historico), `completion_tokens` (tokens gerados na resposta), `total_tokens` (soma)
+3. O backend coleta esses valores (linhas 550-554) e insere na tabela `ai_usage` (linha 571-587)
+4. Porem, o backend **nao envia** esses dados ao frontend no streaming
+
+**Como funciona o gerenciamento:**
+- Cada chamada ao `ai-chat` registra em `ai_usage`: `tokens_total`, `tokens_input`, `tokens_output`, `isp_id`, `agent_id`, `user_id`
+- O sistema verifica limites mensais consultando a tabela `ai_limits` vinculada ao plano do ISP (linhas 402-440)
+- Se o total de tokens do mes exceder `monthly_limit`, a requisicao e bloqueada com status 429
+
+**Solucao:** Incluir um evento SSE com `usage` no stream (junto ao evento `sources` ja existente) e ler no frontend para atualizar o contador.
 
 ---
 
 ## Alteracoes Planejadas
 
-### 1. Edge Function `ai-chat/index.ts` -- Retornar fontes no response
+### 1. `src/components/painel/ai/AgentTestDialog.tsx`
 
-**O que muda:** No response nao-streaming (e no final do streaming), incluir os metadados das fontes consultadas.
+**a) Corrigir scroll:**
+- Adicionar `const messagesEndRef = useRef<HTMLDivElement>(null)` 
+- Colocar `<div ref={messagesEndRef} />` como ultimo elemento dentro do `ScrollArea`
+- No `useEffect` de mensagens, chamar `messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })`
+- Remover o `scrollRef` atual (nao mais necessario)
 
-- Adicionar ao JSON de resposta um campo `sources` contendo:
-  - Trechos de documentos usados (titulo do documento, similaridade)
-  - Itens de Q&A injetados (pergunta, categoria)
-- No modo streaming: enviar as fontes como um evento SSE final especial (`data: {"sources": [...]}`) antes do `[DONE]`
+**b) Atualizar contador de tokens:**
+- No parser SSE, detectar o evento `sources` que ja e enviado pelo backend e tambem o novo campo `usage`
+- Quando receber `usage`, chamar `setTokensUsed(prev => prev + usage.total_tokens)`
+- O contador acumula ao longo da sessao (soma de todas as mensagens)
 
-### 2. Frontend `AgentTestDialog.tsx` -- Corrigir payload + streaming + fontes
+### 2. `supabase/functions/ai-chat/index.ts`
 
-**a) Corrigir o payload:**
-- Enviar `isp_id`, `isp_agent_id`, `messages` (array com historico completo) e `stream: true`
-- Usar `fetch()` direto em vez de `supabase.functions.invoke()` (necessario para streaming)
-
-**b) Implementar streaming:**
-- Usar `fetch` com leitura de `ReadableStream` 
-- Parsear SSE linha por linha (padrao `data: {json}`)
-- Atualizar a mensagem do assistente token por token (efeito digitacao)
-- Tratar `[DONE]` e evento de fontes
-
-**c) Exibir fontes consultadas:**
-- Abaixo de cada mensagem do assistente, mostrar um bloco expansivel "Fontes consultadas"
-- Listar documentos (com % de similaridade) e Q&As utilizadas
-- Usar um Accordion ou Collapsible discreto
-
-**d) Corrigir leitura da resposta:**
-- Ler `data.message` (nao `data.response`) para o fallback nao-streaming
-
-### 3. Interface `Message` -- Adicionar campo de fontes
-
-Estender a interface para armazenar as fontes junto com cada mensagem:
-
-```text
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  sources?: {
-    documents: { content: string; similarity: number; document_title?: string }[];
-    knowledge: { question: string; category?: string }[];
-  };
-}
-```
-
----
-
-## Fluxo Tecnico Completo
-
-```text
-1. Usuario digita mensagem no AgentTestDialog
-2. Frontend monta payload:
-   { isp_id, isp_agent_id, messages: [...historico, nova_msg], stream: true }
-3. fetch() para /functions/v1/ai-chat com Authorization header
-4. Backend:
-   a. Valida JWT, membership, agente
-   b. Busca KB (Q&A) + RAG (document_chunks via pgvector)
-   c. Monta prompt hierarquico (template + tom + docs + Q&A + seguranca)
-   d. Chama OpenAI com stream: true
-   e. Proxeia o stream SSE para o cliente
-   f. Ao final, envia evento com fontes consultadas
-   g. Registra uso em ai_usage
-5. Frontend:
-   a. Le stream token por token, atualiza mensagem em tempo real
-   b. Recebe fontes no evento final
-   c. Exibe bloco "Fontes consultadas" abaixo da resposta
-```
+**Incluir `usage` no evento de fontes:**
+- Na linha 563, alterar o JSON do evento `sources` para incluir tambem o campo `usage`:
+  ```
+  { sources, usage: { total_tokens, prompt_tokens, completion_tokens } }
+  ```
+- Isso reaproveita o evento SSE ja existente, sem adicionar outro
 
 ---
 
 ## Secao Tecnica
 
 ### Arquivos a modificar:
+1. `src/components/painel/ai/AgentTestDialog.tsx` — scroll + leitura de tokens
+2. `supabase/functions/ai-chat/index.ts` — incluir usage no evento SSE de sources
 
-1. **`supabase/functions/ai-chat/index.ts`**
-   - Na branch de streaming (linhas 490-498): interceptar o stream da OpenAI para:
-     - Proxeiar tokens normalmente
-     - Coletar `usage` do ultimo chunk (OpenAI envia usage no ultimo evento quando `stream_options: { include_usage: true }`)
-     - Apos o stream, enviar evento SSE customizado com `sources` (docs + Q&A usados)
-     - Registrar `ai_usage` apos o stream terminar
-   - Adicionar `stream_options: { include_usage: true }` no body enviado a OpenAI
-   - No response nao-streaming (linhas 524-535): adicionar campo `sources` ao JSON
+### Logica do scroll (padrao React):
+```text
+const messagesEndRef = useRef<HTMLDivElement>(null);
 
-2. **`src/components/painel/ai/AgentTestDialog.tsx`**
-   - Reescrever `sendMessage()` para usar `fetch()` com streaming SSE
-   - Corrigir payload para formato `ChatRequest` (`isp_id`, `isp_agent_id`, `messages`, `stream`)
-   - Adicionar parser SSE linha por linha com tratamento de `[DONE]` e evento `sources`
-   - Estender interface `Message` com campo `sources`
-   - Adicionar componente de fontes (Collapsible) abaixo de cada mensagem do assistente
-   - Importar `Collapsible` do Radix UI
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages]);
 
-### Dependencias:
-- `@radix-ui/react-collapsible` -- ja instalado no projeto
+// Dentro do ScrollArea, apos o ultimo item:
+<div ref={messagesEndRef} />
+```
 
-### Sem alteracao de banco:
-- Nenhuma migracao necessaria
-- Todas as tabelas e funcoes RPC ja existem
+### Logica dos tokens no frontend:
+```text
+// No parser SSE, quando receber sources+usage:
+if (parsed.sources) {
+  messageSources = parsed.sources;
+}
+if (parsed.usage) {
+  setTokensUsed(prev => prev + parsed.usage.total_tokens);
+}
+```
 
-### Pre-requisitos para testar:
-- `OPENAI_API_KEY` configurada no painel Admin (integracao OpenAI)
-- `ENCRYPTION_KEY` configurada como secret do Supabase
-- Template do agente com `uses_knowledge_base = true`
-- Pelo menos 1 item de Q&A ou 1 documento indexado na base de conhecimento do agente
+### Evento SSE atualizado (backend):
+```text
+// Linha 563 do ai-chat/index.ts
+const sourcesEvent = `data: ${JSON.stringify({ 
+  sources, 
+  usage: { total_tokens: totalTokens, prompt_tokens: promptTokens, completion_tokens: completionTokens } 
+})}\n\n`;
+```
+
+### Resumo da origem dos tokens:
+- **prompt_tokens**: Numero de tokens do system prompt completo (template + tom de voz + RAG + Q&A + seguranca) somado ao historico de mensagens
+- **completion_tokens**: Numero de tokens gerados pela resposta do agente
+- **total_tokens**: Soma de ambos
+- Esses numeros sao fornecidos pela propria API OpenAI no ultimo chunk do stream
+- Sao registrados permanentemente na tabela `ai_usage` para controle de limites por plano
