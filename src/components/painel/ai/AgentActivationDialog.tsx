@@ -137,7 +137,7 @@ export function AgentActivationDialog({
         ?.map(t => t.id) || [];
       
       form.reset({
-        display_name: agent.name,
+        display_name: "",
         avatar_url: "",
         voice_tone: voiceTones[0]?.id || "",
         escalation_config: {
