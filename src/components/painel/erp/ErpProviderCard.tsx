@@ -109,11 +109,6 @@ export function ErpProviderCard({ provider, config, onConfigure, onTest, isTesti
                   <RefreshCw className="h-4 w-4" />
                 )}
               </Button>
-              <Button variant="outline" size="icon" asChild>
-                <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
             </>
           )}
         </div>
