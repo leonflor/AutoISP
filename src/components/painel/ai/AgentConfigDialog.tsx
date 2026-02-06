@@ -29,7 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import type { IspAgentWithTemplate } from "@/hooks/painel/useIspAgents";
 
 const configSchema = z.object({
-  display_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  display_name: z.string().optional(),
   avatar_url: z.string().url("URL inválida").or(z.literal("")).optional(),
   is_enabled: z.boolean(),
 });
