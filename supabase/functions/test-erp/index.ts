@@ -192,7 +192,8 @@ async function testMkConnection(
 // Test SGP connection
 async function testSgpConnection(
   apiUrl: string,
-  token: string
+  token: string,
+  app: string
 ): Promise<TestResult> {
   try {
     // Normalize URL - remove trailing slash and /api if present
@@ -204,12 +205,17 @@ async function testSgpConnection(
     const testUrl = `${baseUrl}/api/ura/clientes`;
     console.log(`[SGP] Testing connection to: ${testUrl}`);
 
+    const body = new URLSearchParams();
+    body.append('token', token);
+    body.append('app', app);
+    body.append('cpfcnpj', '00000000000');
+
     const response = await fetch(testUrl, {
-      method: "GET",
+      method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
+      body: body.toString(),
     });
 
     console.log(`[SGP] Response status: ${response.status}`);
@@ -217,7 +223,7 @@ async function testSgpConnection(
     if (response.status === 401) {
       return {
         success: false,
-        message: "Token inválido ou expirado. Gere um novo no SGP.",
+        message: "Token ou App inválido. Verifique as credenciais no SGP.",
       };
     }
 
@@ -422,7 +428,16 @@ Deno.serve(async (req) => {
             }
           );
         }
-        result = await testSgpConnection(apiUrl, credentials.token);
+        if (!credentials.username) {
+          return new Response(
+            JSON.stringify({ error: "Nome do App não configurado" }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        result = await testSgpConnection(apiUrl, credentials.token, credentials.username);
         break;
 
       default:

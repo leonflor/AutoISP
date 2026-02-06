@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -60,6 +61,7 @@ interface IxcConfigDialogProps {
 export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps) {
   const { saveConfig, testConnection } = useErpConfigs();
   const [showToken, setShowToken] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -78,10 +80,12 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
         token: '', // Never fill encrypted token
         self_signed_cert: (config?.sync_config as Record<string, unknown>)?.self_signed_cert as boolean || false,
       });
+      setFormError(null);
     }
   }, [config, open, form]);
 
   const onSubmit = (data: FormData) => {
+    setFormError(null);
     saveConfig.mutate(
       {
         provider: 'ixc',
@@ -91,6 +95,9 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
       },
       {
         onSuccess: () => onClose(),
+        onError: (error) => {
+          setFormError(error instanceof Error ? error.message : 'Erro ao salvar configuração. Verifique os dados e tente novamente.');
+        },
       }
     );
   };
@@ -100,8 +107,12 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent
+        className="max-w-lg max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
@@ -114,6 +125,14 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Inline error */}
+            {formError && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
+
             {/* Status Badge if already configured */}
             {config?.is_connected && (
               <Alert className="border-green-500/30 bg-green-500/5">
