@@ -1,99 +1,99 @@
 
-# Atualizar Guia do Projeto - Revisao Completa
+# Migrar de Lovable AI Gateway para OpenAI API Direta
 
-## Discrepancias Identificadas
+## Resumo
 
-Apos revisao completa do codigo implementado versus a documentacao no guia, foram encontradas as seguintes inconsistencias:
+Substituir todas as chamadas ao Lovable AI Gateway (`ai.gateway.lovable.dev`) pela API OpenAI direta (`api.openai.com`), e trocar a `LOVABLE_API_KEY` pela chave OpenAI armazenada criptografada no `platform_config` (mesmo padrao ja usado pelo `process-document`). Em seguida, atualizar toda a documentacao no Guia do Projeto.
 
-### 1. Motor de IA: OpenAI vs Lovable AI Gateway
-O guia documenta extensivamente a integracao com OpenAI direta, mas a implementacao real usa o **Lovable AI Gateway** (`ai.gateway.lovable.dev`) com suporte multi-modelo.
+## Situacao Atual
 
-**O que esta errado no guia:**
-- Titulo da integracao diz "INT-02 -- OpenAI"
-- Secret documentado como `OPENAI_API_KEY` (real: `LOVABLE_API_KEY`)
-- Endpoint documentado como `api.openai.com` (real: `ai.gateway.lovable.dev`)
-- Modelo listado como apenas "GPT-4o" (real: suporta GPT-4o, GPT-4o-mini, Gemini Flash, Gemini Pro, Claude Sonnet)
-- Payloads de exemplo usam formato OpenAI direto
-- Custos referem-se a precos OpenAI diretos (agora via Gateway com pricing diferente)
-- ResumoProjetoTab lista "OpenAI" como tecnologia
+| Item | Atual | Novo |
+|------|-------|------|
+| Endpoint Chat | `ai.gateway.lovable.dev/v1/chat/completions` | `api.openai.com/v1/chat/completions` |
+| Endpoint Embeddings (ai-chat) | `ai.gateway.lovable.dev/v1/embeddings` | `api.openai.com/v1/embeddings` |
+| Endpoint Embeddings (process-document) | `api.openai.com/v1/embeddings` | Sem alteracao (ja correto) |
+| Autenticacao | `LOVABLE_API_KEY` (secret auto-provisionado) | Chave OpenAI criptografada em `platform_config` (via `getOpenAIKey()`) |
+| Modelos | Prefixo provider (`openai/gpt-4o`, `google/gemini-2.5-flash`) | Nomes OpenAI diretos (`gpt-4o`, `gpt-4o-mini`) |
 
-### 2. Lista de Edge Functions Desatualizada
-O guia lista 12 edge functions, mas existem 14 implementadas:
-- Faltam: `save-erp-config`, `test-erp`
-- Nome diferente: `whatsapp-webhook` esta implementado mas guia lista como parte generica
+## Alteracoes por Arquivo
 
-### 3. Lista de Secrets Desatualizada
-Secrets reais configurados:
-- `ENCRYPTION_KEY`
-- `LOVABLE_API_KEY` (auto-provisionado)
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_SUPABASE_URL`
-- `WHATSAPP_APP_SECRET`
+### 1. Edge Function: `supabase/functions/ai-chat/index.ts`
 
-Guia lista incorretamente:
-- `OPENAI_API_KEY` (nao existe, e `LOVABLE_API_KEY`)
-- `ASAAS_API_KEY` (nao configurado ainda)
-- `ASAAS_WEBHOOK_TOKEN` (nao configurado ainda)
-- `WHATSAPP_TOKEN` (real: `WHATSAPP_APP_SECRET`)
-- `RESEND_API_KEY` (nao configurado ainda)
-- Falta documentar que `LOVABLE_API_KEY` e auto-provisionado
+**a) Adicionar funcao `getOpenAIKey()`** (copiar padrao do `process-document`):
+- Importar helper de criptografia (decrypt + deriveKey)
+- Buscar chave criptografada em `platform_config` com key `integration_openai`
+- Descriptografar com `ENCRYPTION_KEY`
 
-### 4. Logica de Nomes dos Agentes de IA Nao Documentada
-A recente implementacao da separacao entre Nome do Template e Nome de Apresentacao nao consta no guia.
+**b) Remover `LOVABLE_API_KEY`** (linhas 155-167):
+- Substituir por chamada a `getOpenAIKey(supabaseAdmin)` apos criar o client admin
+- Atualizar mensagem de erro para "Integracao OpenAI nao configurada"
 
-### 5. Backend: Supabase Externo vs Lovable Cloud
-O guia referencia "Supabase externo conectado", mas o projeto agora roda em **Lovable Cloud**.
+**c) Atualizar `generateQueryEmbedding()`** (linha 63):
+- Endpoint: `https://api.openai.com/v1/embeddings`
 
-### 6. Consolidacao - Decisoes Desatualizadas
-- "Integrações: Core primeiro (Asaas -> OpenAI -> WhatsApp)" deveria mencionar Lovable AI Gateway
-- "Complexidade IA: Estrutura + 1 agente (Atendente)" - Na realidade ja existem multiplos tipos de agentes (atendente, cobrador, vendedor, analista, suporte)
+**d) Simplificar `modelMap`** (linhas 399-407):
+- Remover prefixos de provider: `"gpt-4o" -> "gpt-4o"`, `"gpt-4o-mini" -> "gpt-4o-mini"`
+- Remover modelos nao-OpenAI (Gemini, Claude)
+- Default: `"gpt-4o-mini"`
 
----
+**e) Atualizar chamada de chat** (linha 410):
+- Endpoint: `https://api.openai.com/v1/chat/completions`
 
-## Alteracoes Planejadas
+**f) Atualizar tratamento de erros**:
+- Remover referencia a "Gateway" e "402 creditos Lovable"
+- Manter tratamento de 429 (rate limit OpenAI)
 
-### Arquivo 1: `src/components/guia-projeto/ImplementacaoTab.tsx`
-- Atualizar array `edgeFunctions` de 12 para 14 itens (adicionar `save-erp-config`, `test-erp`)
-- Atualizar array `secrets` com os secrets reais (`LOVABLE_API_KEY` auto-provisionado, `WHATSAPP_APP_SECRET`, remover `OPENAI_API_KEY`)
-- Atualizar consolidacao: "Integrações" mencionar Lovable AI Gateway, "Complexidade IA" mencionar sistema multi-agente
-- Atualizar `backendConfig` para refletir Lovable Cloud
-- Atualizar Fase F2 para referenciar Lovable AI Gateway em vez de OpenAI
+### 2. Guia: `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
 
-### Arquivo 2: `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
-- Renomear para refletir "Lovable AI Gateway" (ou atualizar conteudo interno)
-- Titulo: "INT-02 -- Lovable AI Gateway (Multi-Modelo)"
-- Modelos suportados: GPT-4o, GPT-4o-mini, Gemini Flash, Gemini Pro, Claude Sonnet
-- Secret: `LOVABLE_API_KEY` (auto-provisionado pelo Lovable Cloud)
-- Endpoint: `ai.gateway.lovable.dev/v1/chat/completions`
-- Embeddings: `ai.gateway.lovable.dev/v1/embeddings` com modelo `text-embedding-3-small`
-- Atualizar payloads de exemplo com formato real
-- Atualizar secao de custos (via Lovable AI Gateway, pricing baseado em uso)
-- Remover referencia a `OPENAI_MODEL` e variaveis OpenAI especificas
-- Atualizar troubleshooting para referenciar Gateway
+- Linha 45: Titulo `"INT-02 — OpenAI API"` (era Lovable AI Gateway)
+- Linha 80: Badge `"OpenAI API (GPT-4o / GPT-4o-mini)"`
+- Linhas 89-94: Modelos suportados — remover Gemini, manter apenas GPT-4o e GPT-4o-mini
+- Linha 185: Endpoint para `api.openai.com/v1/chat/completions`
+- Linhas 228-231: Secret `OPENAI_API_KEY` com descricao "Criptografada em platform_config, configurada via painel Admin"
+- Linha 240: Endpoint `https://api.openai.com/v1/chat/completions`
+- Linhas 410-411: Seguranca — trocar "LOVABLE_API_KEY auto-provisionado" por "OPENAI_API_KEY criptografada (AES-256-GCM)"
+- Linhas 422: Rate Limits — trocar "429/402 do Gateway" por "429 da OpenAI"
+- Linhas 468-469: Troubleshooting — trocar "LOVABLE_API_KEY invalida" por "OPENAI_API_KEY invalida ou nao configurada"
+- Linhas 473-474: Remover erro 402 (especifico do Gateway)
+- Linhas 514-518: Payload — atualizar endpoint e header para `api.openai.com` + `$OPENAI_API_KEY`
+- Linhas 523: Modelo `"gpt-4o-mini"` (era `google/gemini-2.5-flash`)
+- Linhas 569-572: Custos — atualizar para pricing OpenAI direto
+- Linha 576-577: Dica — remover Gemini, sugerir gpt-4o-mini para simples e gpt-4o para complexo
 
-### Arquivo 3: `src/components/guia-projeto/integracoes/IASection.tsx`
-- Atualizar titulo e descricao para "Lovable AI Gateway e modelos multi-provider"
+### 3. Guia: `src/components/guia-projeto/integracoes/IASection.tsx`
 
-### Arquivo 4: `src/components/guia-projeto/ResumoProjetoTab.tsx`
-- Trocar "OpenAI" por "Lovable AI Gateway" na lista de tecnologias
-- Ajustar icone/categoria para "IA Multi-Modelo"
-- Atualizar periodo de trial para consistencia (usar "Configuravel" como ja esta)
-- Atualizar resumo executivo mencionando multi-modelo
+- Linha 7: Titulo `"OpenAI API"` (era Lovable AI Gateway)
+- Linha 9: Descricao `"API OpenAI (GPT-4o, GPT-4o-mini) para os Agentes Inteligentes"`
 
-### Arquivo 5: `src/components/guia-projeto/FeaturesTab.tsx`
-- Verificar se contagens de features estao atualizadas (nenhuma alteracao necessaria se contagens estiverem corretas)
+### 4. Guia: `src/components/guia-projeto/ResumoProjetoTab.tsx`
 
----
+- Linha 36: Tecnologia `{ nome: "OpenAI", icon: Bot, categoria: "IA (GPT-4o)" }` (era Lovable AI Gateway)
+- Linhas 340-341: Resumo executivo — trocar "via Lovable AI Gateway" por "via OpenAI API"
+
+### 5. Guia: `src/components/guia-projeto/ImplementacaoTab.tsx`
+
+- Linha 37: Consolidacao `"Core primeiro (Asaas → OpenAI → WhatsApp)"`
+- Linha 55: Secret `{ nome: "OPENAI_API_KEY", fase: "F2", descricao: "Criptografada em platform_config via painel Admin" }`
+- Linha 362-363: Passo F2 — "Configurar OPENAI_API_KEY via painel Admin" e "Criar edge function ai-chat usando OpenAI API"
+- Linha 367: "Testar OpenAI API com prompts basicos"
+- Linha 380: Rodada R6 — "OpenAI API + ai-chat"
+- Linha 384: Rodada R10 — "Testar OpenAI API"
 
 ## Secao Tecnica
 
 ### Arquivos a modificar:
-1. `src/components/guia-projeto/ImplementacaoTab.tsx` -- edge functions, secrets, consolidacao, backend config
-2. `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx` -- reescrita quase completa para Lovable AI Gateway
-3. `src/components/guia-projeto/integracoes/IASection.tsx` -- titulo/descricao
-4. `src/components/guia-projeto/ResumoProjetoTab.tsx` -- tecnologias, resumo executivo
+1. `supabase/functions/ai-chat/index.ts` — migrar de Gateway para OpenAI direta
+2. `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx` — documentacao
+3. `src/components/guia-projeto/integracoes/IASection.tsx` — titulo/descricao
+4. `src/components/guia-projeto/ResumoProjetoTab.tsx` — tecnologias e resumo
+5. `src/components/guia-projeto/ImplementacaoTab.tsx` — secrets, consolidacao, fases
+
+### Padrao de autenticacao OpenAI (reutilizar de process-document):
+A chave OpenAI sera obtida da tabela `platform_config` (key: `integration_openai`), descriptografada com `ENCRYPTION_KEY` usando AES-256-GCM. Este padrao ja esta implementado e testado no `process-document`.
 
 ### Sem alteracao de banco:
-- Todas as alteracoes sao em componentes de documentacao do guia
-- Nenhuma logica de negocio e afetada
 - Nenhuma migracao necessaria
+- A tabela `platform_config` e a funcao `getOpenAIKey()` ja existem
+
+### Prerequisito:
+- A chave OpenAI deve estar configurada no painel Admin (integracao OpenAI) antes de usar os agentes de IA
