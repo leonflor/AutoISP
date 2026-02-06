@@ -23,21 +23,21 @@ import {
 
 const ImplementacaoTab = () => {
   const backendConfig = {
-    projectUrl: "https://zvxcwwhsjtdliihlvvof.supabase.co",
-    projectId: "zvxcwwhsjtdliihlvvof",
+    projectUrl: "Lovable Cloud (gerenciado automaticamente)",
+    projectId: "Lovable Cloud",
     clientFile: "src/integrations/supabase/client.ts",
-    typesFile: "src/types/database.ts",
-    deployMode: "Migrations manuais via Supabase Dashboard",
+    typesFile: "src/integrations/supabase/types.ts",
+    deployMode: "Migrations via Lovable Cloud (automático)",
   };
 
   const consolidacao = [
-    { aspecto: "Backend", decisao: "Supabase externo conectado" },
+    { aspecto: "Backend", decisao: "Lovable Cloud (Supabase gerenciado)" },
     { aspecto: "Rodadas por Fase", decisao: "Máximo 15" },
     { aspecto: "Seeds", decisao: "Mínimos (usuário master + dados essenciais)" },
-    { aspecto: "Integrações", decisao: "Core primeiro (Asaas → OpenAI → WhatsApp)" },
-    { aspecto: "Ambiente Dev", decisao: "Supabase externo (projeto conectado)" },
+    { aspecto: "Integrações", decisao: "Core primeiro (Asaas → Lovable AI Gateway → WhatsApp)" },
+    { aspecto: "Ambiente Dev", decisao: "Lovable Cloud (automático)" },
     { aspecto: "Ordem Plataformas", decisao: "Admin primeiro → Cliente → Landing" },
-    { aspecto: "Complexidade IA", decisao: "Estrutura + 1 agente (Atendente)" },
+    { aspecto: "Complexidade IA", decisao: "Sistema multi-agente (Atendente, Cobrador, Vendedor, Analista, Suporte)" },
     { aspecto: "Teste Pagamentos", decisao: "Sandbox Asaas" },
   ];
 
@@ -52,12 +52,12 @@ const ImplementacaoTab = () => {
   ];
 
   const secrets = [
-    { nome: "ASAAS_API_KEY", fase: "F2", descricao: "Chave da API Asaas (sandbox/prod)" },
-    { nome: "ASAAS_WEBHOOK_TOKEN", fase: "F2", descricao: "Token para validar webhooks Asaas" },
-    { nome: "OPENAI_API_KEY", fase: "F2", descricao: "Chave da API OpenAI" },
-    { nome: "WHATSAPP_TOKEN", fase: "F2", descricao: "Token WhatsApp Business" },
-    { nome: "RESEND_API_KEY", fase: "F2", descricao: "Chave da API Resend para emails" },
-    { nome: "ENCRYPTION_KEY", fase: "F1", descricao: "Chave para criptografia de dados sensíveis" },
+    { nome: "LOVABLE_API_KEY", fase: "F2", descricao: "Auto-provisionado pelo Lovable Cloud (IA Gateway)" },
+    { nome: "ENCRYPTION_KEY", fase: "F1", descricao: "Chave para criptografia de dados sensíveis do ERP" },
+    { nome: "WHATSAPP_APP_SECRET", fase: "F2", descricao: "Segredo para validação de webhooks do Meta" },
+    { nome: "ASAAS_API_KEY", fase: "F2", descricao: "Chave da API Asaas (a configurar)" },
+    { nome: "ASAAS_WEBHOOK_TOKEN", fase: "F2", descricao: "Token para validar webhooks Asaas (a configurar)" },
+    { nome: "RESEND_API_KEY", fase: "F2", descricao: "Chave da API Resend para emails (a configurar)" },
   ];
 
   const riscos = [
@@ -81,6 +81,8 @@ const ImplementacaoTab = () => {
     "send-email",
     "invite-admin",
     "process-document",
+    "save-erp-config",
+    "test-erp",
   ];
 
   return (
@@ -118,8 +120,8 @@ const ImplementacaoTab = () => {
               <Server className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle>Configuração Backend — Supabase Externo</CardTitle>
-              <CardDescription>Projeto Supabase conectado e configurado</CardDescription>
+              <CardTitle>Configuração Backend — Lovable Cloud</CardTitle>
+              <CardDescription>Backend gerenciado automaticamente pelo Lovable Cloud</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -129,20 +131,12 @@ const ImplementacaoTab = () => {
               <h4 className="font-semibold text-foreground">Conexão</h4>
               <div className="space-y-2">
                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">Project ID</span>
+                  <span className="text-sm text-muted-foreground">Plataforma</span>
                   <code className="text-xs font-mono text-primary">{backendConfig.projectId}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">URL</span>
-                  <a 
-                    href={backendConfig.projectUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs font-mono text-primary hover:underline"
-                  >
-                    {backendConfig.projectId}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  <span className="text-sm text-muted-foreground">Gerenciamento</span>
+                  <span className="text-xs font-mono text-primary">Automático (Lovable Cloud)</span>
                 </div>
               </div>
             </div>
@@ -165,20 +159,18 @@ const ImplementacaoTab = () => {
             <h4 className="mb-3 font-semibold text-foreground">Processo de Migrations</h4>
             <div className="rounded-lg border border-border bg-muted/30 p-4">
               <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-                <li>Acessar <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Supabase Dashboard</a> → Projeto <code className="font-mono text-xs">{backendConfig.projectId}</code></li>
-                <li>Navegar até <strong>SQL Editor</strong></li>
-                <li>Executar scripts SQL na ordem definida nas fases (F1, F2, etc.)</li>
-                <li>Verificar tabelas criadas em <strong>Table Editor</strong></li>
-                <li>Atualizar <code className="font-mono text-xs">{backendConfig.typesFile}</code> com novas interfaces</li>
+                <li>Migrations são executadas via <strong>Lovable Cloud</strong> (automático)</li>
+                <li>Gerenciar dados via <strong>Cloud View → Database</strong></li>
+                <li>Executar SQL customizado via <strong>Cloud View → Run SQL</strong></li>
+                <li>Types são atualizados automaticamente em <code className="font-mono text-xs">{backendConfig.typesFile}</code></li>
               </ol>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              <strong>Importante:</strong> Todas as migrations devem ser executadas manualmente no Supabase Dashboard. 
-              O CLI local não está disponível neste ambiente.
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 p-3">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <p className="text-sm text-emerald-700 dark:text-emerald-300">
+              <strong>Lovable Cloud:</strong> Migrations e deploy de Edge Functions são gerenciados automaticamente.
             </p>
           </div>
         </CardContent>
@@ -367,12 +359,12 @@ const ImplementacaoTab = () => {
                     <li>Criar edge function asaas-create-customer</li>
                     <li>Criar edge function asaas-create-subscription</li>
                     <li>Criar edge function asaas-webhook (recebe eventos)</li>
-                    <li>Configurar secret OPENAI_API_KEY</li>
-                    <li>Criar edge function ai-chat (agente Atendente) usando OpenAI API</li>
+                    <li>LOVABLE_API_KEY já auto-provisionado pelo Cloud</li>
+                    <li>Criar edge function ai-chat (multi-agente) usando Lovable AI Gateway</li>
                     <li>Criar edge function ai-usage (registro de consumo)</li>
-                    <li>Criar estrutura WhatsApp (webhook placeholder)</li>
+                    <li>Criar estrutura WhatsApp (webhook + validação)</li>
                     <li>Testar integração Asaas sandbox</li>
-                    <li>Testar OpenAI com prompts básicos</li>
+                    <li>Testar Lovable AI Gateway com prompts básicos</li>
                   </ol>
                 </div>
 
@@ -385,11 +377,11 @@ const ImplementacaoTab = () => {
                       { r: 3, desc: "asaas-create-subscription" },
                       { r: 4, desc: "asaas-webhook" },
                       { r: 5, desc: "Lógica webhook → banco" },
-                      { r: 6, desc: "OPENAI_API_KEY + ai-chat" },
+                      { r: 6, desc: "Lovable AI Gateway + ai-chat" },
                       { r: 7, desc: "ai-usage" },
-                      { r: 8, desc: "whatsapp-webhook (placeholder)" },
+                      { r: 8, desc: "whatsapp-webhook + validação" },
                       { r: 9, desc: "Testar Asaas sandbox" },
-                      { r: 10, desc: "Testar OpenAI API" },
+                      { r: 10, desc: "Testar AI Gateway" },
                     ].map((item) => (
                       <div key={item.r} className="rounded border border-border bg-muted/20 p-2 text-xs">
                         <span className="font-mono font-bold text-primary">R{item.r}:</span>{" "}
