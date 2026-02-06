@@ -33,6 +33,9 @@ async function encrypt(
 ): Promise<{ ciphertext: string; iv: string }> {
   const encoder = new TextEncoder();
   const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
+  if (keyBytes.length !== 32) {
+    throw new Error(`ENCRYPTION_KEY inválida: esperado 32 bytes, recebido ${keyBytes.length}. Gere com: openssl rand -base64 32`);
+  }
   const key = await crypto.subtle.importKey(
     "raw",
     keyBytes,
@@ -283,6 +286,24 @@ Deno.serve(async (req) => {
           status: 503,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
+      );
+    }
+
+    // Validate encryption key length
+    try {
+      const keyBytes = Uint8Array.from(atob(encryptionKey), (c) => c.charCodeAt(0));
+      if (keyBytes.length !== 32) {
+        console.error(`ENCRYPTION_KEY has ${keyBytes.length} bytes, expected 32`);
+        return new Response(
+          JSON.stringify({ error: "Chave de criptografia com tamanho inválido. Gere com: openssl rand -base64 32" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } catch {
+      console.error("ENCRYPTION_KEY is not valid base64");
+      return new Response(
+        JSON.stringify({ error: "Chave de criptografia mal formatada. Gere com: openssl rand -base64 32" }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
