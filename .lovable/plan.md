@@ -1,99 +1,129 @@
 
-# Migrar de Lovable AI Gateway para OpenAI API Direta
+# Implementar "Testar Agente" com Iteracao Real (Streaming + RAG + Fontes)
 
-## Resumo
+## Objetivo
 
-Substituir todas as chamadas ao Lovable AI Gateway (`ai.gateway.lovable.dev`) pela API OpenAI direta (`api.openai.com`), e trocar a `LOVABLE_API_KEY` pela chave OpenAI armazenada criptografada no `platform_config` (mesmo padrao ja usado pelo `process-document`). Em seguida, atualizar toda a documentacao no Guia do Projeto.
+Fazer o botao "Testar Agente" funcionar de verdade: o ISP envia uma mensagem, o agente responde usando a base de conhecimento (Q&A + documentos RAG), com efeito de digitacao (streaming) e exibindo as fontes consultadas abaixo de cada resposta.
 
-## Situacao Atual
+## Problema Atual
 
-| Item | Atual | Novo |
-|------|-------|------|
-| Endpoint Chat | `ai.gateway.lovable.dev/v1/chat/completions` | `api.openai.com/v1/chat/completions` |
-| Endpoint Embeddings (ai-chat) | `ai.gateway.lovable.dev/v1/embeddings` | `api.openai.com/v1/embeddings` |
-| Endpoint Embeddings (process-document) | `api.openai.com/v1/embeddings` | Sem alteracao (ja correto) |
-| Autenticacao | `LOVABLE_API_KEY` (secret auto-provisionado) | Chave OpenAI criptografada em `platform_config` (via `getOpenAIKey()`) |
-| Modelos | Prefixo provider (`openai/gpt-4o`, `google/gemini-2.5-flash`) | Nomes OpenAI diretos (`gpt-4o`, `gpt-4o-mini`) |
+O frontend (`AgentTestDialog.tsx`) envia o payload em formato **incompativel** com o que a Edge Function `ai-chat` espera:
 
-## Alteracoes por Arquivo
+```text
+Frontend envia:          Backend espera:
+  message                  messages[] (array OpenAI format)
+  agentId                  isp_id
+  ispAgentId               isp_agent_id
+  ispId                    stream (boolean)
+  conversationHistory
+```
 
-### 1. Edge Function: `supabase/functions/ai-chat/index.ts`
+Alem disso, a resposta do backend retorna `data.message` mas o frontend le `data.response`. E nao ha suporte a streaming nem exibicao de fontes.
 
-**a) Adicionar funcao `getOpenAIKey()`** (copiar padrao do `process-document`):
-- Importar helper de criptografia (decrypt + deriveKey)
-- Buscar chave criptografada em `platform_config` com key `integration_openai`
-- Descriptografar com `ENCRYPTION_KEY`
+---
 
-**b) Remover `LOVABLE_API_KEY`** (linhas 155-167):
-- Substituir por chamada a `getOpenAIKey(supabaseAdmin)` apos criar o client admin
-- Atualizar mensagem de erro para "Integracao OpenAI nao configurada"
+## Alteracoes Planejadas
 
-**c) Atualizar `generateQueryEmbedding()`** (linha 63):
-- Endpoint: `https://api.openai.com/v1/embeddings`
+### 1. Edge Function `ai-chat/index.ts` -- Retornar fontes no response
 
-**d) Simplificar `modelMap`** (linhas 399-407):
-- Remover prefixos de provider: `"gpt-4o" -> "gpt-4o"`, `"gpt-4o-mini" -> "gpt-4o-mini"`
-- Remover modelos nao-OpenAI (Gemini, Claude)
-- Default: `"gpt-4o-mini"`
+**O que muda:** No response nao-streaming (e no final do streaming), incluir os metadados das fontes consultadas.
 
-**e) Atualizar chamada de chat** (linha 410):
-- Endpoint: `https://api.openai.com/v1/chat/completions`
+- Adicionar ao JSON de resposta um campo `sources` contendo:
+  - Trechos de documentos usados (titulo do documento, similaridade)
+  - Itens de Q&A injetados (pergunta, categoria)
+- No modo streaming: enviar as fontes como um evento SSE final especial (`data: {"sources": [...]}`) antes do `[DONE]`
 
-**f) Atualizar tratamento de erros**:
-- Remover referencia a "Gateway" e "402 creditos Lovable"
-- Manter tratamento de 429 (rate limit OpenAI)
+### 2. Frontend `AgentTestDialog.tsx` -- Corrigir payload + streaming + fontes
 
-### 2. Guia: `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
+**a) Corrigir o payload:**
+- Enviar `isp_id`, `isp_agent_id`, `messages` (array com historico completo) e `stream: true`
+- Usar `fetch()` direto em vez de `supabase.functions.invoke()` (necessario para streaming)
 
-- Linha 45: Titulo `"INT-02 — OpenAI API"` (era Lovable AI Gateway)
-- Linha 80: Badge `"OpenAI API (GPT-4o / GPT-4o-mini)"`
-- Linhas 89-94: Modelos suportados — remover Gemini, manter apenas GPT-4o e GPT-4o-mini
-- Linha 185: Endpoint para `api.openai.com/v1/chat/completions`
-- Linhas 228-231: Secret `OPENAI_API_KEY` com descricao "Criptografada em platform_config, configurada via painel Admin"
-- Linha 240: Endpoint `https://api.openai.com/v1/chat/completions`
-- Linhas 410-411: Seguranca — trocar "LOVABLE_API_KEY auto-provisionado" por "OPENAI_API_KEY criptografada (AES-256-GCM)"
-- Linhas 422: Rate Limits — trocar "429/402 do Gateway" por "429 da OpenAI"
-- Linhas 468-469: Troubleshooting — trocar "LOVABLE_API_KEY invalida" por "OPENAI_API_KEY invalida ou nao configurada"
-- Linhas 473-474: Remover erro 402 (especifico do Gateway)
-- Linhas 514-518: Payload — atualizar endpoint e header para `api.openai.com` + `$OPENAI_API_KEY`
-- Linhas 523: Modelo `"gpt-4o-mini"` (era `google/gemini-2.5-flash`)
-- Linhas 569-572: Custos — atualizar para pricing OpenAI direto
-- Linha 576-577: Dica — remover Gemini, sugerir gpt-4o-mini para simples e gpt-4o para complexo
+**b) Implementar streaming:**
+- Usar `fetch` com leitura de `ReadableStream` 
+- Parsear SSE linha por linha (padrao `data: {json}`)
+- Atualizar a mensagem do assistente token por token (efeito digitacao)
+- Tratar `[DONE]` e evento de fontes
 
-### 3. Guia: `src/components/guia-projeto/integracoes/IASection.tsx`
+**c) Exibir fontes consultadas:**
+- Abaixo de cada mensagem do assistente, mostrar um bloco expansivel "Fontes consultadas"
+- Listar documentos (com % de similaridade) e Q&As utilizadas
+- Usar um Accordion ou Collapsible discreto
 
-- Linha 7: Titulo `"OpenAI API"` (era Lovable AI Gateway)
-- Linha 9: Descricao `"API OpenAI (GPT-4o, GPT-4o-mini) para os Agentes Inteligentes"`
+**d) Corrigir leitura da resposta:**
+- Ler `data.message` (nao `data.response`) para o fallback nao-streaming
 
-### 4. Guia: `src/components/guia-projeto/ResumoProjetoTab.tsx`
+### 3. Interface `Message` -- Adicionar campo de fontes
 
-- Linha 36: Tecnologia `{ nome: "OpenAI", icon: Bot, categoria: "IA (GPT-4o)" }` (era Lovable AI Gateway)
-- Linhas 340-341: Resumo executivo — trocar "via Lovable AI Gateway" por "via OpenAI API"
+Estender a interface para armazenar as fontes junto com cada mensagem:
 
-### 5. Guia: `src/components/guia-projeto/ImplementacaoTab.tsx`
+```text
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  sources?: {
+    documents: { content: string; similarity: number; document_title?: string }[];
+    knowledge: { question: string; category?: string }[];
+  };
+}
+```
 
-- Linha 37: Consolidacao `"Core primeiro (Asaas → OpenAI → WhatsApp)"`
-- Linha 55: Secret `{ nome: "OPENAI_API_KEY", fase: "F2", descricao: "Criptografada em platform_config via painel Admin" }`
-- Linha 362-363: Passo F2 — "Configurar OPENAI_API_KEY via painel Admin" e "Criar edge function ai-chat usando OpenAI API"
-- Linha 367: "Testar OpenAI API com prompts basicos"
-- Linha 380: Rodada R6 — "OpenAI API + ai-chat"
-- Linha 384: Rodada R10 — "Testar OpenAI API"
+---
+
+## Fluxo Tecnico Completo
+
+```text
+1. Usuario digita mensagem no AgentTestDialog
+2. Frontend monta payload:
+   { isp_id, isp_agent_id, messages: [...historico, nova_msg], stream: true }
+3. fetch() para /functions/v1/ai-chat com Authorization header
+4. Backend:
+   a. Valida JWT, membership, agente
+   b. Busca KB (Q&A) + RAG (document_chunks via pgvector)
+   c. Monta prompt hierarquico (template + tom + docs + Q&A + seguranca)
+   d. Chama OpenAI com stream: true
+   e. Proxeia o stream SSE para o cliente
+   f. Ao final, envia evento com fontes consultadas
+   g. Registra uso em ai_usage
+5. Frontend:
+   a. Le stream token por token, atualiza mensagem em tempo real
+   b. Recebe fontes no evento final
+   c. Exibe bloco "Fontes consultadas" abaixo da resposta
+```
+
+---
 
 ## Secao Tecnica
 
 ### Arquivos a modificar:
-1. `supabase/functions/ai-chat/index.ts` — migrar de Gateway para OpenAI direta
-2. `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx` — documentacao
-3. `src/components/guia-projeto/integracoes/IASection.tsx` — titulo/descricao
-4. `src/components/guia-projeto/ResumoProjetoTab.tsx` — tecnologias e resumo
-5. `src/components/guia-projeto/ImplementacaoTab.tsx` — secrets, consolidacao, fases
 
-### Padrao de autenticacao OpenAI (reutilizar de process-document):
-A chave OpenAI sera obtida da tabela `platform_config` (key: `integration_openai`), descriptografada com `ENCRYPTION_KEY` usando AES-256-GCM. Este padrao ja esta implementado e testado no `process-document`.
+1. **`supabase/functions/ai-chat/index.ts`**
+   - Na branch de streaming (linhas 490-498): interceptar o stream da OpenAI para:
+     - Proxeiar tokens normalmente
+     - Coletar `usage` do ultimo chunk (OpenAI envia usage no ultimo evento quando `stream_options: { include_usage: true }`)
+     - Apos o stream, enviar evento SSE customizado com `sources` (docs + Q&A usados)
+     - Registrar `ai_usage` apos o stream terminar
+   - Adicionar `stream_options: { include_usage: true }` no body enviado a OpenAI
+   - No response nao-streaming (linhas 524-535): adicionar campo `sources` ao JSON
+
+2. **`src/components/painel/ai/AgentTestDialog.tsx`**
+   - Reescrever `sendMessage()` para usar `fetch()` com streaming SSE
+   - Corrigir payload para formato `ChatRequest` (`isp_id`, `isp_agent_id`, `messages`, `stream`)
+   - Adicionar parser SSE linha por linha com tratamento de `[DONE]` e evento `sources`
+   - Estender interface `Message` com campo `sources`
+   - Adicionar componente de fontes (Collapsible) abaixo de cada mensagem do assistente
+   - Importar `Collapsible` do Radix UI
+
+### Dependencias:
+- `@radix-ui/react-collapsible` -- ja instalado no projeto
 
 ### Sem alteracao de banco:
 - Nenhuma migracao necessaria
-- A tabela `platform_config` e a funcao `getOpenAIKey()` ja existem
+- Todas as tabelas e funcoes RPC ja existem
 
-### Prerequisito:
-- A chave OpenAI deve estar configurada no painel Admin (integracao OpenAI) antes de usar os agentes de IA
+### Pre-requisitos para testar:
+- `OPENAI_API_KEY` configurada no painel Admin (integracao OpenAI)
+- `ENCRYPTION_KEY` configurada como secret do Supabase
+- Template do agente com `uses_knowledge_base = true`
+- Pelo menos 1 item de Q&A ou 1 documento indexado na base de conhecimento do agente
