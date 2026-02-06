@@ -73,8 +73,8 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
         (c.login && c.login.toLowerCase().includes(s));
       if (!match) return false;
     }
-    if (status && c.status_contrato !== status) return false;
-    if (provider && c.provider !== provider) return false;
+    if (status && status !== "all" && c.status_contrato !== status) return false;
+    if (provider && provider !== "all" && c.provider !== provider) return false;
     return true;
   });
 
