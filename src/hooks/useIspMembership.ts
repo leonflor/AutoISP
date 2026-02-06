@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { IspMemberRole } from '@/types/database';
@@ -34,6 +34,7 @@ export function useIspMembership(): UseIspMembershipReturn {
   const [membership, setMembership] = useState<IspMembership | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const membershipRef = useRef<IspMembership | null>(null);
 
   useEffect(() => {
     async function fetchMembership() {
@@ -41,12 +42,13 @@ export function useIspMembership(): UseIspMembershipReturn {
       
       if (!user) {
         setMembership(null);
+        membershipRef.current = null;
         setLoading(false);
         return;
       }
 
       try {
-        setLoading(true);
+        if (!membershipRef.current) setLoading(true);
         setError(null);
 
         const { data, error: fetchError } = await supabase
@@ -67,20 +69,24 @@ export function useIspMembership(): UseIspMembershipReturn {
           if (fetchError.code === 'PGRST116') {
             // No membership found
             setMembership(null);
+            membershipRef.current = null;
           } else {
             throw fetchError;
           }
         } else if (data) {
           const typedData = data as unknown as IspUserWithIsp;
           if (typedData.isps && typedData.isps.status === 'ativo') {
-            setMembership({
+            const m: IspMembership = {
               ispId: typedData.isps.id,
               ispName: typedData.isps.name,
               ispSlug: typedData.isps.slug,
               role: typedData.role as IspMemberRole,
-            });
+            };
+            setMembership(m);
+            membershipRef.current = m;
           } else {
             setMembership(null);
+            membershipRef.current = null;
           }
         }
       } catch (err) {
