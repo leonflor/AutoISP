@@ -1,40 +1,31 @@
 
 
-# Corrigir Contagem de Tokens Usados no Mes
+# Corrigir Rota de Validacao do SGP para `/api/ura/clientes`
 
 ## Problema
 
-O hook `useIspAiUsage.ts` usa o nome de campo `total_tokens` nas linhas 76 e 90, mas a coluna real na tabela `ai_usage` chama-se `tokens_total`. Isso faz com que o `reduce` sempre some `0`, resultando em "0 tokens usados este mes".
+As Edge Functions `save-erp-config` e `test-erp` usam a rota `/api/clientes` para validar a conexao com o SGP, mas a rota correta e `/api/ura/clientes`.
 
-## Solucao
+## Alteracoes
 
-Corrigir as duas referencias no arquivo `src/hooks/painel/useIspAiUsage.ts`:
+### 1. `supabase/functions/save-erp-config/index.ts`
 
-- **Linha 76**: `u.total_tokens` para `u.tokens_total`
-- **Linha 90**: `u.total_tokens` para `u.tokens_total`
+Na funcao `testSgpConnection`, alterar a URL de teste:
 
-## Secao Tecnica
-
-### Arquivo a modificar:
-`src/hooks/painel/useIspAiUsage.ts`
-
-### Alteracoes (2 linhas):
-
-Linha 76:
 ```text
 // De:
-const totalTokens = typedUsageData.reduce((sum: number, u: any) => sum + (u.total_tokens || 0), 0);
+const testUrl = `${baseUrl}/api/clientes`;
 // Para:
-const totalTokens = typedUsageData.reduce((sum: number, u: any) => sum + (u.tokens_total || 0), 0);
+const testUrl = `${baseUrl}/api/ura/clientes`;
 ```
 
-Linha 90:
-```text
-// De:
-tokens: current.tokens + (u.total_tokens || 0),
-// Para:
-tokens: current.tokens + (u.tokens_total || 0),
-```
+### 2. `supabase/functions/test-erp/index.ts`
 
-Sem impacto no backend. Sem novas dependencias. Sem migracao.
+Na funcao que testa SGP, aplicar a mesma correcao:
+- Adicionar normalizacao de URL (remover `/api` duplicado, como ja feito em `save-erp-config`)
+- Alterar a rota de `/api/clientes` para `/api/ura/clientes`
+
+### Requer redeploy das duas Edge Functions
+
+Sem alteracao de banco. Sem novas dependencias.
 
