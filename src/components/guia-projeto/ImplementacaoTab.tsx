@@ -34,7 +34,7 @@ const ImplementacaoTab = () => {
     { aspecto: "Backend", decisao: "Lovable Cloud (Supabase gerenciado)" },
     { aspecto: "Rodadas por Fase", decisao: "Máximo 15" },
     { aspecto: "Seeds", decisao: "Mínimos (usuário master + dados essenciais)" },
-    { aspecto: "Integrações", decisao: "Core primeiro (Asaas → Lovable AI Gateway → WhatsApp)" },
+    { aspecto: "Integrações", decisao: "Core primeiro (Asaas → OpenAI → WhatsApp)" },
     { aspecto: "Ambiente Dev", decisao: "Lovable Cloud (automático)" },
     { aspecto: "Ordem Plataformas", decisao: "Admin primeiro → Cliente → Landing" },
     { aspecto: "Complexidade IA", decisao: "Sistema multi-agente (Atendente, Cobrador, Vendedor, Analista, Suporte)" },
@@ -52,7 +52,7 @@ const ImplementacaoTab = () => {
   ];
 
   const secrets = [
-    { nome: "LOVABLE_API_KEY", fase: "F2", descricao: "Auto-provisionado pelo Lovable Cloud (IA Gateway)" },
+    { nome: "OPENAI_API_KEY", fase: "F2", descricao: "Criptografada em platform_config, configurada via painel Admin → Integrações" },
     { nome: "ENCRYPTION_KEY", fase: "F1", descricao: "Chave para criptografia de dados sensíveis do ERP" },
     { nome: "WHATSAPP_APP_SECRET", fase: "F2", descricao: "Segredo para validação de webhooks do Meta" },
     { nome: "ASAAS_API_KEY", fase: "F2", descricao: "Chave da API Asaas (a configurar)" },
@@ -359,12 +359,12 @@ const ImplementacaoTab = () => {
                     <li>Criar edge function asaas-create-customer</li>
                     <li>Criar edge function asaas-create-subscription</li>
                     <li>Criar edge function asaas-webhook (recebe eventos)</li>
-                    <li>LOVABLE_API_KEY já auto-provisionado pelo Cloud</li>
-                    <li>Criar edge function ai-chat (multi-agente) usando Lovable AI Gateway</li>
+                    <li>Configurar OPENAI_API_KEY via painel Admin → Integrações</li>
+                    <li>Criar edge function ai-chat usando OpenAI API</li>
                     <li>Criar edge function ai-usage (registro de consumo)</li>
                     <li>Criar estrutura WhatsApp (webhook + validação)</li>
                     <li>Testar integração Asaas sandbox</li>
-                    <li>Testar Lovable AI Gateway com prompts básicos</li>
+                    <li>Testar OpenAI API com prompts básicos</li>
                   </ol>
                 </div>
 
@@ -377,11 +377,11 @@ const ImplementacaoTab = () => {
                       { r: 3, desc: "asaas-create-subscription" },
                       { r: 4, desc: "asaas-webhook" },
                       { r: 5, desc: "Lógica webhook → banco" },
-                      { r: 6, desc: "Lovable AI Gateway + ai-chat" },
+                      { r: 6, desc: "OpenAI API + ai-chat" },
                       { r: 7, desc: "ai-usage" },
                       { r: 8, desc: "whatsapp-webhook + validação" },
                       { r: 9, desc: "Testar Asaas sandbox" },
-                      { r: 10, desc: "Testar AI Gateway" },
+                      { r: 10, desc: "Testar OpenAI API" },
                     ].map((item) => (
                       <div key={item.r} className="rounded border border-border bg-muted/20 p-2 text-xs">
                         <span className="font-mono font-bold text-primary">R{item.r}:</span>{" "}

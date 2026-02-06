@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,9 +58,64 @@ interface DocumentChunk {
   similarity: number;
 }
 
-// Generate embedding for query
+interface OpenAIConfigValue {
+  api_key_encrypted?: string;
+  encryption_iv?: string;
+  default_model?: string;
+  masked_key?: string;
+  configured?: boolean;
+}
+
+// ============= ENCRYPTION HELPERS =============
+async function deriveKey(masterKey: string): Promise<CryptoKey> {
+  const keyMaterial = new TextEncoder().encode(masterKey);
+  const keyData = keyMaterial.slice(0, 32);
+  return await crypto.subtle.importKey("raw", keyData, "AES-GCM", false, ["decrypt"]);
+}
+
+async function decrypt(ciphertext: string, iv: string, masterKey: string): Promise<string> {
+  const key = await deriveKey(masterKey);
+  const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+  const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivBytes }, key, ciphertextBytes);
+  return new TextDecoder().decode(decrypted);
+}
+
+// Get OpenAI API key from platform config (encrypted)
+async function getOpenAIKey(supabaseAdmin: SupabaseClient): Promise<string> {
+  const masterKey = Deno.env.get("ENCRYPTION_KEY");
+  if (!masterKey) {
+    throw new Error("ENCRYPTION_KEY not configured");
+  }
+
+  const { data: config, error } = await supabaseAdmin
+    .from("platform_config")
+    .select("value")
+    .eq("key", "integration_openai")
+    .single();
+
+  if (error || !config) {
+    console.error("Failed to fetch OpenAI config:", error);
+    throw new Error("OpenAI config not found");
+  }
+
+  const value = config.value as OpenAIConfigValue;
+  
+  if (!value?.api_key_encrypted || !value?.encryption_iv) {
+    throw new Error("OpenAI not configured. Configure via admin panel.");
+  }
+
+  try {
+    return await decrypt(value.api_key_encrypted, value.encryption_iv, masterKey);
+  } catch (decryptError) {
+    console.error("Failed to decrypt OpenAI key:", decryptError);
+    throw new Error("Failed to decrypt OpenAI key");
+  }
+}
+
+// Generate embedding for RAG query using OpenAI API
 async function generateQueryEmbedding(query: string, apiKey: string): Promise<number[]> {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+  const response = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -151,21 +206,6 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Check API key (Lovable AI Gateway)
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
-  if (!LOVABLE_API_KEY) {
-    console.warn("⚠️ LOVABLE_API_KEY not configured - AI feature disabled");
-    return new Response(
-      JSON.stringify({
-        error: "SERVICE_NOT_CONFIGURED",
-        message: "Gateway de IA não configurado. A LOVABLE_API_KEY deve ser provisionada automaticamente.",
-        docs: "https://docs.lovable.dev/features/ai-gateway"
-      }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
   // Validate JWT
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -208,6 +248,21 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get OpenAI API key from platform_config (encrypted)
+    let openAIKey: string;
+    try {
+      openAIKey = await getOpenAIKey(supabaseAdmin);
+    } catch (keyError) {
+      console.warn("⚠️ OpenAI API key not configured:", keyError);
+      return new Response(
+        JSON.stringify({
+          error: "SERVICE_NOT_CONFIGURED",
+          message: "Integração OpenAI não configurada. Configure a chave da API no painel Admin → Configurações → Integrações.",
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Verify user belongs to ISP
     const { data: membership } = await supabaseAdmin
@@ -312,9 +367,9 @@ Deno.serve(async (req) => {
       
       // RAG: Search document chunks if available
       const lastUserMessage = body.messages.filter(m => m.role === "user").pop();
-      if (lastUserMessage && LOVABLE_API_KEY) {
+      if (lastUserMessage) {
         try {
-          const queryEmbedding = await generateQueryEmbedding(lastUserMessage.content, LOVABLE_API_KEY);
+          const queryEmbedding = await generateQueryEmbedding(lastUserMessage.content, openAIKey);
           
           if (queryEmbedding.length > 0) {
             const { data: chunks } = await supabaseAdmin.rpc("match_document_chunks", {
@@ -395,23 +450,20 @@ Deno.serve(async (req) => {
       ...body.messages
     ];
 
-    // Map model name for Lovable AI Gateway
+    // Map model name to OpenAI model
     const modelMap: Record<string, string> = {
-      "gpt-4o": "openai/gpt-4o",
-      "gpt-4o-mini": "openai/gpt-4o-mini",
-      "gemini-flash": "google/gemini-2.5-flash-preview",
-      "gemini-pro": "google/gemini-2.5-pro-preview",
-      "claude-sonnet": "anthropic/claude-sonnet-4"
+      "gpt-4o": "gpt-4o",
+      "gpt-4o-mini": "gpt-4o-mini",
     };
 
-    const model = modelMap[template.model || "gemini-flash"] || "google/gemini-2.5-flash-preview";
+    const model = modelMap[template.model || "gpt-4o-mini"] || "gpt-4o-mini";
 
-    // Call Lovable AI Gateway
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Call OpenAI API directly
+    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`
+        "Authorization": `Bearer ${openAIKey}`
       },
       body: JSON.stringify({
         model,
@@ -424,10 +476,10 @@ Deno.serve(async (req) => {
 
     if (!aiResponse.ok) {
       const errorData = await aiResponse.json();
-      console.error("❌ AI Gateway error:", errorData);
+      console.error("❌ OpenAI API error:", errorData);
       return new Response(
         JSON.stringify({ 
-          error: "AI Gateway error", 
+          error: "OpenAI API error", 
           message: errorData.error?.message || "Erro ao processar requisição de IA"
         }),
         { status: aiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -453,7 +505,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ AI response generated, tokens: ${tokensUsed}`);
 
-    // Log usage with correct column names
+    // Log usage
     await supabaseAdmin.from("ai_usage").insert({
       isp_id: body.isp_id,
       agent_id: template.id,

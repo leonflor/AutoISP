@@ -33,7 +33,7 @@ const ResumoProjetoTab = () => {
   ];
 
   const tecnologias = [
-    { nome: "Lovable AI Gateway", icon: Bot, categoria: "IA Multi-Modelo" },
+    { nome: "OpenAI", icon: Bot, categoria: "IA (GPT-4o)" },
     { nome: "Asaas", icon: CreditCard, categoria: "Pagamentos" },
     { nome: "Resend", icon: Mail, categoria: "Email" },
     { nome: "Supabase Storage", icon: Database, categoria: "Arquivos" },
@@ -338,7 +338,7 @@ const ResumoProjetoTab = () => {
         <CardContent>
           <p className="text-muted-foreground">
             O <strong className="text-foreground">AutoISP</strong> é uma plataforma SaaS de automação inteligente para provedores de internet brasileiros, 
-            combinando agentes de IA multi-modelo (via Lovable AI Gateway), integração com ERPs e sistemas de monitoramento para oferecer atendimento 24h, 
+            combinando agentes de IA (via OpenAI API — GPT-4o/GPT-4o-mini), integração com ERPs e sistemas de monitoramento para oferecer atendimento 24h, 
             automação de cobranças e suporte técnico proativo. Com conformidade LGPD, sistema RBAC granular, arquitetura de agentes em 3 camadas 
             e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
           </p>
