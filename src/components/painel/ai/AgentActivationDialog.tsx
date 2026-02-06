@@ -35,7 +35,7 @@ import type { CatalogTemplate, AgentActivationForm, KnowledgeItem } from "@/hook
 import type { VoiceTone, EscalationOptions } from "@/components/admin/ai-agents/constants";
 
 const activationSchema = z.object({
-  display_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  display_name: z.string().optional(),
   avatar_url: z.string().url("URL inválida").or(z.literal("")).optional(),
   voice_tone: z.string().optional(),
   escalation_config: z.object({
