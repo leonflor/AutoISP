@@ -198,7 +198,7 @@ async function testSgpConnection(
       baseUrl = baseUrl.slice(0, -4);
     }
     
-    const testUrl = `${baseUrl}/api/clientes`;
+    const testUrl = `${baseUrl}/api/ura/clientes`;
     console.log(`[SGP] Testing connection to: ${testUrl}`);
 
     const response = await fetch(testUrl, {

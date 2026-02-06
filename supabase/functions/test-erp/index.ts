@@ -195,9 +195,16 @@ async function testSgpConnection(
   token: string
 ): Promise<TestResult> {
   try {
-    console.log(`[SGP] Testing connection to: ${apiUrl}`);
+    // Normalize URL - remove trailing slash and /api if present
+    let baseUrl = apiUrl.replace(/\/+$/, '');
+    if (baseUrl.endsWith('/api')) {
+      baseUrl = baseUrl.slice(0, -4);
+    }
+    
+    const testUrl = `${baseUrl}/api/ura/clientes`;
+    console.log(`[SGP] Testing connection to: ${testUrl}`);
 
-    const response = await fetch(`${apiUrl}/api/clientes`, {
+    const response = await fetch(testUrl, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
