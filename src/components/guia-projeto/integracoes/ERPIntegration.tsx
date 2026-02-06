@@ -26,7 +26,8 @@ import {
   Users,
   FileText,
   Settings,
-  Layers
+  Layers,
+  ExternalLink
 } from "lucide-react";
 
 const ERPIntegration = () => {
@@ -91,7 +92,13 @@ const ERPIntegration = () => {
                     <TableCell className="font-medium">SGP (Sistema Gerencial de Provedores)</TableCell>
                     <TableCell>Brasil (Nordeste/Norte)</TableCell>
                     <TableCell><Badge variant="outline">REST</Badge></TableCell>
-                    <TableCell><Badge className="bg-green-500/10 text-green-600">Disponível</Badge></TableCell>
+                    <TableCell>
+                      <a href="https://bookstack.sgp.net.br/books" target="_blank" rel="noopener noreferrer">
+                        <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 cursor-pointer gap-1">
+                          Docs API <ExternalLink className="h-3 w-3" />
+                        </Badge>
+                      </a>
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-medium">IXC Soft</TableCell>
