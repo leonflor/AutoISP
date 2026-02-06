@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Zap } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Send, Bot, User, Loader2, Zap, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,16 +20,24 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useIspMembership } from "@/hooks/useIspMembership";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
 import type { IspAgentWithTemplate } from "@/hooks/painel/useIspAgents";
+
+interface SourcesPayload {
+  documents: { content: string; similarity: number; document_title?: string }[];
+  knowledge: { question: string; category?: string }[];
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  sources?: SourcesPayload;
 }
 
 const agentTypeLabels: Record<string, string> = {
@@ -47,6 +55,55 @@ interface AgentTestDialogProps {
   initialAgentId?: string;
 }
 
+function SourcesBlock({ sources }: { sources: SourcesPayload }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const hasDocuments = sources.documents.length > 0;
+  const hasKnowledge = sources.knowledge.length > 0;
+
+  if (!hasDocuments && !hasKnowledge) return null;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-1">
+      <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <FileText className="h-3 w-3" />
+        <span>{sources.documents.length + sources.knowledge.length} fonte(s) consultada(s)</span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 space-y-2">
+        {hasDocuments && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Documentos:</p>
+            {sources.documents.map((doc, i) => (
+              <div key={i} className="rounded border border-border bg-background/50 p-2 text-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium truncate">{doc.document_title || `Trecho ${i + 1}`}</span>
+                  <Badge variant="outline" className="text-[10px] ml-2 shrink-0">
+                    {(doc.similarity * 100).toFixed(0)}%
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground line-clamp-2">{doc.content}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {hasKnowledge && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Q&A Base:</p>
+            {sources.knowledge.map((item, i) => (
+              <div key={i} className="rounded border border-border bg-background/50 p-2 text-xs">
+                <span className="font-medium">{item.question}</span>
+                {item.category && (
+                  <Badge variant="secondary" className="text-[10px] ml-2">{item.category}</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function AgentTestDialog({
   agents,
   open,
@@ -62,10 +119,10 @@ export function AgentTestDialog({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Initialize selected agent when dialog opens
   useEffect(() => {
     if (open) {
       if (initialAgentId && agents.find((a) => a.id === initialAgentId)) {
@@ -76,7 +133,6 @@ export function AgentTestDialog({
     }
   }, [open, initialAgentId, agents]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -89,6 +145,7 @@ export function AgentTestDialog({
   const avatarUrl = currentAgent?.avatar_url || template?.avatar_url;
 
   const handleAgentChange = (newAgentId: string) => {
+    abortRef.current?.abort();
     setSelectedAgentId(newAgentId);
     setMessages([]);
     setTokensUsed(0);
@@ -97,7 +154,7 @@ export function AgentTestDialog({
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      // Clear everything when closing
+      abortRef.current?.abort();
       setMessages([]);
       setInputMessage("");
       setTokensUsed(0);
@@ -106,7 +163,7 @@ export function AgentTestDialog({
     onOpenChange(newOpen);
   };
 
-  const sendMessage = async () => {
+  const sendMessage = useCallback(async () => {
     if (!inputMessage.trim() || !selectedAgentId || !currentAgent || !membership?.ispId || !user) return;
 
     const userMessage: Message = {
@@ -115,45 +172,149 @@ export function AgentTestDialog({
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInputMessage("");
     setIsLoading(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      const { data, error } = await supabase.functions.invoke("ai-chat", {
-        body: {
-          message: userMessage.content,
-          agentId: template?.id,
-          ispAgentId: currentAgent.id,
-          ispId: membership.ispId,
-          conversationHistory: messages.slice(-10).map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        },
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão expirada. Faça login novamente.");
 
-      if (error) throw error;
+      const chatUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.response,
-        timestamp: new Date(),
+      const payload = {
+        isp_id: membership.ispId,
+        isp_agent_id: currentAgent.id,
+        messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
+        stream: true,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
-      setTokensUsed((prev) => prev + (data.tokensUsed || 0));
+      const resp = await fetch(chatUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        const msg = errorData.message || errorData.error || `Erro ${resp.status}`;
+        throw new Error(msg);
+      }
+
+      if (!resp.body) throw new Error("Sem corpo na resposta");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = "";
+      let messageSources: SourcesPayload | undefined;
+      let textBuffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+
+            // Check if this is the sources event
+            if (parsed.sources) {
+              messageSources = parsed.sources;
+              continue;
+            }
+
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === "assistant") {
+                  return prev.map((m, i) =>
+                    i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                  );
+                }
+                return [...prev, { role: "assistant", content: assistantContent, timestamp: new Date() }];
+              });
+            }
+          } catch {
+            // Partial JSON, put back
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+
+      // Final flush
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split("\n")) {
+          if (!raw) continue;
+          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+          if (raw.startsWith(":") || raw.trim() === "") continue;
+          if (!raw.startsWith("data: ")) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.sources) {
+              messageSources = parsed.sources;
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      // Attach sources to the final assistant message
+      if (messageSources) {
+        setMessages(prev =>
+          prev.map((m, i) =>
+            i === prev.length - 1 && m.role === "assistant"
+              ? { ...m, sources: messageSources }
+              : m
+          )
+        );
+      }
     } catch (error: any) {
+      if (error.name === "AbortError") return;
       console.error("Error sending message:", error);
       toast({
         variant: "destructive",
         title: "Erro ao enviar mensagem",
         description: error.message || "Tente novamente em instantes.",
       });
+      // Remove the empty assistant message if streaming failed before content
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && !last.content) {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
     } finally {
       setIsLoading(false);
+      abortRef.current = null;
     }
-  };
+  }, [inputMessage, selectedAgentId, currentAgent, membership?.ispId, user, messages, toast]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -245,29 +406,40 @@ export function AgentTestDialog({
                   </Avatar>
                 )}
 
-                <Card
-                  className={`max-w-[80%] ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                >
-                  <CardContent className="p-3">
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <span
-                      className={`text-xs mt-1 block ${
-                        message.role === "user"
-                          ? "text-primary-foreground/70"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {message.timestamp.toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </CardContent>
-                </Card>
+                <div className="max-w-[80%]">
+                  <Card
+                    className={
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }
+                  >
+                    <CardContent className="p-3">
+                      {message.role === "assistant" ? (
+                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      )}
+                      <span
+                        className={`text-xs mt-1 block ${
+                          message.role === "user"
+                            ? "text-primary-foreground/70"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {message.timestamp.toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </CardContent>
+                  </Card>
+                  {message.role === "assistant" && message.sources && (
+                    <SourcesBlock sources={message.sources} />
+                  )}
+                </div>
 
                 {message.role === "user" && (
                   <Avatar className="h-8 w-8 flex-shrink-0">
@@ -279,7 +451,7 @@ export function AgentTestDialog({
               </div>
             ))}
 
-            {isLoading && (
+            {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
               <div className="flex gap-3">
                 <Avatar className="h-8 w-8 flex-shrink-0">
                   <AvatarImage src={avatarUrl || undefined} />

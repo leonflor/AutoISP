@@ -56,6 +56,12 @@ interface KnowledgeItem {
 interface DocumentChunk {
   content: string;
   similarity: number;
+  document_title?: string;
+}
+
+interface SourcesPayload {
+  documents: { content: string; similarity: number; document_title?: string }[];
+  knowledge: { question: string; category?: string }[];
 }
 
 interface OpenAIConfigValue {
@@ -380,9 +386,10 @@ Deno.serve(async (req) => {
             });
             
             if (chunks && chunks.length > 0) {
-              documentChunks = chunks.map((c: { content: string; similarity: number }) => ({
+              documentChunks = chunks.map((c: { content: string; similarity: number; document_title?: string }) => ({
                 content: c.content,
-                similarity: c.similarity
+                similarity: c.similarity,
+                document_title: c.document_title || undefined,
               }));
             }
           }
@@ -470,7 +477,8 @@ Deno.serve(async (req) => {
         messages,
         temperature: template.temperature || 0.7,
         max_tokens: template.max_tokens || 1000,
-        stream: body.stream || false
+        stream: body.stream || false,
+        ...(body.stream ? { stream_options: { include_usage: true } } : {})
       })
     });
 
@@ -486,9 +494,105 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Build sources payload
+    const sources: SourcesPayload = {
+      documents: documentChunks.map(d => ({
+        content: d.content.slice(0, 200),
+        similarity: d.similarity,
+        document_title: d.document_title,
+      })),
+      knowledge: knowledgeBase.map(k => ({
+        question: k.question,
+        category: k.category || undefined,
+      })),
+    };
+
     // Handle streaming response
     if (body.stream) {
-      return new Response(aiResponse.body, {
+      const openaiBody = aiResponse.body;
+      if (!openaiBody) {
+        return new Response(JSON.stringify({ error: "No stream body" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const reader = openaiBody.getReader();
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+
+      let totalTokens = 0;
+      let promptTokens = 0;
+      let completionTokens = 0;
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            let buffer = "";
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith(":")) continue;
+                if (!trimmed.startsWith("data: ")) continue;
+
+                const jsonStr = trimmed.slice(6);
+                if (jsonStr === "[DONE]") continue;
+
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  // Collect usage from the last chunk
+                  if (parsed.usage) {
+                    totalTokens = parsed.usage.total_tokens || 0;
+                    promptTokens = parsed.usage.prompt_tokens || 0;
+                    completionTokens = parsed.usage.completion_tokens || 0;
+                  }
+                } catch { /* partial JSON, just forward */ }
+
+                // Forward the line as-is
+                controller.enqueue(encoder.encode(trimmed + "\n\n"));
+              }
+            }
+
+            // Send sources event before DONE
+            const sourcesEvent = `data: ${JSON.stringify({ sources })}\n\n`;
+            controller.enqueue(encoder.encode(sourcesEvent));
+
+            // Send DONE
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+
+            // Log usage async
+            supabaseAdmin.from("ai_usage").insert({
+              isp_id: body.isp_id,
+              agent_id: template.id,
+              user_id: userId,
+              tokens_total: totalTokens,
+              tokens_input: promptTokens,
+              tokens_output: completionTokens,
+              metadata: {
+                model,
+                isp_agent_id: ispAgent.id,
+                knowledge_items: knowledgeBase.length,
+                document_chunks: documentChunks.length,
+                security_clauses: securityClauses?.length || 0
+              }
+            }).then(() => {
+              console.log(`✅ Streaming usage logged: ${totalTokens} tokens`);
+            });
+          } catch (err) {
+            console.error("Stream error:", err);
+            controller.error(err);
+          }
+        }
+      });
+
+      return new Response(stream, {
         headers: {
           ...corsHeaders,
           "Content-Type": "text/event-stream",
@@ -525,6 +629,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: assistantMessage,
+        sources,
         usage: {
           tokens_used: tokensUsed,
           prompt_tokens: aiData.usage?.prompt_tokens || 0,
