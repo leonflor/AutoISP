@@ -73,7 +73,7 @@ export function useIspAiUsage(): UseIspAiUsageReturn {
       const typedUsageData = usageData || [];
 
       // Calculate totals
-      const totalTokens = typedUsageData.reduce((sum: number, u: any) => sum + (u.total_tokens || 0), 0);
+      const totalTokens = typedUsageData.reduce((sum: number, u: any) => sum + (u.tokens_total || 0), 0);
       const totalRequests = typedUsageData.length;
       const costUsd = typedUsageData.reduce((sum: number, u: any) => sum + (u.cost_usd || 0), 0);
 
@@ -87,7 +87,7 @@ export function useIspAiUsage(): UseIspAiUsageReturn {
       typedUsageData.forEach((u: any) => {
         const current = agentUsage.get(u.agent_id) || { tokens: 0, requests: 0 };
         agentUsage.set(u.agent_id, {
-          tokens: current.tokens + (u.total_tokens || 0),
+          tokens: current.tokens + (u.tokens_total || 0),
           requests: current.requests + 1,
         });
       });
