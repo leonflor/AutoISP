@@ -29,7 +29,8 @@ export function ActiveAgentCard({
   const navigate = useNavigate();
   const template = agent.ai_agents;
   const IconComponent = agentIcons[template.type] || Bot;
-  const displayName = agent.display_name || template.name;
+  const templateName = template.name;
+  const presentationName = agent.display_name || null;
   const avatarUrl = agent.avatar_url || template.avatar_url;
   
   // Verificar se o template foi desativado pelo admin
@@ -76,13 +77,16 @@ export function ActiveAgentCard({
       <CardHeader>
         <div className="flex items-center gap-3">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={avatarUrl || undefined} alt={displayName} />
+            <AvatarImage src={avatarUrl || undefined} alt={templateName} />
             <AvatarFallback className="bg-primary/10">
               <IconComponent className="h-6 w-6 text-primary" />
             </AvatarFallback>
           </Avatar>
           <div>
-            <CardTitle className="text-lg">{displayName}</CardTitle>
+            <CardTitle className="text-lg">{templateName}</CardTitle>
+            {presentationName && (
+              <p className="text-xs text-muted-foreground">Apresenta-se como: <span className="font-medium text-foreground">{presentationName}</span></p>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline" className="text-xs">
                 {agentTypeLabels[template.type] || template.type}

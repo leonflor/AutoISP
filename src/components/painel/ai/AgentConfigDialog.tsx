@@ -29,7 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import type { IspAgentWithTemplate } from "@/hooks/painel/useIspAgents";
 
 const configSchema = z.object({
-  display_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  display_name: z.string().optional(),
   avatar_url: z.string().url("URL inválida").or(z.literal("")).optional(),
   is_enabled: z.boolean(),
 });
@@ -120,18 +120,20 @@ export function AgentConfigDialog({
               />
             </div>
 
+            {/* Nome do Template (somente leitura) */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Template</Label>
+              <p className="text-sm font-medium text-foreground">{template.name}</p>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="display_name">Nome de Exibição</Label>
+              <Label htmlFor="display_name">Nome de Apresentação (opcional)</Label>
+              <p className="text-xs text-muted-foreground">Como o agente se apresentará aos seus clientes. Se vazio, usará o nome do template.</p>
               <Input
                 id="display_name"
-                placeholder="Ex: Atendente Virtual"
+                placeholder={template.name}
                 {...form.register("display_name")}
               />
-              {form.formState.errors.display_name && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.display_name.message}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">

@@ -35,7 +35,7 @@ import type { CatalogTemplate, AgentActivationForm, KnowledgeItem } from "@/hook
 import type { VoiceTone, EscalationOptions } from "@/components/admin/ai-agents/constants";
 
 const activationSchema = z.object({
-  display_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  display_name: z.string().optional(),
   avatar_url: z.string().url("URL inválida").or(z.literal("")).optional(),
   voice_tone: z.string().optional(),
   escalation_config: z.object({
@@ -119,7 +119,7 @@ export function AgentActivationDialog({
   const form = useForm<AgentActivationForm>({
     resolver: zodResolver(activationSchema),
     defaultValues: {
-      display_name: agent?.name || "",
+      display_name: "",
       avatar_url: "",
       voice_tone: voiceTones[0]?.id || "",
       escalation_config: {
@@ -137,7 +137,7 @@ export function AgentActivationDialog({
         ?.map(t => t.id) || [];
       
       form.reset({
-        display_name: agent.name,
+        display_name: "",
         avatar_url: "",
         voice_tone: voiceTones[0]?.id || "",
         escalation_config: {
@@ -200,6 +200,7 @@ export function AgentActivationDialog({
   const submitActivation = (data: AgentActivationForm) => {
     onActivate({
       ...data,
+      display_name: data.display_name?.trim() || "",
       knowledge_items: parsedItems.length > 0 ? parsedItems : undefined,
       knowledge_import_mode: parsedItems.length > 0 ? importMode : undefined,
     });
@@ -234,18 +235,20 @@ export function AgentActivationDialog({
               <div className="space-y-4 px-1">
                 {/* Configuração */}
                 <div className="space-y-4">
+                  {/* Nome do Template (somente leitura) */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Template</Label>
+                    <p className="text-sm font-medium text-foreground">{agent.name}</p>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="display_name">Nome de Exibição</Label>
+                    <Label htmlFor="display_name">Nome de Apresentação (opcional)</Label>
+                    <p className="text-xs text-muted-foreground">Como o agente se apresentará aos seus clientes. Se vazio, usará o nome do template.</p>
                     <Input
                       id="display_name"
-                      placeholder="Ex: Atendente Virtual"
+                      placeholder={agent.name}
                       {...form.register("display_name")}
                     />
-                    {form.formState.errors.display_name && (
-                      <p className="text-sm text-destructive">
-                        {form.formState.errors.display_name.message}
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-2">
