@@ -1,4 +1,7 @@
-import { FileText, Trash2, RefreshCw, FileWarning, Database, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { FileText, Trash2, RefreshCw, FileWarning, Database, AlertCircle, Download, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -65,6 +68,35 @@ export function DocumentsTable({
   isDeleting,
   isReprocessing,
 }: DocumentsTableProps) {
+  const { toast } = useToast();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = async (doc: KnowledgeDocument) => {
+    if (!doc.storage_path) return;
+    setDownloadingId(doc.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("knowledge-docs")
+        .download(doc.storage_path);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.original_filename || doc.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao baixar",
+        description: err.message || "Não foi possível baixar o arquivo.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -170,6 +202,23 @@ export function DocumentsTable({
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDownload(doc)}
+                        disabled={downloadingId === doc.id || !doc.storage_path}
+                      >
+                        {downloadingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Baixar arquivo</TooltipContent>
+                  </Tooltip>
                   {doc.status === "error" && (
                     <Tooltip>
                       <TooltipTrigger asChild>

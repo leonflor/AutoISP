@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, MoreHorizontal, Pencil, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Search, MoreHorizontal, Pencil, Trash2, CheckCircle, XCircle, Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -33,6 +33,7 @@ interface KnowledgeBaseTableProps {
   knowledge: KnowledgeBase[] | undefined;
   categories: string[] | undefined;
   isLoading: boolean;
+  onView: (item: KnowledgeBase) => void;
   onEdit: (item: KnowledgeBase) => void;
   onDelete: (id: string) => void;
 }
@@ -41,6 +42,7 @@ export function KnowledgeBaseTable({
   knowledge,
   categories,
   isLoading,
+  onView,
   onEdit,
   onDelete,
 }: KnowledgeBaseTableProps) {
@@ -156,6 +158,10 @@ export function KnowledgeBaseTable({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onView(item)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Visualizar
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit(item)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Editar

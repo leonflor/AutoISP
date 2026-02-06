@@ -12,6 +12,7 @@ import { useAgentKnowledge, KnowledgeBaseForm as KnowledgeFormType } from "@/hoo
 import { useDocumentKnowledge, useDocumentLimits } from "@/hooks/painel/useDocumentKnowledge";
 import { KnowledgeBaseTable } from "@/components/painel/ai/KnowledgeBaseTable";
 import { KnowledgeBaseForm } from "@/components/painel/ai/KnowledgeBaseForm";
+import { KnowledgeBaseViewDialog } from "@/components/painel/ai/KnowledgeBaseViewDialog";
 import { KnowledgeBaseImport } from "@/components/painel/ai/KnowledgeBaseImport";
 import { DocumentUpload } from "@/components/painel/ai/DocumentUpload";
 import { DocumentsTable } from "@/components/painel/ai/DocumentsTable";
@@ -28,6 +29,7 @@ const AiAgentKnowledgePage = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<KnowledgeBase | null>(null);
+  const [viewingItem, setViewingItem] = useState<KnowledgeBase | null>(null);
   const [activeTab, setActiveTab] = useState("qa");
 
   // Fetch agent details
@@ -275,6 +277,7 @@ const AiAgentKnowledgePage = () => {
                 knowledge={knowledge}
                 categories={categories}
                 isLoading={knowledgeLoading}
+                onView={setViewingItem}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />
@@ -380,6 +383,17 @@ const AiAgentKnowledgePage = () => {
         }}
         onSave={handleSave}
         isLoading={createKnowledge.isPending || updateKnowledge.isPending}
+      />
+
+      {/* View Dialog */}
+      <KnowledgeBaseViewDialog
+        item={viewingItem}
+        open={!!viewingItem}
+        onOpenChange={(open) => { if (!open) setViewingItem(null); }}
+        onEdit={(item) => {
+          setViewingItem(null);
+          handleEdit(item);
+        }}
       />
 
       {/* Import Dialog */}
