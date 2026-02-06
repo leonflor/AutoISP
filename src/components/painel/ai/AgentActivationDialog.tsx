@@ -200,6 +200,7 @@ export function AgentActivationDialog({
   const submitActivation = (data: AgentActivationForm) => {
     onActivate({
       ...data,
+      display_name: data.display_name?.trim() || "",
       knowledge_items: parsedItems.length > 0 ? parsedItems : undefined,
       knowledge_import_mode: parsedItems.length > 0 ? importMode : undefined,
     });

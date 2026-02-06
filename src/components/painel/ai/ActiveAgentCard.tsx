@@ -83,7 +83,10 @@ export function ActiveAgentCard({
             </AvatarFallback>
           </Avatar>
           <div>
-            <CardTitle className="text-lg">{displayName}</CardTitle>
+            <CardTitle className="text-lg">{templateName}</CardTitle>
+            {presentationName && (
+              <p className="text-xs text-muted-foreground">Apresenta-se como: <span className="font-medium text-foreground">{presentationName}</span></p>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline" className="text-xs">
                 {agentTypeLabels[template.type] || template.type}
