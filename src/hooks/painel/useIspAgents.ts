@@ -142,7 +142,7 @@ export function useIspAgents() {
         .insert({
           isp_id: membership!.ispId,
           agent_id: data.agentId,
-          display_name: data.form.display_name,
+          display_name: data.form.display_name?.trim() || null,
           avatar_url: data.form.avatar_url || null,
           voice_tone: data.form.voice_tone || null,
           escalation_config: data.form.escalation_config || null,
