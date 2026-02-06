@@ -29,7 +29,8 @@ export function ActiveAgentCard({
   const navigate = useNavigate();
   const template = agent.ai_agents;
   const IconComponent = agentIcons[template.type] || Bot;
-  const displayName = agent.display_name || template.name;
+  const templateName = template.name;
+  const presentationName = agent.display_name || null;
   const avatarUrl = agent.avatar_url || template.avatar_url;
   
   // Verificar se o template foi desativado pelo admin
