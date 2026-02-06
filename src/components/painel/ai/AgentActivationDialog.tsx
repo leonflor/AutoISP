@@ -119,7 +119,7 @@ export function AgentActivationDialog({
   const form = useForm<AgentActivationForm>({
     resolver: zodResolver(activationSchema),
     defaultValues: {
-      display_name: agent?.name || "",
+      display_name: "",
       avatar_url: "",
       voice_tone: voiceTones[0]?.id || "",
       escalation_config: {
