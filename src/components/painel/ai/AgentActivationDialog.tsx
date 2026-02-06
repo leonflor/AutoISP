@@ -234,18 +234,20 @@ export function AgentActivationDialog({
               <div className="space-y-4 px-1">
                 {/* Configuração */}
                 <div className="space-y-4">
+                  {/* Nome do Template (somente leitura) */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Template</Label>
+                    <p className="text-sm font-medium text-foreground">{agent.name}</p>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="display_name">Nome de Exibição</Label>
+                    <Label htmlFor="display_name">Nome de Apresentação (opcional)</Label>
+                    <p className="text-xs text-muted-foreground">Como o agente se apresentará aos seus clientes. Se vazio, usará o nome do template.</p>
                     <Input
                       id="display_name"
-                      placeholder="Ex: Atendente Virtual"
+                      placeholder={agent.name}
                       {...form.register("display_name")}
                     />
-                    {form.formState.errors.display_name && (
-                      <p className="text-sm text-destructive">
-                        {form.formState.errors.display_name.message}
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-2">
