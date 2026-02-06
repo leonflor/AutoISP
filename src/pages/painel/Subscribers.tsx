@@ -32,8 +32,8 @@ const providerLabels: Record<string, string> = {
 
 export default function SubscribersPage() {
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [provider, setProvider] = useState('');
+  const [status, setStatus] = useState('all');
+  const [provider, setProvider] = useState('all');
   const [page, setPage] = useState(1);
   const { toast } = useToast();
 
@@ -137,7 +137,7 @@ export default function SubscribersPage() {
                 <SelectValue placeholder="Todas integrações" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="ixc">IXC Soft</SelectItem>
                 <SelectItem value="sgp">SGP</SelectItem>
                 <SelectItem value="mk_solutions">MK-Solutions</SelectItem>
@@ -148,7 +148,7 @@ export default function SubscribersPage() {
                 <SelectValue placeholder="Todos os status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="suspenso">Suspensos</SelectItem>
                 <SelectItem value="bloqueado">Bloqueados</SelectItem>
@@ -172,7 +172,7 @@ export default function SubscribersPage() {
                 Tentar novamente
               </Button>
             </div>
-          ) : clients.length === 0 && !search && !status && !provider ? (
+          ) : clients.length === 0 && !search && status === 'all' && provider === 'all' ? (
             <div className="text-center py-12">
               <Database className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <h3 className="font-medium mb-1">Nenhum cliente encontrado</h3>
