@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -69,7 +69,8 @@ function SourcesBlock({ sources }: { sources: SourcesPayload }) {
         <FileText className="h-3 w-3" />
         <span>{sources.documents.length + sources.knowledge.length} fonte(s) consultada(s)</span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2 space-y-2">
+      <CollapsibleContent className="mt-2">
+        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
         {hasDocuments && (
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground">Documentos:</p>
@@ -99,6 +100,7 @@ function SourcesBlock({ sources }: { sources: SourcesPayload }) {
             ))}
           </div>
         )}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -367,7 +369,7 @@ export function AgentTestDialog({
         </div>
 
         {/* Messages Area */}
-        <ScrollArea className="flex-1 py-4 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto py-4">
           <div className="space-y-4 pr-4">
             {messages.length === 0 && currentAgent && (
               <Card className="bg-muted/50 border-dashed">
@@ -472,7 +474,7 @@ export function AgentTestDialog({
             )}
             <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Input Area */}
         <div className="flex-shrink-0 pt-4 border-t">
