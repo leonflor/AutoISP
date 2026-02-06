@@ -42,17 +42,17 @@ const OpenAIIntegration = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <CardTitle className="text-xl">INT-02 — Lovable AI Gateway</CardTitle>
+                <CardTitle className="text-xl">INT-02 — OpenAI API</CardTitle>
                 <Badge variant="destructive" className="text-xs">Crítica</Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Motor de IA Multi-Modelo para Agentes Inteligentes dos ISPs
+                Motor de IA (GPT-4o / GPT-4o-mini) para Agentes Inteligentes dos ISPs
               </p>
             </div>
           </div>
           <div className="flex gap-2">
             <a 
-              href="https://docs.lovable.dev/features/ai" 
+              href="https://platform.openai.com/docs" 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
@@ -76,8 +76,8 @@ const OpenAIIntegration = () => {
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <h4 className="mb-2 text-sm font-medium text-foreground">Gateway:</h4>
-                    <Badge variant="secondary" className="text-sm">Lovable AI Gateway (multi-modelo)</Badge>
+                    <h4 className="mb-2 text-sm font-medium text-foreground">API:</h4>
+                    <Badge variant="secondary" className="text-sm">OpenAI API (GPT-4o / GPT-4o-mini)</Badge>
                   </div>
                   <div>
                     <h4 className="mb-2 text-sm font-medium text-foreground">Arquitetura:</h4>
@@ -89,9 +89,6 @@ const OpenAIIntegration = () => {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">GPT-4o</Badge>
                     <Badge variant="secondary">GPT-4o-mini</Badge>
-                    <Badge variant="secondary">Gemini 2.5 Flash</Badge>
-                    <Badge variant="secondary">Gemini 2.5 Pro</Badge>
-                    <Badge variant="outline">+ outros via Gateway</Badge>
                   </div>
                 </div>
                 <div>
@@ -182,7 +179,7 @@ const OpenAIIntegration = () => {
                     <li>Edge Function busca contexto (assinante, histórico, config agente)</li>
                     <li><strong>RAG:</strong> Gera embedding da pergunta → busca docs similares (pgvector)</li>
                     <li>Monta prompt hierárquico (template + tom + RAG + Q&A + segurança)</li>
-                    <li><strong>Chat:</strong> POST ai.gateway.lovable.dev/v1/chat/completions (streaming + tools)</li>
+                    <li><strong>Chat:</strong> POST api.openai.com/v1/chat/completions (streaming + tools)</li>
                     <li><strong>Function Call:</strong> Se IA chamar function → executa ação no ERP</li>
                     <li>Retorna resultado da function para IA continuar</li>
                     <li><strong>Streaming:</strong> Tokens são enviados gradualmente ao usuário</li>
@@ -191,7 +188,7 @@ const OpenAIIntegration = () => {
                 <div className="rounded-lg bg-yellow-500/10 p-4">
                   <h4 className="mb-2 text-sm font-medium text-yellow-600">Fallback — API Indisponível:</h4>
                   <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
-                    <li>Edge Function detecta falha (timeout, 5xx, 429, 402)</li>
+                    <li>Edge Function detecta falha (timeout, 5xx, 429)</li>
                     <li>Registra falha no banco</li>
                     <li>Envia mensagem: "Sistema instável, aguarde..."</li>
                     <li>Notifica Admin do SaaS (email/webhook)</li>
@@ -225,20 +222,37 @@ const OpenAIIntegration = () => {
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="font-mono text-xs">LOVABLE_API_KEY</TableCell>
-                        <TableCell className="text-sm">Chave do Lovable AI Gateway</TableCell>
+                        <TableCell className="font-mono text-xs">OPENAI_API_KEY</TableCell>
+                        <TableCell className="text-sm">Chave da API OpenAI</TableCell>
                         <TableCell className="text-sm">
-                          <Badge variant="outline" className="border-emerald-500/50 text-emerald-600 text-xs">Auto-provisionado</Badge>
+                          <Badge variant="outline" className="border-amber-500/50 text-amber-600 text-xs">
+                            Painel Admin → Integrações → OpenAI
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-xs">ENCRYPTION_KEY</TableCell>
+                        <TableCell className="text-sm">Chave mestra para criptografia AES-256-GCM</TableCell>
+                        <TableCell className="text-sm">
+                          <Badge variant="outline" className="border-emerald-500/50 text-emerald-600 text-xs">
+                            Supabase Secret
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
+                  <div className="mt-3 rounded-lg bg-muted/50 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      A chave OpenAI é armazenada criptografada (AES-256-GCM) na tabela <code>platform_config</code> (key: <code>integration_openai</code>). 
+                      A descriptografia é feita em runtime nas Edge Functions usando a <code>ENCRYPTION_KEY</code>.
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <h4 className="mb-3 text-sm font-medium">Endpoint</h4>
                   <div className="rounded-lg bg-muted/50 p-3">
-                    <code className="text-xs">https://ai.gateway.lovable.dev/v1/chat/completions</code>
-                    <p className="mt-1 text-xs text-muted-foreground">API compatível com OpenAI — aceita mesmo formato de payloads</p>
+                    <code className="text-xs">https://api.openai.com/v1/chat/completions</code>
+                    <p className="mt-1 text-xs text-muted-foreground">API OpenAI direta — chat completions com streaming e function calling</p>
                   </div>
                 </div>
                 <div>
@@ -407,7 +421,7 @@ const OpenAIIntegration = () => {
                 <div className="rounded-lg bg-muted/50 p-4">
                   <h4 className="mb-2 text-sm font-medium">Proteção de Secrets</h4>
                   <p className="text-sm text-muted-foreground">
-                    LOVABLE_API_KEY auto-provisionado, nunca exposto no frontend
+                    OPENAI_API_KEY criptografada (AES-256-GCM) em platform_config, nunca exposta no frontend
                   </p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-4">
@@ -419,7 +433,7 @@ const OpenAIIntegration = () => {
                 <div className="rounded-lg bg-muted/50 p-4">
                   <h4 className="mb-2 text-sm font-medium">Rate Limits</h4>
                   <p className="text-sm text-muted-foreground">
-                    Controle por tenant + tratamento de 429/402 do Gateway
+                    Controle por tenant + tratamento de 429 da OpenAI
                   </p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-4">
@@ -465,23 +479,23 @@ const OpenAIIntegration = () => {
                   <TableBody>
                     <TableRow>
                       <TableCell><Badge variant="destructive">401</Badge></TableCell>
-                      <TableCell className="text-sm">LOVABLE_API_KEY inválida</TableCell>
-                      <TableCell className="text-sm">Verificar provisionamento no Lovable Cloud</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell><Badge variant="destructive">402</Badge></TableCell>
-                      <TableCell className="text-sm">Créditos insuficientes</TableCell>
-                      <TableCell className="text-sm">Adicionar créditos em Settings → Workspace → Usage</TableCell>
+                      <TableCell className="text-sm">OPENAI_API_KEY inválida ou não configurada</TableCell>
+                      <TableCell className="text-sm">Verificar configuração no painel Admin → Integrações → OpenAI</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell><Badge variant="destructive">429</Badge></TableCell>
-                      <TableCell className="text-sm">Rate limit excedido</TableCell>
+                      <TableCell className="text-sm">Rate limit excedido na OpenAI</TableCell>
                       <TableCell className="text-sm">Implementar backoff + exibir mensagem ao usuário</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell><Badge variant="destructive">500/503</Badge></TableCell>
-                      <TableCell className="text-sm">Gateway instável</TableCell>
+                      <TableCell className="text-sm">API OpenAI instável</TableCell>
                       <TableCell className="text-sm">Ativar fallback + notificar admin</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell><Badge variant="secondary">503</Badge></TableCell>
+                      <TableCell className="text-sm">Integração OpenAI não configurada</TableCell>
+                      <TableCell className="text-sm">Configurar chave no painel Admin → Integrações</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell><Badge variant="secondary">Incoerente</Badge></TableCell>
@@ -512,15 +526,15 @@ const OpenAIIntegration = () => {
                 <div>
                   <h4 className="mb-2 text-sm font-medium">Request — Chat com Streaming + Functions + RAG:</h4>
                   <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-xs">
-{`POST https://ai.gateway.lovable.dev/v1/chat/completions
+{`POST https://api.openai.com/v1/chat/completions
 
 Headers:
-Authorization: Bearer $LOVABLE_API_KEY
+Authorization: Bearer $OPENAI_API_KEY
 Content-Type: application/json
 
 Body:
 {
-  "model": "google/gemini-2.5-flash",
+  "model": "gpt-4o-mini",
   "messages": [
     {
       "role": "system",
@@ -567,14 +581,14 @@ data: [DONE]`}
                 <div className="rounded-lg bg-muted/50 p-4">
                   <h4 className="mb-2 text-sm font-medium">Modelo de Custo:</h4>
                   <p className="text-sm text-muted-foreground">
-                    Via Lovable AI Gateway — pricing baseado em uso (requests). Inclui uso gratuito mensal.
-                    Créditos adicionais podem ser adquiridos em Settings → Workspace → Usage.
+                    Cobrança direta pela OpenAI — pay-per-use baseado em tokens consumidos.
+                    GPT-4o-mini: ~$0.15/1M input tokens | GPT-4o: ~$2.50/1M input tokens.
                   </p>
                 </div>
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                   <p className="text-sm text-amber-600">
-                    <strong>Dica:</strong> Use modelos mais leves (Gemini Flash, GPT-4o-mini) para atendimentos simples
-                    e reserve modelos maiores (GPT-4o, Gemini Pro) para análises complexas.
+                    <strong>Dica:</strong> Use GPT-4o-mini para atendimentos simples (mais rápido e barato)
+                    e reserve GPT-4o para análises complexas que exigem maior raciocínio.
                   </p>
                 </div>
               </div>
