@@ -1,201 +1,103 @@
 
 
-# Injecao de Prompt: Fluxos + Tools nos Agentes de IA
+# Pendencias da Implementacao de Tools + Fluxos
 
-## Como funciona a injecao hoje
+## Bugs criticos encontrados
 
-O `ai-chat/index.ts` monta o system prompt em camadas via `buildSystemPrompt()`:
+### 1. Streaming quebrado no `ai-chat/index.ts`
+O bloco de streaming (linhas 734-826) referencia a variavel `aiResponse` que esta fora do escopo do loop -- ela so existe dentro do `for`. Apos o loop, o codigo tenta ler `aiResponse.body` mas essa variavel nao esta acessivel. O correto e **re-chamar a OpenAI com `stream: true`** usando as `messages` ja enriquecidas (com resultados de tool calls), ou usar o `finalResponse` ja obtido.
 
-```text
-1. System prompt base (do template ai_agents)
-2. Tom de voz (do isp_agent)
-3. Documentos RAG (chunks por similaridade)
-4. Perguntas frequentes (knowledge base)
-5. Clausulas de seguranca
-6. Contexto atual (nome ISP, data, agente)
-```
+### 2. Resposta nao-streaming duplicada
+O bloco nao-streaming (linhas 828-831) faz `await aiResponse.json()` novamente, mas o body ja foi consumido no loop. Deve usar `finalResponse` que ja contem os dados parseados.
 
-O plano adiciona **duas novas camadas** entre a 5 e a 6: **Tools disponiveis** e **Fluxos ativos**.
+### 3. `fetch-erp-clients/index.ts` nao foi refatorado
+O plano previa refatorar este arquivo para importar de `_shared/erp-fetcher.ts`, eliminando a duplicacao. A logica ainda esta 100% duplicada.
 
 ---
 
-## Modelo de dados
+## Itens pendentes (nao-bugs)
 
-Tres novas tabelas, todas vinculadas ao template (`ai_agents`):
+### 4. Seed de dados (tools e fluxos padrao)
+A migracao criou as tabelas mas nao inseriu dados de exemplo (seed). O plano previa criar:
+- Tool: `buscar_contrato_cliente` (handler: `erp_search`)
+- Fluxo: Cobranca (5 etapas)
+- Fluxo: Suporte Tecnico (4 etapas)
+- Fluxo: Venda/Upgrade (4 etapas)
 
-### `ai_agent_tools`
-Cada registro vira uma funcao no `tools[]` da API OpenAI.
+Esses seeds dependem do `id` de um agente existente, entao serao inseridos condicionalmente (ou via SQL com subquery).
 
-| Campo chave | Exemplo |
-|---|---|
-| name | `buscar_contrato_cliente` |
-| description | "Busca contrato no ERP por nome ou CPF" |
-| parameters_schema | `{ type: "object", properties: { busca: { type: "string" } }, required: ["busca"] }` |
-| handler_type | `erp_search` |
-| requires_erp | true |
-
-### `ai_agent_flows`
-Define fluxos conversacionais que o agente pode seguir.
-
-| Campo chave | Exemplo |
-|---|---|
-| name | "Cobranca" |
-| trigger_keywords | `["fatura", "boleto", "debito"]` |
-| trigger_prompt | "Ative quando o usuario mencionar problemas financeiros" |
-| is_fixed | true (roteiro) ou false (guia flexivel) |
-
-### `ai_agent_flow_steps`
-Etapas de cada fluxo, com referencia opcional a uma tool.
-
-| Campo chave | Exemplo |
-|---|---|
-| step_order | 1 |
-| name | "Identificar cliente" |
-| instruction | "Peca o CPF ou nome completo" |
-| tool_id | NULL (nao usa tool) ou FK para `buscar_contrato_cliente` |
-| condition_to_advance | "Quando o cliente informar o CPF" |
+### 5. Deploy das edge functions
+As funcoes `ai-chat` e `fetch-erp-clients` (e as novas shared files) precisam ser deployadas apos as correcoes.
 
 ---
 
-## Exemplo concreto da injecao no system prompt
+## Plano de execucao
 
-Apos carregar tools e flows do banco, o `buildSystemPrompt` adicionara algo como:
+### Etapa 1 -- Corrigir streaming e nao-streaming no `ai-chat/index.ts`
 
-```text
-## Ferramentas Disponiveis
-Voce tem acesso as seguintes funcoes. Use-as quando necessario:
-- buscar_contrato_cliente: Busca contrato no ERP por nome ou CPF
-- consultar_faturas: Lista faturas abertas de um cliente
+**Streaming:** Apos o tool call loop, se `body.stream = true`, fazer uma nova chamada a OpenAI com `stream: true` usando as `messages` finais (que ja incluem resultados de tools). Transmitir essa stream via SSE.
 
-## Fluxos Conversacionais
+**Nao-streaming:** Substituir `await aiResponse.json()` por `finalResponse` (que ja foi parseado no loop).
 
-### Fluxo: Cobranca (roteiro fixo)
-Ative quando: fatura, boleto, debito, pagamento, cobranca
-Siga as etapas na ordem. Nao pule etapas.
+Resumo das alteracoes no `ai-chat/index.ts`:
+- Remover referencia a `aiResponse` fora do loop
+- Para streaming: re-chamar OpenAI com `stream: true` e `messages` finais
+- Para nao-streaming: usar `finalResponse` diretamente para extrair `message.content` e `usage`
 
-1. IDENTIFICAR CLIENTE
-   Instrucao: Peca o CPF ou nome completo do cliente.
-   Avance quando: O cliente informar o dado.
+### Etapa 2 -- Refatorar `fetch-erp-clients/index.ts`
 
-2. BUSCAR CONTRATO
-   Instrucao: Use a funcao buscar_contrato_cliente com o dado informado.
-   Ferramenta: buscar_contrato_cliente
-   Avance quando: Os dados do contrato forem retornados.
+- Remover as funcoes `decrypt`, `fetchIxcClients`, `fetchSgpClients`, `fetchMkClients` duplicadas
+- Importar de `../_shared/erp-fetcher.ts`
+- Manter a mesma interface HTTP (sem breaking change)
 
-3. LISTAR FATURAS
-   Instrucao: Use consultar_faturas para verificar debitos em aberto.
-   Ferramenta: consultar_faturas
-   Avance quando: As faturas forem listadas.
+### Etapa 3 -- Seed de dados (migracao SQL)
 
-4. NEGOCIAR
-   Instrucao: Apresente as faturas e ofereca opcoes de pagamento.
-   Avance quando: O cliente escolher uma opcao.
+Inserir condicionalmente tools e fluxos de exemplo vinculados ao primeiro agente do tipo `atendente`:
 
-5. ENCERRAR
-   Instrucao: Confirme o acordo e encerre o atendimento.
+- 1 tool: `buscar_contrato_cliente` com `handler_type = 'erp_search'` e `requires_erp = true`
+- 3 fluxos (Cobranca, Suporte Tecnico, Venda) com etapas, vinculando a tool onde aplicavel
 
-### Fluxo: Atendimento Geral (guia flexivel)
-Ative quando: nenhum outro fluxo se aplicar.
-Use as etapas como guia, adaptando conforme a conversa.
-...
-```
+### Etapa 4 -- Deploy das edge functions
+
+Deployar `ai-chat` e `fetch-erp-clients` para aplicar as correcoes.
 
 ---
 
-## Fluxo de execucao no ai-chat
+## Detalhes tecnicos
 
-### Passo 1 -- Carregar dados
+### Correcao do streaming (Etapa 1)
 
-Apos carregar o template e clausulas de seguranca (como ja faz), adicionar:
-
-```text
-// Buscar tools ativas do agente
-SELECT * FROM ai_agent_tools WHERE agent_id = $templateId AND is_active = true
-
-// Buscar flows ativos com steps
-SELECT f.*, 
-  (SELECT json_agg(s ORDER BY s.step_order) FROM ai_agent_flow_steps s WHERE s.flow_id = f.id AND s.is_active = true) as steps
-FROM ai_agent_flows f
-WHERE f.agent_id = $templateId AND f.is_active = true
-ORDER BY f.sort_order
-```
-
-### Passo 2 -- Filtrar tools condicionais
-
-Se uma tool tem `requires_erp = true`, verificar se o ISP tem `erp_configs` com `is_active = true`. Se nao tiver, remover a tool da lista e remover etapas de fluxo que dependem dela.
-
-### Passo 3 -- Injetar no system prompt
-
-Adicionar a `buildSystemPrompt` dois novos parametros: `tools` e `flows`. Gerar as secoes de texto mostradas acima.
-
-### Passo 4 -- Registrar tools na chamada OpenAI
-
-Converter cada registro de `ai_agent_tools` para o formato OpenAI:
+A logica correta e:
 
 ```text
-tools: [
-  {
-    type: "function",
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters_schema  // ja esta no formato correto
-    }
-  }
-]
+// Apos o tool call loop:
+if (body.stream) {
+  // Re-chamar OpenAI com stream: true e as messages finais (com tool results)
+  const streamResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { ... },
+    body: JSON.stringify({
+      model, messages, temperature, max_tokens,
+      stream: true,
+      stream_options: { include_usage: true }
+      // SEM tools -- tool calls ja foram resolvidos
+    })
+  });
+  // Transmitir streamResponse.body via SSE (codigo existente funciona)
+} else {
+  // Usar finalResponse diretamente
+  const assistantMessage = finalResponse.choices?.[0]?.message?.content || "";
+  const tokensUsed = finalResponse.usage?.total_tokens || 0;
+  // ... resto igual
+}
 ```
 
-### Passo 5 -- Tool call loop (max 3 iteracoes)
+### Refatoracao do `fetch-erp-clients` (Etapa 2)
 
 ```text
-loop (max 3x):
-  resposta = chamar OpenAI(messages, tools)
-  
-  se resposta.tool_calls:
-    para cada tool_call:
-      handler = registry[tool.handler_type]
-      resultado = handler.execute(args, config)
-      messages.push({ role: "assistant", tool_calls: [...] })
-      messages.push({ role: "tool", tool_call_id, content: JSON.stringify(resultado) })
-    continuar loop
-  
-  senao:
-    retornar resposta final (streaming ou nao)
+// Antes: ~200 linhas com funcoes duplicadas
+// Depois: ~80 linhas importando de _shared
+import { decrypt, fetchIxcClients, fetchSgpClients, fetchMkClients } from "../_shared/erp-fetcher.ts";
+// ... manter apenas o Deno.serve() com a logica de orquestracao
 ```
-
-### Passo 6 -- Streaming com tool calls
-
-Quando `stream = true` e houver tool calls intermediarios:
-- As chamadas de tool sao executadas internamente (sem streaming parcial)
-- Somente a resposta final e transmitida via SSE ao cliente
-- Isso significa: primeira chamada sem stream, processar tools, ultima chamada com stream
-
----
-
-## Alteracoes nos arquivos
-
-| Arquivo | O que muda |
-|---|---|
-| **Migracao SQL** | Criar `ai_agent_tools`, `ai_agent_flows`, `ai_agent_flow_steps` com RLS + triggers + seed (fluxos Cobranca, Suporte, Venda) |
-| **`_shared/erp-fetcher.ts`** | Novo: extrair logica ERP de `fetch-erp-clients` + funcao `searchErpClient` |
-| **`_shared/tool-handlers.ts`** | Novo: registry de handlers (`erp_search` inicialmente) |
-| **`ai-chat/index.ts`** | Carregar tools/flows do banco, injetar no prompt, montar array `tools` para OpenAI, implementar tool call loop |
-| **`fetch-erp-clients/index.ts`** | Refatorar para usar `_shared/erp-fetcher.ts` |
-| **`AgentTemplateForm.tsx`** | Adicionar abas "Tools" e "Fluxos" |
-| **`AgentToolsTab.tsx`** | Novo: lista/CRUD de tools do agente |
-| **`AgentToolForm.tsx`** | Novo: formulario de tool (nome, schema, handler) |
-| **`AgentFlowsTab.tsx`** | Novo: lista de fluxos do agente |
-| **`AgentFlowForm.tsx`** | Novo: formulario de fluxo (nome, triggers, tipo) |
-| **`AgentFlowStepsEditor.tsx`** | Novo: editor de etapas com reordenacao e selecao de tool |
-| **`useAgentTools.ts`** | Novo: hook CRUD tools |
-| **`useAgentFlows.ts`** | Novo: hook CRUD flows + steps |
-
----
-
-## Seguranca
-
-- O LLM recebe os fluxos como texto no prompt -- ele interpreta e segue. Nao ha maquina de estados no backend (o LLM e a maquina de estados).
-- Tools executam no backend via handlers registrados. O LLM nunca acessa dados diretamente.
-- O `handler_config` nunca contem credenciais (essas vem de `erp_configs` ou `platform_config`).
-- RLS: somente `super_admin` gerencia tools, flows e steps.
 
