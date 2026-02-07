@@ -53,12 +53,6 @@ export function ActiveAgentCard({
       )}
 
       <div className={`absolute ${isTemplateInactive ? 'top-9' : 'top-2'} right-2 flex items-center gap-2`}>
-        {template.is_premium && (
-          <Badge variant="secondary" className="gap-1">
-            <Zap className="h-3 w-3" />
-            Premium
-          </Badge>
-        )}
         <Badge variant={agent.is_enabled ? "default" : "secondary"} className="gap-1">
           {agent.is_enabled ? (
             <>

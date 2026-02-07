@@ -68,14 +68,13 @@ type AiAgentScope = 'tenant' | 'platform';
 interface UseAiAgentTemplatesOptions {
   scope?: AiAgentScope;
   isActive?: boolean;
-  isPremium?: boolean;
 }
 
 export function useAiAgentTemplates(options: UseAiAgentTemplatesOptions = {}) {
-  const { scope, isActive, isPremium } = options;
+  const { scope, isActive } = options;
 
   return useQuery({
-    queryKey: ['ai-agent-templates', scope, isActive, isPremium],
+    queryKey: ['ai-agent-templates', scope, isActive],
     queryFn: async () => {
       let query = supabase
         .from('ai_agents')
@@ -89,10 +88,6 @@ export function useAiAgentTemplates(options: UseAiAgentTemplatesOptions = {}) {
 
       if (isActive !== undefined) {
         query = query.eq('is_active', isActive);
-      }
-
-      if (isPremium !== undefined) {
-        query = query.eq('is_premium', isPremium);
       }
 
       const { data, error } = await query;

@@ -353,9 +353,6 @@ export function AgentTestDialog({
                       </AvatarFallback>
                     </Avatar>
                     <span>{agent.display_name || agent.ai_agents.name}</span>
-                    {agent.ai_agents.is_premium && (
-                      <Badge variant="secondary" className="text-xs ml-1">Pro</Badge>
-                    )}
                   </div>
                 </SelectItem>
               ))}

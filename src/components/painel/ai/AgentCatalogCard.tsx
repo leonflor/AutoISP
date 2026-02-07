@@ -40,14 +40,6 @@ export function AgentCatalogCard({
           : "hover:shadow-lg hover:border-primary/50"
       }`}
     >
-      {agent.is_premium && (
-        <div className="absolute top-2 right-2">
-          <Badge variant="secondary" className="gap-1">
-            <Zap className="h-3 w-3" />
-            Premium
-          </Badge>
-        </div>
-      )}
 
       <CardHeader>
         <div className="flex items-center gap-3">
