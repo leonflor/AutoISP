@@ -47,6 +47,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FeatureTagsSelector } from './FeatureTagsSelector';
 import { PersonalizationTab } from './PersonalizationTab';
+import { AgentToolsTab } from './AgentToolsTab';
+import { AgentFlowsTab } from './AgentFlowsTab';
 import { TemplateAvatarUpload } from './TemplateAvatarUpload';
 import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS, DEFAULT_VOICE_TONES, DEFAULT_ESCALATION_OPTIONS } from './constants';
 import type { AiAgent } from '@/hooks/admin/useAiAgentTemplates';
@@ -227,11 +229,13 @@ export function AgentTemplateForm({
             <ScrollArea className="flex-1 px-6 pr-4">
               <div className="pb-4">
                 <Tabs defaultValue="basic" className="w-full overflow-hidden">
-                <TabsList className="grid w-full grid-cols-4 mb-4">
+                <TabsList className="grid w-full grid-cols-6 mb-4">
                   <TabsTrigger value="basic">Básico</TabsTrigger>
                   <TabsTrigger value="ai">Config IA</TabsTrigger>
                   <TabsTrigger value="features">Features</TabsTrigger>
                   <TabsTrigger value="personalization" disabled={scope === 'platform'}>Personalização</TabsTrigger>
+                  <TabsTrigger value="tools" disabled={!agent}>Tools</TabsTrigger>
+                  <TabsTrigger value="flows" disabled={!agent}>Fluxos</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4 mt-0 overflow-hidden">
@@ -556,6 +560,22 @@ export function AgentTemplateForm({
 
                 <TabsContent value="personalization" className="space-y-4 mt-0 overflow-hidden">
                   <PersonalizationTab form={form} scope={scope as 'tenant' | 'platform'} />
+                </TabsContent>
+
+                <TabsContent value="tools" className="space-y-4 mt-0 overflow-hidden">
+                  {agent ? (
+                    <AgentToolsTab agentId={agent.id} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Salve o agente primeiro para configurar tools.</p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="flows" className="space-y-4 mt-0 overflow-hidden">
+                  {agent ? (
+                    <AgentFlowsTab agentId={agent.id} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Salve o agente primeiro para configurar fluxos.</p>
+                  )}
                 </TabsContent>
                 </Tabs>
               </div>

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { executeToolHandler, type ToolExecutionContext } from "../_shared/tool-handlers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -143,6 +144,37 @@ async function generateQueryEmbedding(query: string, apiKey: string): Promise<nu
   return data.data[0].embedding;
 }
 
+// Interfaces for tools and flows
+interface AgentToolRecord {
+  id: string;
+  name: string;
+  description: string;
+  parameters_schema: Record<string, unknown>;
+  handler_type: string;
+  handler_config: Record<string, unknown> | null;
+  requires_erp: boolean;
+}
+
+interface FlowStepRecord {
+  name: string;
+  instruction: string;
+  expected_input: string | null;
+  tool_id: string | null;
+  tool_auto_execute: boolean;
+  condition_to_advance: string | null;
+}
+
+interface AgentFlowRecord {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  trigger_keywords: string[];
+  trigger_prompt: string | null;
+  is_fixed: boolean;
+  steps: FlowStepRecord[];
+}
+
 // Build the final system prompt with all layers
 function buildSystemPrompt(
   template: IspAgentWithTemplate["ai_agents"],
@@ -150,7 +182,9 @@ function buildSystemPrompt(
   securityClauses: SecurityClause[],
   knowledgeBase: KnowledgeItem[],
   documentChunks: DocumentChunk[],
-  ispName: string
+  ispName: string,
+  agentTools: AgentToolRecord[],
+  agentFlows: AgentFlowRecord[]
 ): string {
   const parts: string[] = [];
 
@@ -189,6 +223,43 @@ function buildSystemPrompt(
       .join("\n");
     
     parts.push(`\n## REGRAS OBRIGATÓRIAS DE SEGURANÇA\nVocê DEVE seguir estas regras em todas as interações:\n${clausesText}`);
+  }
+
+  // 5.5 Tools section
+  if (agentTools.length > 0) {
+    const toolsList = agentTools
+      .map((t) => `- ${t.name}: ${t.description}`)
+      .join("\n");
+    parts.push(`\n## Ferramentas Disponíveis\nVocê tem acesso às seguintes funções. Use-as quando necessário:\n${toolsList}`);
+  }
+
+  // 5.6 Flows section
+  if (agentFlows.length > 0) {
+    const flowsSections = agentFlows.map((flow) => {
+      const typeLabel = flow.is_fixed ? "roteiro fixo" : "guia flexível";
+      const triggerLine = flow.trigger_keywords.length > 0
+        ? `Ative quando: ${flow.trigger_keywords.join(", ")}`
+        : flow.trigger_prompt || "";
+      
+      const stepsText = flow.steps.map((step, i) => {
+        let line = `${i + 1}. ${step.name.toUpperCase()}\n   Instrução: ${step.instruction}`;
+        if (step.tool_id) {
+          const tool = agentTools.find(t => t.id === step.tool_id);
+          if (tool) line += `\n   Ferramenta: ${tool.name}`;
+        }
+        if (step.expected_input) line += `\n   Input esperado: ${step.expected_input}`;
+        if (step.condition_to_advance) line += `\n   Avance quando: ${step.condition_to_advance}`;
+        return line;
+      }).join("\n\n");
+
+      const instructions = flow.is_fixed
+        ? "Siga as etapas na ordem. Não pule etapas."
+        : "Use as etapas como guia, adaptando conforme a conversa.";
+
+      return `### Fluxo: ${flow.name} (${typeLabel})\n${triggerLine}\n${instructions}\n\n${stepsText}`;
+    }).join("\n\n");
+
+    parts.push(`\n## Fluxos Conversacionais\n\n${flowsSections}`);
   }
 
   // 6. Context anchoring (prevent cross-tenant data leakage)
@@ -430,7 +501,7 @@ Deno.serve(async (req) => {
           return new Response(
             JSON.stringify({ 
               error: "Limit exceeded", 
-              message: `Limite mensal de ${limits.monthly_limit.toLocaleString()} tokens atingido. Contate o suporte para aumentar.`,
+              message: `Limite mensal de ${limits.monthly_limit.toLocaleString()} tokens atingido.`,
               usage: { current: totalTokens, limit: limits.monthly_limit }
             }),
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -439,20 +510,91 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build complete system prompt with all layers (hybrid RAG)
+    // ── Load tools and flows for this agent ──
+    let agentTools: AgentToolRecord[] = [];
+    let agentFlows: AgentFlowRecord[] = [];
+
+    // Fetch active tools
+    const { data: toolsData } = await supabaseAdmin
+      .from("ai_agent_tools")
+      .select("id, name, description, parameters_schema, handler_type, handler_config, requires_erp")
+      .eq("agent_id", template.id)
+      .eq("is_active", true)
+      .order("sort_order");
+
+    // Check if ISP has active ERP (for conditional tools)
+    let hasActiveErp = false;
+    if (toolsData && toolsData.some((t: any) => t.requires_erp)) {
+      const { data: erpConfig } = await supabaseAdmin
+        .from("erp_configs")
+        .select("id")
+        .eq("isp_id", body.isp_id)
+        .eq("is_active", true)
+        .eq("is_connected", true)
+        .limit(1)
+        .single();
+      hasActiveErp = !!erpConfig;
+    }
+
+    agentTools = ((toolsData || []) as any[])
+      .filter((t) => !t.requires_erp || hasActiveErp)
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        parameters_schema: t.parameters_schema,
+        handler_type: t.handler_type,
+        handler_config: t.handler_config,
+        requires_erp: t.requires_erp,
+      }));
+
+    // Fetch active flows with steps
+    const { data: flowsData } = await supabaseAdmin
+      .from("ai_agent_flows")
+      .select("id, name, slug, description, trigger_keywords, trigger_prompt, is_fixed")
+      .eq("agent_id", template.id)
+      .eq("is_active", true)
+      .order("sort_order");
+
+    if (flowsData && flowsData.length > 0) {
+      const flowIds = flowsData.map((f: any) => f.id);
+      const { data: stepsData } = await supabaseAdmin
+        .from("ai_agent_flow_steps")
+        .select("flow_id, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance")
+        .in("flow_id", flowIds)
+        .eq("is_active", true)
+        .order("step_order");
+
+      const stepsMap: Record<string, FlowStepRecord[]> = {};
+      for (const s of (stepsData || []) as any[]) {
+        // Skip steps that reference tools removed due to ERP requirement
+        if (s.tool_id && !agentTools.find(t => t.id === s.tool_id)) continue;
+        if (!stepsMap[s.flow_id]) stepsMap[s.flow_id] = [];
+        stepsMap[s.flow_id].push(s);
+      }
+
+      agentFlows = (flowsData as any[]).map((f) => ({
+        ...f,
+        steps: stepsMap[f.id] || [],
+      }));
+    }
+
+    // Build complete system prompt with all layers (hybrid RAG + tools + flows)
     const systemPrompt = buildSystemPrompt(
       template,
       ispAgent,
       securityClauses || [],
       knowledgeBase,
       documentChunks,
-      ispName
+      ispName,
+      agentTools,
+      agentFlows
     );
 
-    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length} Q&A, Docs=${documentChunks.length} chunks, Security=${securityClauses?.length || 0} clauses`);
+    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${agentTools.length}, Flows=${agentFlows.length}`);
 
     // Build messages with enriched system prompt
-    const messages: ChatMessage[] = [
+    const messages: any[] = [
       { role: "system", content: systemPrompt },
       ...body.messages
     ];
@@ -462,35 +604,115 @@ Deno.serve(async (req) => {
       "gpt-4o": "gpt-4o",
       "gpt-4o-mini": "gpt-4o-mini",
     };
-
     const model = modelMap[template.model || "gpt-4o-mini"] || "gpt-4o-mini";
 
-    // Call OpenAI API directly
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openAIKey}`
+    // Build OpenAI tools array
+    const openaiTools = agentTools.length > 0 ? agentTools.map((t) => ({
+      type: "function" as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters_schema,
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: template.temperature || 0.7,
-        max_tokens: template.max_tokens || 1000,
-        stream: body.stream || false,
-        ...(body.stream ? { stream_options: { include_usage: true } } : {})
-      })
-    });
+    })) : undefined;
 
-    if (!aiResponse.ok) {
-      const errorData = await aiResponse.json();
-      console.error("❌ OpenAI API error:", errorData);
+    // Tool execution context
+    const encryptionKey = Deno.env.get("ENCRYPTION_KEY") || "";
+    const toolCtx: ToolExecutionContext = {
+      supabaseAdmin,
+      ispId: body.isp_id,
+      encryptionKey,
+    };
+
+    // Tool name -> handler mapping for execution
+    const toolHandlerMap: Record<string, { handler_type: string; handler_config: Record<string, unknown> | null }> = {};
+    for (const t of agentTools) {
+      toolHandlerMap[t.name] = { handler_type: t.handler_type, handler_config: t.handler_config };
+    }
+
+    // ── Tool call loop (max 3 iterations) ──
+    const MAX_TOOL_ITERATIONS = 3;
+    let finalResponse: any = null;
+
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
+      const shouldStream = (body.stream || false) && (iteration === 0 || isLastIteration);
+
+      const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openAIKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: template.temperature || 0.7,
+          max_tokens: template.max_tokens || 1000,
+          ...(openaiTools ? { tools: openaiTools } : {}),
+          // Only stream on the final response (no tool calls expected)
+          stream: false, // We'll handle streaming separately after the loop
+          ...(false ? { stream_options: { include_usage: true } } : {})
+        })
+      });
+
+      if (!aiResponse.ok) {
+        const errorData = await aiResponse.json();
+        console.error("❌ OpenAI API error:", errorData);
+        return new Response(
+          JSON.stringify({ 
+            error: "OpenAI API error", 
+            message: errorData.error?.message || "Erro ao processar requisição de IA"
+          }),
+          { status: aiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiData = await aiResponse.json();
+      const choice = aiData.choices?.[0];
+
+      // Check if the model wants to call tools
+      if (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && !isLastIteration) {
+        // Add assistant message with tool_calls
+        messages.push(choice.message);
+
+        // Execute each tool call
+        for (const toolCall of choice.message.tool_calls) {
+          const fnName = toolCall.function.name;
+          const fnArgs = JSON.parse(toolCall.function.arguments || "{}");
+          const handler = toolHandlerMap[fnName];
+
+          console.log(`🔧 Tool call: ${fnName}(${JSON.stringify(fnArgs)})`);
+
+          let result: any;
+          if (handler) {
+            result = await executeToolHandler(handler.handler_type, toolCtx, fnArgs, handler.handler_config || undefined);
+          } else {
+            result = { success: false, error: `Tool "${fnName}" não encontrada` };
+          }
+
+          console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
+        }
+
+        // Continue loop to get next response from model
+        continue;
+      }
+
+      // No tool calls - this is the final response
+      finalResponse = aiData;
+      break;
+    }
+
+    if (!finalResponse) {
       return new Response(
-        JSON.stringify({ 
-          error: "OpenAI API error", 
-          message: errorData.error?.message || "Erro ao processar requisição de IA"
-        }),
-        { status: aiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Max tool iterations exceeded" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -507,7 +729,8 @@ Deno.serve(async (req) => {
       })),
     };
 
-    // Handle streaming response
+    // Handle streaming response - re-call with stream=true for final response
+    // (tool calls were already resolved in the loop above without streaming)
     if (body.stream) {
       const openaiBody = aiResponse.body;
       if (!openaiBody) {
