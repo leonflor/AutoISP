@@ -69,9 +69,32 @@ const erpSearchHandler: ToolHandler = async (ctx, args) => {
   }
 };
 
+// ── Handler: erp_invoice_search ──
+const erpInvoiceSearchHandler: ToolHandler = async (_ctx, args) => {
+  const clienteId = String(args.cliente_id || "");
+  if (!clienteId) {
+    return { success: false, error: "Informe o CPF/CNPJ ou ID do cliente" };
+  }
+
+  // Mock — pronto para integração futura com ERPs reais
+  return {
+    success: true,
+    data: {
+      cliente_id: clienteId,
+      faturas: [
+        { numero: "FAT-2026-001", valor: 129.90, vencimento: "2026-01-15", status: "vencida", dias_atraso: 23 },
+        { numero: "FAT-2026-002", valor: 129.90, vencimento: "2026-02-15", status: "aberta", dias_atraso: 0 },
+      ],
+      total_aberto: 259.80,
+      mensagem: "Dados simulados para teste. Integrar com API do ERP para dados reais.",
+    },
+  };
+};
+
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_search: erpSearchHandler,
+  erp_invoice_search: erpInvoiceSearchHandler,
 };
 
 /**
