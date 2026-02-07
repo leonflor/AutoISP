@@ -1,28 +1,17 @@
 
-# Remover tudo relacionado a "Premium" dos Agentes de IA
-
-Conforme o planejamento do projeto, a indicacao de agente Premium nao faz parte do escopo -- a disponibilidade dos agentes e controlada pelos limites dos planos de assinatura.
+# Mover campos de Status para aba Basico e remover aba Status
 
 ## Alteracoes
 
-### 1. `src/components/admin/ai-agents/AgentTemplateForm.tsx`
-- Remover `is_premium` do schema Zod (linha 69)
-- Remover `is_premium: false` dos valores default (linha 132)
-- Remover `is_premium` do reset com dados do agente (linha 158)
-- Remover o bloco `FormField` do switch Premium (linhas 565-584)
+**Arquivo:** `src/components/admin/ai-agents/AgentTemplateForm.tsx`
 
-### 2. `src/hooks/admin/useAiAgentTemplates.ts`
-- Remover `isPremium` da interface `UseAiAgentTemplatesOptions`
-- Remover `isPremium` da desestruturacao e do `queryKey`
-- Remover o bloco condicional que filtra por `is_premium`
+### 1. Reduzir tabs de 5 para 4 colunas e remover "Status"
+- Linha 233: mudar `grid-cols-5` para `grid-cols-4`
+- Linha 238: remover `<TabsTrigger value="status">Status</TabsTrigger>`
 
-### 3. `src/components/painel/ai/AgentCatalogCard.tsx`
-- Remover o bloco que exibe o Badge "Premium" no canto superior direito (linhas 43-49)
+### 2. Mover campos `is_active` e `sort_order` para o final da aba "Basico"
+- Os dois `FormField` (linhas 544-580) serao movidos para dentro de `<TabsContent value="basic">`, logo antes do fechamento dessa aba (apos a linha ~348, no final do bloco basico)
+- O switch "Ativo" e o campo "Ordem de Exibicao" ficarao no final da aba Basico
 
-### 4. `src/components/painel/ai/ActiveAgentCard.tsx`
-- Remover o bloco que exibe o Badge "Premium" (linhas 56-61)
-
-### 5. `src/components/painel/ai/AgentTestDialog.tsx`
-- Remover a exibicao do Badge "Pro" ao lado do nome do agente (linhas 356-358)
-
-Nenhuma coluna sera removida do banco de dados -- apenas as referencias no frontend serao limpas.
+### 3. Remover a `<TabsContent value="status">` inteira (linhas 543-581)
+- Todo o bloco sera removido, pois seus campos ja estarao na aba Basico
