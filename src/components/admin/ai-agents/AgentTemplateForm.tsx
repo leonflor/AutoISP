@@ -64,7 +64,6 @@ const agentSchema = z.object({
   system_prompt: z.string().min(10, 'Prompt é obrigatório'),
   avatar_url: z.string().url().optional().or(z.literal('')),
   feature_tags: z.array(z.string()).default([]),
-  feature_custom: z.array(z.string()).default([]),
   uses_knowledge_base: z.boolean().default(false),
   is_active: z.boolean().default(true),
   is_premium: z.boolean().default(false),
@@ -107,7 +106,7 @@ export function AgentTemplateForm({
   onSubmit,
   isSubmitting,
 }: AgentTemplateFormProps) {
-  const [customFeature, setCustomFeature] = useState('');
+  
   const [showDeactivateAlert, setShowDeactivateAlert] = useState(false);
   const [pendingData, setPendingData] = useState<AgentFormValues | null>(null);
   
@@ -128,7 +127,6 @@ export function AgentTemplateForm({
       system_prompt: '',
       avatar_url: '',
       feature_tags: [],
-      feature_custom: [],
       uses_knowledge_base: false,
       is_active: true,
       is_premium: false,
@@ -155,7 +153,6 @@ export function AgentTemplateForm({
         system_prompt: agent.system_prompt || '',
         avatar_url: agent.avatar_url || '',
         feature_tags: (agent.feature_tags as string[]) || [],
-        feature_custom: (agent.feature_custom as string[]) || [],
         uses_knowledge_base: agent.uses_knowledge_base || false,
         is_active: agent.is_active ?? true,
         is_premium: agent.is_premium || false,
@@ -183,18 +180,6 @@ export function AgentTemplateForm({
     }
   }, [name, agent, form]);
 
-  const addCustomFeature = () => {
-    if (customFeature.trim()) {
-      const current = form.getValues('feature_custom');
-      form.setValue('feature_custom', [...current, customFeature.trim()]);
-      setCustomFeature('');
-    }
-  };
-
-  const removeCustomFeature = (index: number) => {
-    const current = form.getValues('feature_custom');
-    form.setValue('feature_custom', current.filter((_, i) => i !== index));
-  };
 
   const handleSubmit = (data: AgentFormValues) => {
     // Platform agents shouldn't use knowledge base
@@ -526,39 +511,6 @@ export function AgentTemplateForm({
                     )}
                   />
 
-                  <div className="space-y-3">
-                    <FormLabel>Features Customizadas</FormLabel>
-                    <div className="flex gap-2">
-                      <Input
-                        value={customFeature}
-                        onChange={(e) => setCustomFeature(e.target.value)}
-                        placeholder="Descreva uma feature..."
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addCustomFeature();
-                          }
-                        }}
-                      />
-                      <Button type="button" variant="outline" onClick={addCustomFeature}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {form.watch('feature_custom').map((feature, index) => (
-                        <Badge key={index} variant="secondary" className="gap-1">
-                          {feature}
-                          <button
-                            type="button"
-                            onClick={() => removeCustomFeature(index)}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
 
                   {scope === 'tenant' && (
                     <FormField
