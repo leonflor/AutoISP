@@ -1,17 +1,21 @@
 
-# Mover campos de Status para aba Basico e remover aba Status
+# Remover campo "Ordem de Exibicao" dos agentes de IA e ordenar por nome
+
+O campo `sort_order` sera removido do formulario de agentes de IA. A ordenacao passara a ser alfabetica pelo nome do agente em todos os locais onde `sort_order` era usado para ordenar templates de agentes.
 
 ## Alteracoes
 
-**Arquivo:** `src/components/admin/ai-agents/AgentTemplateForm.tsx`
+### 1. `src/components/admin/ai-agents/AgentTemplateForm.tsx`
+- Remover `sort_order` do schema Zod
+- Remover `sort_order: 0` dos valores default
+- Remover `sort_order` do reset com dados do agente
+- Remover o bloco `FormField` do campo "Ordem de Exibicao" (input numerico na aba Basico)
 
-### 1. Reduzir tabs de 5 para 4 colunas e remover "Status"
-- Linha 233: mudar `grid-cols-5` para `grid-cols-4`
-- Linha 238: remover `<TabsTrigger value="status">Status</TabsTrigger>`
+### 2. `src/hooks/admin/useAiAgentTemplates.ts`
+- Linha 82: remover `.order('sort_order', { ascending: true })`
+- Manter apenas `.order('name', { ascending: true })` que ja existe na linha 83
 
-### 2. Mover campos `is_active` e `sort_order` para o final da aba "Basico"
-- Os dois `FormField` (linhas 544-580) serao movidos para dentro de `<TabsContent value="basic">`, logo antes do fechamento dessa aba (apos a linha ~348, no final do bloco basico)
-- O switch "Ativo" e o campo "Ordem de Exibicao" ficarao no final da aba Basico
+### 3. `src/hooks/painel/useIspAgents.ts`
+- Linha 90: trocar `.order("sort_order")` por `.order("name", { ascending: true })`
 
-### 3. Remover a `<TabsContent value="status">` inteira (linhas 543-581)
-- Todo o bloco sera removido, pois seus campos ja estarao na aba Basico
+Nota: o campo `sort_order` continuara existindo na tabela do banco -- apenas as referencias no frontend serao removidas. Tabelas como `ai_security_clauses` e `agent_knowledge_base` que tambem usam `sort_order` nao serao afetadas.
