@@ -66,7 +66,7 @@ const agentSchema = z.object({
   feature_tags: z.array(z.string()).default([]),
   uses_knowledge_base: z.boolean().default(false),
   is_active: z.boolean().default(true),
-  is_premium: z.boolean().default(false),
+  
   sort_order: z.coerce.number().default(0),
   allowed_data_access: z.array(z.string()).default([]),
   // Novos campos de personalização
@@ -129,7 +129,7 @@ export function AgentTemplateForm({
       feature_tags: [],
       uses_knowledge_base: false,
       is_active: true,
-      is_premium: false,
+      
       sort_order: 0,
       allowed_data_access: [],
       voice_tones: DEFAULT_VOICE_TONES,
@@ -155,7 +155,7 @@ export function AgentTemplateForm({
         feature_tags: (agent.feature_tags as string[]) || [],
         uses_knowledge_base: agent.uses_knowledge_base || false,
         is_active: agent.is_active ?? true,
-        is_premium: agent.is_premium || false,
+        
         sort_order: agent.sort_order || 0,
         allowed_data_access: (agent.allowed_data_access as string[]) || [],
         voice_tones: (agent.voice_tones as any[]) || DEFAULT_VOICE_TONES,
@@ -550,27 +550,6 @@ export function AgentTemplateForm({
                           <FormLabel className="text-base">Ativo</FormLabel>
                           <FormDescription>
                             Agentes inativos não aparecem para ISPs
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="is_premium"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Premium</FormLabel>
-                          <FormDescription>
-                            Marcar como recurso premium (disponível apenas em planos específicos)
                           </FormDescription>
                         </div>
                         <FormControl>

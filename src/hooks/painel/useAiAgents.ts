@@ -69,9 +69,9 @@ export function useAiAgents() {
 
   // Check if agent is available for ISP's plan
   const isAgentAvailable = (agent: AiAgent): boolean => {
-    if (!agentLimits || agentLimits.length === 0) return !agent.is_premium;
+    if (!agentLimits || agentLimits.length === 0) return true;
     const limit = agentLimits.find((l) => l.agent_id === agent.id);
-    return limit?.is_enabled ?? !agent.is_premium;
+    return limit?.is_enabled ?? true;
   };
 
   // Get agent limit for ISP
