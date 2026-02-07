@@ -58,6 +58,175 @@ export type Database = {
           },
         ]
       }
+      ai_agent_flow_steps: {
+        Row: {
+          condition_to_advance: string | null
+          created_at: string
+          expected_input: string | null
+          fallback_instruction: string | null
+          flow_id: string
+          id: string
+          instruction: string
+          is_active: boolean
+          name: string
+          step_order: number
+          tool_auto_execute: boolean
+          tool_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          condition_to_advance?: string | null
+          created_at?: string
+          expected_input?: string | null
+          fallback_instruction?: string | null
+          flow_id: string
+          id?: string
+          instruction: string
+          is_active?: boolean
+          name: string
+          step_order?: number
+          tool_auto_execute?: boolean
+          tool_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          condition_to_advance?: string | null
+          created_at?: string
+          expected_input?: string | null
+          fallback_instruction?: string | null
+          flow_id?: string
+          id?: string
+          instruction?: string
+          is_active?: boolean
+          name?: string
+          step_order?: number
+          tool_auto_execute?: boolean
+          tool_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_flow_steps_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_flow_steps_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_flows: {
+        Row: {
+          agent_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_fixed: boolean
+          name: string
+          slug: string
+          sort_order: number
+          trigger_keywords: string[] | null
+          trigger_prompt: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_fixed?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+          trigger_keywords?: string[] | null
+          trigger_prompt?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_fixed?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+          trigger_keywords?: string[] | null
+          trigger_prompt?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_flows_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_tools: {
+        Row: {
+          agent_id: string
+          created_at: string
+          description: string
+          handler_config: Json | null
+          handler_type: string
+          id: string
+          is_active: boolean
+          name: string
+          parameters_schema: Json
+          requires_erp: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          description: string
+          handler_config?: Json | null
+          handler_type?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          parameters_schema?: Json
+          requires_erp?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          description?: string
+          handler_config?: Json | null
+          handler_type?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          parameters_schema?: Json
+          requires_erp?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_tools_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agents: {
         Row: {
           allowed_data_access: Json | null
