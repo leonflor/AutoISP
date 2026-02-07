@@ -230,12 +230,11 @@ export function AgentTemplateForm({
             <ScrollArea className="flex-1 px-6 pr-4">
               <div className="pb-4">
                 <Tabs defaultValue="basic" className="w-full overflow-hidden">
-                <TabsList className="grid w-full grid-cols-5 mb-4">
+                <TabsList className="grid w-full grid-cols-4 mb-4">
                   <TabsTrigger value="basic">Básico</TabsTrigger>
                   <TabsTrigger value="ai">Config IA</TabsTrigger>
                   <TabsTrigger value="features">Features</TabsTrigger>
                   <TabsTrigger value="personalization" disabled={scope === 'platform'}>Personalização</TabsTrigger>
-                  <TabsTrigger value="status">Status</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4 mt-0 overflow-hidden">
@@ -403,6 +402,44 @@ export function AgentTemplateForm({
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="is_active"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Ativo</FormLabel>
+                          <FormDescription>
+                            Agentes inativos não aparecem para ISPs
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="sort_order"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ordem de Exibição</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Número menor = aparece primeiro na listagem
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </TabsContent>
 
                 <TabsContent value="ai" className="space-y-4 mt-0 overflow-hidden">
@@ -538,46 +575,6 @@ export function AgentTemplateForm({
 
                 <TabsContent value="personalization" className="space-y-4 mt-0 overflow-hidden">
                   <PersonalizationTab form={form} scope={scope as 'tenant' | 'platform'} />
-                </TabsContent>
-
-                <TabsContent value="status" className="space-y-4 mt-0 overflow-hidden">
-                  <FormField
-                    control={form.control}
-                    name="is_active"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Ativo</FormLabel>
-                          <FormDescription>
-                            Agentes inativos não aparecem para ISPs
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="sort_order"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ordem de Exibição</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={0} {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Número menor = aparece primeiro na listagem
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </TabsContent>
                 </Tabs>
               </div>
