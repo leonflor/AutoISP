@@ -87,7 +87,7 @@ export function useIspAgents() {
         .select("*")
         .eq("scope", "tenant")
         .eq("is_active", true)
-        .order("sort_order");
+        .order("name", { ascending: true });
 
       if (templatesError) throw templatesError;
 

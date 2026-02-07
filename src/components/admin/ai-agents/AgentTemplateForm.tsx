@@ -67,7 +67,6 @@ const agentSchema = z.object({
   uses_knowledge_base: z.boolean().default(false),
   is_active: z.boolean().default(true),
   
-  sort_order: z.coerce.number().default(0),
   allowed_data_access: z.array(z.string()).default([]),
   // Novos campos de personalização
   voice_tones: z.array(z.object({
@@ -130,7 +129,6 @@ export function AgentTemplateForm({
       uses_knowledge_base: false,
       is_active: true,
       
-      sort_order: 0,
       allowed_data_access: [],
       voice_tones: DEFAULT_VOICE_TONES,
       escalation_options: DEFAULT_ESCALATION_OPTIONS,
@@ -156,7 +154,6 @@ export function AgentTemplateForm({
         uses_knowledge_base: agent.uses_knowledge_base || false,
         is_active: agent.is_active ?? true,
         
-        sort_order: agent.sort_order || 0,
         allowed_data_access: (agent.allowed_data_access as string[]) || [],
         voice_tones: (agent.voice_tones as any[]) || DEFAULT_VOICE_TONES,
         escalation_options: (agent.escalation_options as any) || DEFAULT_ESCALATION_OPTIONS,
@@ -424,22 +421,6 @@ export function AgentTemplateForm({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="sort_order"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ordem de Exibição</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={0} {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Número menor = aparece primeiro na listagem
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </TabsContent>
 
                 <TabsContent value="ai" className="space-y-4 mt-0 overflow-hidden">
