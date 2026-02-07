@@ -729,10 +729,36 @@ Deno.serve(async (req) => {
       })),
     };
 
-    // Handle streaming response - re-call with stream=true for final response
+    // Handle streaming response - re-call OpenAI with stream=true using enriched messages
     // (tool calls were already resolved in the loop above without streaming)
     if (body.stream) {
-      const openaiBody = aiResponse.body;
+      const streamResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openAIKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: template.temperature || 0.7,
+          max_tokens: template.max_tokens || 1000,
+          stream: true,
+          stream_options: { include_usage: true }
+          // No tools here - tool calls already resolved
+        })
+      });
+
+      if (!streamResponse.ok) {
+        const errorData = await streamResponse.json();
+        console.error("❌ OpenAI streaming error:", errorData);
+        return new Response(
+          JSON.stringify({ error: "OpenAI API error", message: errorData.error?.message || "Erro ao processar streaming" }),
+          { status: streamResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const openaiBody = streamResponse.body;
       if (!openaiBody) {
         return new Response(JSON.stringify({ error: "No stream body" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -769,7 +795,6 @@ Deno.serve(async (req) => {
 
                 try {
                   const parsed = JSON.parse(jsonStr);
-                  // Collect usage from the last chunk
                   if (parsed.usage) {
                     totalTokens = parsed.usage.total_tokens || 0;
                     promptTokens = parsed.usage.prompt_tokens || 0;
@@ -777,7 +802,6 @@ Deno.serve(async (req) => {
                   }
                 } catch { /* partial JSON, just forward */ }
 
-                // Forward the line as-is
                 controller.enqueue(encoder.encode(trimmed + "\n\n"));
               }
             }
@@ -785,8 +809,6 @@ Deno.serve(async (req) => {
             // Send sources + usage event before DONE
             const sourcesEvent = `data: ${JSON.stringify({ sources, usage: { total_tokens: totalTokens, prompt_tokens: promptTokens, completion_tokens: completionTokens } })}\n\n`;
             controller.enqueue(encoder.encode(sourcesEvent));
-
-            // Send DONE
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
 
@@ -825,10 +847,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Non-streaming response
-    const aiData = await aiResponse.json();
-    const assistantMessage = aiData.choices?.[0]?.message?.content || "";
-    const tokensUsed = aiData.usage?.total_tokens || 0;
+    // Non-streaming response - use finalResponse already parsed in the loop
+    const assistantMessage = finalResponse.choices?.[0]?.message?.content || "";
+    const tokensUsed = finalResponse.usage?.total_tokens || 0;
 
     console.log(`✅ AI response generated, tokens: ${tokensUsed}`);
 
@@ -838,10 +859,10 @@ Deno.serve(async (req) => {
       agent_id: template.id,
       user_id: userId,
       tokens_total: tokensUsed,
-      tokens_input: aiData.usage?.prompt_tokens || 0,
-      tokens_output: aiData.usage?.completion_tokens || 0,
+      tokens_input: finalResponse.usage?.prompt_tokens || 0,
+      tokens_output: finalResponse.usage?.completion_tokens || 0,
       metadata: {
-        model: model,
+        model,
         isp_agent_id: ispAgent.id,
         knowledge_items: knowledgeBase.length,
         security_clauses: securityClauses?.length || 0
@@ -855,8 +876,8 @@ Deno.serve(async (req) => {
         sources,
         usage: {
           tokens_used: tokensUsed,
-          prompt_tokens: aiData.usage?.prompt_tokens || 0,
-          completion_tokens: aiData.usage?.completion_tokens || 0
+          prompt_tokens: finalResponse.usage?.prompt_tokens || 0,
+          completion_tokens: finalResponse.usage?.completion_tokens || 0
         }
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
