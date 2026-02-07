@@ -79,7 +79,6 @@ export function useAiAgentTemplates(options: UseAiAgentTemplatesOptions = {}) {
       let query = supabase
         .from('ai_agents')
         .select('*')
-        .order('sort_order', { ascending: true })
         .order('name', { ascending: true });
 
       if (scope) {
