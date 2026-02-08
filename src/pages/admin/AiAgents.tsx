@@ -1,54 +1,32 @@
-import { useState } from 'react';
 import { Plus, Bot, Server, Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AgentTemplateTable } from '@/components/admin/ai-agents/AgentTemplateTable';
-import { AgentTemplateForm } from '@/components/admin/ai-agents/AgentTemplateForm';
 import {
   useAiAgentTemplates,
-  useCreateAiAgent,
-  useUpdateAiAgent,
   useDeleteAiAgent,
   useDuplicateAiAgent,
   type AiAgent,
 } from '@/hooks/admin/useAiAgentTemplates';
+import { useState } from 'react';
 
 export default function AiAgentsPage() {
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<AiAgent | null>(null);
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'tenant' | 'platform'>('tenant');
 
   const { data: tenantAgents, isLoading: loadingTenant } = useAiAgentTemplates({ scope: 'tenant' });
   const { data: platformAgents, isLoading: loadingPlatform } = useAiAgentTemplates({ scope: 'platform' });
 
-  const createMutation = useCreateAiAgent();
-  const updateMutation = useUpdateAiAgent();
   const deleteMutation = useDeleteAiAgent();
   const duplicateMutation = useDuplicateAiAgent();
 
   const handleEdit = (agent: AiAgent) => {
-    setEditingAgent(agent);
-    setFormOpen(true);
+    navigate(`/admin/ai-agents/${agent.id}`);
   };
 
   const handleCreate = () => {
-    setEditingAgent(null);
-    setFormOpen(true);
-  };
-
-  const handleSubmit = async (data: any) => {
-    // Ensure scope matches current tab when creating new
-    if (!editingAgent) {
-      data.scope = activeTab;
-    }
-
-    if (editingAgent) {
-      await updateMutation.mutateAsync({ id: editingAgent.id, ...data });
-    } else {
-      await createMutation.mutateAsync(data);
-    }
-    setFormOpen(false);
-    setEditingAgent(null);
+    navigate('/admin/ai-agents/novo');
   };
 
   const handleDelete = async (agent: AiAgent) => {
@@ -56,7 +34,8 @@ export default function AiAgentsPage() {
   };
 
   const handleDuplicate = async (agent: AiAgent) => {
-    await duplicateMutation.mutateAsync(agent);
+    const duplicated = await duplicateMutation.mutateAsync(agent);
+    navigate(`/admin/ai-agents/${duplicated.id}`);
   };
 
   return (
@@ -146,14 +125,6 @@ export default function AiAgentsPage() {
           </div>
         </TabsContent>
       </Tabs>
-
-      <AgentTemplateForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        agent={editingAgent}
-        onSubmit={handleSubmit}
-        isSubmitting={createMutation.isPending || updateMutation.isPending}
-      />
     </div>
   );
 }

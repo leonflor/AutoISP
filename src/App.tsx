@@ -48,6 +48,7 @@ const AdminSupport = lazy(() => import("./pages/admin/Support"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
 const AiAgentsPage = lazy(() => import("./pages/admin/AiAgents"));
+const AiAgentDetail = lazy(() => import("./pages/admin/AiAgentDetail"));
 const AiSecurityPage = lazy(() => import("./pages/admin/AiSecurity"));
 const AiProcessingLogsPage = lazy(() => import("./pages/admin/AiProcessingLogs"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
@@ -97,6 +98,8 @@ const App = () => (
                 <Route path="tickets" element={<SupportTickets />} />
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
                 <Route path="ai-agents" element={<AiAgentsPage />} />
+                <Route path="ai-agents/novo" element={<AiAgentDetail />} />
+                <Route path="ai-agents/:id" element={<AiAgentDetail />} />
                 <Route path="ai-logs" element={<AiProcessingLogsPage />} />
                 <Route path="ai-security" element={<AiSecurityPage />} />
                 <Route path="relatorios" element={<AdminReports />} />
