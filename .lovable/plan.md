@@ -1,124 +1,106 @@
 
 
-# Atualizar Guia do Projeto com Funcionalidades Implementadas
+# Redesign: Pagina Dedicada para Editar Agente de IA
 
-## Lacunas Identificadas
+## Problema Atual
 
-Apos comparar todo o codigo implementado com a documentacao no Guia, foram encontradas as seguintes lacunas:
+O formulario de agente e um **Sheet** (painel lateral) com 6 abas comprimidas. As abas "Tools" e "Fluxos" abrem **Dialogs em cima do Sheet**, causando:
+- Modais empilhados (Sheet + Dialog) com conflitos de z-index
+- Espaco reduzido para editar conteudo complexo (Steps do Fluxo, JSON Schema das Tools)
+- Abas "Tools" e "Fluxos" desabilitadas ate salvar o agente (fluxo confuso)
+- 6 abas em `grid-cols-6` ficam apertadas e pouco legíveis
 
----
+## Solucao: Pagina `/admin/ai-agents/:id`
 
-### 1. Features Admin IA -- Falta documentar Tools, Flows e Logs (IAFeatures.tsx)
+Substituir o Sheet por uma **pagina dedicada** com layout espaçoso, eliminando modais aninhados.
 
-O guia documenta apenas 8 features (F-ADMIN-108 a F-ADMIN-115) para o modulo IA. Porem, existem funcionalidades implementadas e nao documentadas:
-
-| Feature | Implementacao | Status no Guia |
-|---|---|---|
-| CRUD de Tools (ai_agent_tools) | AgentToolsTab, AgentToolForm, useAgentTools | Ausente |
-| CRUD de Flows (ai_agent_flows) | AgentFlowsTab, AgentFlowForm, useAgentFlows | Ausente |
-| Editor de Etapas (ai_agent_flow_steps) | AgentFlowStepsEditor, useSaveFlowSteps | Ausente |
-| Logs de Processamento RAG | AiProcessingLogs, ProcessingLogsTable, LogDetailsDialog | Ausente |
-| Aba Personalizacao (VoiceTones, Escalation) | PersonalizationTab, constants.ts | Ausente |
-
-**Plano:** Adicionar features F-ADMIN-116 a F-ADMIN-123 cobrindo:
-- F-ADMIN-116: Listar Tools do Agente
-- F-ADMIN-117: Criar/Editar Tool
-- F-ADMIN-118: Excluir Tool
-- F-ADMIN-119: Listar Fluxos Conversacionais
-- F-ADMIN-120: Criar/Editar Fluxo
-- F-ADMIN-121: Gerenciar Etapas do Fluxo
-- F-ADMIN-122: Visualizar Logs de Processamento RAG
-- F-ADMIN-123: Configurar Personalizacao do Template (VoiceTones, Escalation)
-
-Tambem corrigir a regra RN-F108-03 que ainda menciona `sort_order` (removido) -- substituir por "Ordenacao alfabetica por nome".
-
-Atualizar o contador de features de 8 para 16 no cabecalho.
-
----
-
-### 2. Integracao OpenAI -- Atualizar secao Function Calling (OpenAIIntegration.tsx)
-
-A secao "Function Calling (Tools)" lista 6 functions aspiracionais que **nao existem** no codigo:
-- `consultar_fatura`, `verificar_conexao`, `abrir_chamado`, `consultar_plano`, `segunda_via_boleto`, `agendar_visita`
-
-O que **realmente existe** implementado:
-- `buscar_contrato_cliente` (handler: `erp_search`) -- busca clientes no ERP
-- `consultar_faturas` (handler: `erp_invoice_search`) -- lista faturas (mock)
-
-**Plano:**
-- Substituir a tabela de functions pela lista real implementada
-- Adicionar nota explicativa sobre a arquitetura dinamica (tools carregadas do banco, gerenciaveis pelo admin)
-- Documentar o Tool Call Loop (max 3 iteracoes) do `ai-chat`
-- Manter as functions aspiracionais em uma secao separada "Roadmap de Tools"
-
----
-
-### 3. Implementacao Tab -- Atualizar modulos da F5 (ImplementacaoTab.tsx)
-
-A lista de modulos da Fase 5 mostra:
-```
-Dashboard, Assinantes, Agentes IA, Faturas, Usuarios, Relatorios, Configuracoes
+```text
+/admin/ai-agents          --> Lista de agentes (mantida)
+/admin/ai-agents/novo     --> Criar novo agente
+/admin/ai-agents/:id      --> Editar agente existente
 ```
 
-Faltam os modulos ja implementados:
-- **Comunicacao** (PainelCommunication)
-- **WhatsApp** (PainelWhatsApp)
-- **Integracoes ERP** (PainelErpIntegrations)
-- **Base de Conhecimento** (PainelAgentKnowledge)
-- **Atendimentos/Tickets** (PainelTickets)
+### Layout da Pagina
 
-**Plano:** Atualizar o array de badges da F5 para incluir todos os 12 modulos implementados.
+```text
++----------------------------------------------------------+
+| < Voltar para Agentes     [Salvar Alteracoes]            |
+| Assistente de Suporte     [Cancelar]                     |
++----------------------------------------------------------+
+| [Basico] [Config IA] [Features] [Personal.] [Tools] [Fluxos] |
++----------------------------------------------------------+
+|                                                          |
+|  (conteudo da aba ativa -- largura total da pagina)      |
+|                                                          |
++----------------------------------------------------------+
+```
+
+- Header fixo com botao "Voltar" (navegacao via `react-router-dom`), nome do agente e botoes de acao
+- Abas horizontais com mais espaco para respirar
+- Tools e Fluxos ficam **sempre habilitadas** (para agentes novos, a pagina redireciona apos primeiro save)
+
+### Fluxo de Criacao (Novo Agente)
+
+1. Clicar "Novo Agente" na lista redireciona para `/admin/ai-agents/novo`
+2. Pagina mostra apenas as abas relevantes (Basico, Config IA, Features, Personalizacao)
+3. Ao clicar "Criar Agente", salva e redireciona para `/admin/ai-agents/:id` com todas as abas habilitadas
+4. Uma mensagem orienta: "Agente criado! Agora configure Tools e Fluxos."
+
+### Tools e Fluxos Inline
+
+Os formularios de Tool e Fluxo continuam usando **Dialog**, porem agora abrem sobre a pagina (nao sobre um Sheet), eliminando o problema de z-index. O `AgentFlowStepsEditor` ganha mais espaco horizontal.
 
 ---
 
-### 4. Features Admin IA -- Atualizar contagem no FeaturesAdminSection.tsx
+## Arquivos a serem modificados/criados
 
-O modulo "IA" aparece com `count: 8`. Sera atualizado para `count: 16` apos adicionar as novas features.
-
----
-
-### 5. Edge Functions na ImplementacaoTab -- Adicionar `fetch-erp-clients`
-
-A lista de Edge Functions ja contem `fetch-erp-clients` (14 no total). Confirmar que a lista esta correta e documentar os modulos compartilhados (`_shared/tool-handlers.ts`, `_shared/erp-fetcher.ts`).
-
-**Plano:** Adicionar uma nota sobre os modulos compartilhados abaixo da lista de Edge Functions.
-
----
-
-## Arquivos a serem modificados
-
-| Arquivo | Alteracao |
+| Arquivo | Acao |
 |---|---|
-| `src/components/guia-projeto/features/modules/IAFeatures.tsx` | Adicionar 8 novas features (F-ADMIN-116 a 123), corrigir RN-F108-03, atualizar contagem |
-| `src/components/guia-projeto/features/FeaturesAdminSection.tsx` | Atualizar count do modulo IA de 8 para 16 |
-| `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx` | Reescrever secao Function Calling com tools reais + arquitetura dinamica + roadmap |
-| `src/components/guia-projeto/ImplementacaoTab.tsx` | Atualizar modulos F5 + adicionar nota sobre `_shared/` |
+| `src/pages/admin/AiAgentDetail.tsx` | **Novo** -- Pagina dedicada de edicao/criacao |
+| `src/pages/admin/AiAgents.tsx` | Refatorar -- Remover Sheet, usar `navigate()` |
+| `src/components/admin/ai-agents/AgentTemplateForm.tsx` | Refatorar -- Converter de Sheet para componente de formulario inline |
+| `src/App.tsx` | Adicionar rotas `ai-agents/novo` e `ai-agents/:id` |
 
----
+### Detalhes tecnicos
 
-## Detalhes tecnicos
+#### 1. Nova rota em `App.tsx`
 
-### Novas features a documentar em IAFeatures.tsx
+Adicionar dentro do bloco `<Route path="/admin">`:
+```text
+<Route path="ai-agents/novo" element={<AiAgentDetail />} />
+<Route path="ai-agents/:id" element={<AiAgentDetail />} />
+```
 
-Cada feature segue o padrao existente com: codigo, nome, modulo, plataforma, descricao, criticidade, regrasNegocio, permissoes, entidades.
+#### 2. `AiAgentDetail.tsx` (nova pagina)
 
-As entidades referenciam as tabelas reais:
-- `ai_agent_tools` (name, description, parameters_schema, handler_type, handler_config, is_active, requires_erp, sort_order)
-- `ai_agent_flows` (name, slug, description, trigger_keywords, trigger_prompt, is_active, is_fixed, sort_order)
-- `ai_agent_flow_steps` (flow_id, step_order, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance, fallback_instruction, is_active)
-- `ai_processing_logs` (logs de erro do pipeline RAG)
+- Usa `useParams()` para obter `:id` (ou "novo")
+- Carrega dados do agente via query existente (`useAiAgentTemplates`)
+- Header com:
+  - Botao "Voltar" (`navigate('/admin/ai-agents')`)
+  - Titulo dinamico (nome do agente ou "Novo Agente")
+  - Botoes "Cancelar" e "Salvar"
+- Renderiza o formulario inline (componente refatorado do `AgentTemplateForm`)
+- Abas Tools e Fluxos habilitadas apenas quando `id !== 'novo'`
 
-### Correcao RN-F108-03
+#### 3. Refatorar `AgentTemplateForm.tsx`
 
-De: "Ordenacao padrao por sort_order, depois por nome"
-Para: "Ordenacao alfabetica por nome"
+- Remover `Sheet`, `SheetContent`, `SheetHeader`
+- Remover props `open`/`onOpenChange` (nao e mais um modal)
+- Exportar como componente de formulario puro que recebe `agent`, `onSubmit`, `isSubmitting`
+- Manter toda a logica de form, validacao e abas
+- Expandir `TabsList` para usar mais espaco (nao mais `grid-cols-6` comprimido)
+- Remover `ScrollArea` wrapper (a pagina inteira faz scroll)
 
-### Secao Function Calling atualizada
+#### 4. Atualizar `AiAgents.tsx`
 
-Documentar a arquitetura dinamica:
-1. Tools sao registradas no banco (ai_agent_tools) e gerenciadas pelo Admin
-2. O ai-chat carrega tools ativas do agente e as injeta como OpenAI functions
-3. Handler registry em `_shared/tool-handlers.ts` mapeia handler_type para funcoes
-4. Tool Call Loop: ate 3 iteracoes de function calling antes de resposta final
-5. Handlers implementados: `erp_search`, `erp_invoice_search`
+- Remover estado `formOpen`, `editingAgent`, e o componente `<AgentTemplateForm />`
+- `handleCreate` -> `navigate('/admin/ai-agents/novo')`
+- `handleEdit` -> `navigate('/admin/ai-agents/${agent.id}')`
+- Manter a logica de duplicar (duplica e redireciona para o novo ID)
+- Manter a logica de excluir (permanece na lista)
+
+#### 5. `AgentTemplateTable.tsx`
+
+- `onEdit` agora chama `navigate` em vez de abrir modal
+- Sem mudanca na estrutura da tabela
 
