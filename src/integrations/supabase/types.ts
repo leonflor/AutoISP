@@ -239,7 +239,6 @@ export type Database = {
           features: Json | null
           id: string
           is_active: boolean | null
-          is_premium: boolean | null
           max_tokens: number | null
           model: string | null
           name: string
@@ -264,7 +263,6 @@ export type Database = {
           features?: Json | null
           id?: string
           is_active?: boolean | null
-          is_premium?: boolean | null
           max_tokens?: number | null
           model?: string | null
           name: string
@@ -289,7 +287,6 @@ export type Database = {
           features?: Json | null
           id?: string
           is_active?: boolean | null
-          is_premium?: boolean | null
           max_tokens?: number | null
           model?: string | null
           name?: string
