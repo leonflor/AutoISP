@@ -50,7 +50,7 @@ export function useIspAgents() {
           *,
           ai_agents!inner (
             id, name, slug, type, description, avatar_url,
-            uses_knowledge_base, is_premium, system_prompt,
+            uses_knowledge_base, system_prompt,
             model, temperature, max_tokens, feature_tags,
             voice_tones, escalation_options, scope,
             is_active
@@ -121,7 +121,7 @@ export function useIspAgents() {
       // Marcar disponibilidade
       const catalogTemplates: CatalogTemplate[] = (templates || []).map((t) => ({
         ...t,
-        isAvailable: !t.is_premium || limits.some((l) => l.agent_id === t.id && l.is_enabled),
+        isAvailable: limits.length === 0 || limits.some((l) => l.agent_id === t.id && l.is_enabled),
         isActivated: activatedIds.has(t.id),
       }));
 
