@@ -1,108 +1,46 @@
 
 
-# Adicionar Tool `consultar_faturas` e Vincular ao Fluxo de Cobranca
+# Limpeza do campo `is_premium` residual
 
-## O que existe hoje
+## Problema
 
-- **Tool**: `buscar_contrato_cliente` (handler: `erp_search`) vinculada ao agente "Atendente Virtual"
-- **Fluxo Cobranca**: 5 etapas, mas somente a etapa 2 usa uma tool. A etapa 3 ("Verificar debitos") nao tem tool vinculada.
+O campo `is_premium` foi removido da UI admin mas ainda persiste em dois lugares no painel ISP:
 
-## O que sera feito
+1. **`src/hooks/painel/useIspAgents.ts` (linha 53)**: o SELECT inclui `is_premium` no JOIN com `ai_agents`
+2. **`src/hooks/painel/useIspAgents.ts` (linha 124)**: a logica de disponibilidade usa `!t.is_premium` como condicao
 
-### 1. Nova tool: `consultar_faturas`
+A disponibilidade ja e controlada pela tabela `ai_limits` (campo `is_enabled`), tornando `is_premium` redundante.
 
-Inserir no banco a tool vinculada ao agente "Atendente Virtual":
+## Ordem de exibicao
 
-| Campo | Valor |
-|---|---|
-| name | `consultar_faturas` |
-| description | Lista faturas abertas de um cliente pelo CPF/CNPJ ou ID do contrato |
-| handler_type | `erp_invoice_search` |
-| requires_erp | true |
-| parameters_schema | `{ type: "object", properties: { cliente_id: { type: "string", description: "CPF, CNPJ ou ID do cliente" } }, required: ["cliente_id"] }` |
+A ordenacao dos agentes no admin ja e alfabetica por nome (`order('name')`). Nenhuma correcao necessaria.
 
-### 2. Novo handler: `erp_invoice_search`
+## Plano de execucao
 
-Adicionar ao `_shared/tool-handlers.ts` um handler que simula a consulta de faturas. Como os ERPs reais tem APIs diferentes para faturas, o handler inicial retornara dados simulados (mock) para validacao do fluxo, com a estrutura pronta para integracao futura.
+### Etapa 1 -- Remover `is_premium` do hook `useIspAgents.ts`
 
-O handler retornara:
+- **Linha 53**: Remover `is_premium` do SELECT do `ai_agents`
+- **Linha 124**: Simplificar a logica de `isAvailable` para depender apenas de `ai_limits`:
 
 ```text
-{
-  success: true,
-  data: {
-    cliente: "Nome do cliente",
-    faturas: [
-      { numero: "FAT-001", valor: 120.00, vencimento: "2026-01-15", status: "vencida" },
-      { numero: "FAT-002", valor: 120.00, vencimento: "2026-02-15", status: "aberta" }
-    ],
-    total_aberto: 240.00
-  }
-}
+// Antes:
+isAvailable: !t.is_premium || limits.some((l) => l.agent_id === t.id && l.is_enabled)
+
+// Depois:
+isAvailable: limits.length === 0 || limits.some((l) => l.agent_id === t.id && l.is_enabled)
 ```
 
-### 3. Vincular tool a etapa 3 do fluxo Cobranca
+Se nao houver limites configurados para o plano, todos os templates ficam disponiveis. Se houver, respeita o `is_enabled` de cada agente.
 
-Atualizar a etapa "Verificar debitos" (step_order = 3) para usar a nova tool `consultar_faturas`, adicionando o `tool_id` correspondente.
+### Etapa 2 -- Remover `is_premium` do banco (migracao SQL)
 
-### 4. Deploy
-
-Deployar `ai-chat` (que importa `tool-handlers.ts`) para que o novo handler fique disponivel.
-
----
-
-## Arquivos alterados
-
-| Arquivo | Alteracao |
-|---|---|
-| Migracao SQL | INSERT da tool `consultar_faturas` + UPDATE da etapa 3 do fluxo Cobranca |
-| `_shared/tool-handlers.ts` | Novo handler `erp_invoice_search` (mock) + registro no registry |
-| Deploy | `ai-chat` e `fetch-erp-clients` |
-
----
-
-## Detalhes tecnicos
-
-### Handler `erp_invoice_search`
+Dropar a coluna `is_premium` da tabela `ai_agents` para evitar confusao futura:
 
 ```text
-const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
-  const clienteId = String(args.cliente_id || "");
-  if (!clienteId) return { success: false, error: "Informe o CPF/CNPJ ou ID do cliente" };
-
-  // Mock -- pronto para integracao futura com ERPs reais
-  return {
-    success: true,
-    data: {
-      cliente_id: clienteId,
-      faturas: [
-        { numero: "FAT-2026-001", valor: 129.90, vencimento: "2026-01-15", status: "vencida", dias_atraso: 23 },
-        { numero: "FAT-2026-002", valor: 129.90, vencimento: "2026-02-15", status: "aberta", dias_atraso: 0 }
-      ],
-      total_aberto: 259.80,
-      mensagem: "Dados simulados para teste. Integrar com API do ERP para dados reais."
-    }
-  };
-};
+ALTER TABLE ai_agents DROP COLUMN IF EXISTS is_premium;
 ```
 
-### SQL da migracao
+### Etapa 3 -- Regenerar types
 
-```text
--- Inserir tool consultar_faturas
-INSERT INTO ai_agent_tools (agent_id, name, description, parameters_schema, handler_type, requires_erp, sort_order)
-VALUES (
-  '599bcd52-350c-47e7-8f96-b919a5e2a8a1',
-  'consultar_faturas',
-  'Lista faturas abertas de um cliente pelo CPF/CNPJ ou ID do contrato',
-  '{ "type": "object", "properties": { "cliente_id": { "type": "string", "description": "CPF, CNPJ ou ID do cliente" } }, "required": ["cliente_id"] }',
-  'erp_invoice_search',
-  true,
-  2
-);
+O `src/integrations/supabase/types.ts` sera atualizado automaticamente para refletir a remocao da coluna.
 
--- Vincular a tool a etapa 3 do fluxo Cobranca
-UPDATE ai_agent_flow_steps
-SET tool_id = (SELECT id FROM ai_agent_tools WHERE name = 'consultar_faturas' AND agent_id = '599bcd52-350c-47e7-8f96-b919a5e2a8a1')
-WHERE id = '6c047fd3-22d3-42b0-9df7-6472734a6faa';
-```
