@@ -83,6 +83,7 @@ const ImplementacaoTab = () => {
     "process-document",
     "save-erp-config",
     "test-erp",
+    "fetch-erp-clients",
   ];
 
   return (
@@ -567,7 +568,7 @@ const ImplementacaoTab = () => {
                 <div>
                   <h4 className="mb-3 font-semibold text-foreground">Módulos</h4>
                   <div className="flex flex-wrap gap-2">
-                    {["Dashboard", "Assinantes", "Agentes IA", "Faturas", "Usuários", "Relatórios", "Configurações"].map((mod) => (
+                    {["Dashboard", "Assinantes", "Agentes IA", "Base de Conhecimento", "Faturas", "Usuários", "Relatórios", "Configurações", "Comunicação", "WhatsApp", "Integrações ERP", "Atendimentos"].map((mod) => (
                       <Badge key={mod} variant="secondary">{mod}</Badge>
                     ))}
                   </div>
@@ -748,6 +749,13 @@ const ImplementacaoTab = () => {
                 {fn}
               </Badge>
             ))}
+          </div>
+          <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/)</h4>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li><code className="rounded bg-muted px-1">_shared/tool-handlers.ts</code> — Registry de handlers para function calling (mapeia handler_type → função executável)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-fetcher.ts</code> — Lógica centralizada de busca em ERPs (IXC, SGP, MK) com descriptografia de credenciais</li>
+            </ul>
           </div>
         </CardContent>
       </Card>
