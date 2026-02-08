@@ -293,54 +293,68 @@ const OpenAIIntegration = () => {
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-yellow-500" />
-                <span className="font-medium">Function Calling (Tools)</span>
+                <span className="font-medium">Function Calling (Tools) — Arquitetura Dinâmica</span>
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <div className="space-y-4">
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                    <strong>✓ Implementado:</strong> Arquitetura dinâmica — tools são registradas no banco (<code>ai_agent_tools</code>) e gerenciadas pelo Admin. O <code>ai-chat</code> carrega tools ativas e as injeta como OpenAI functions em runtime.
+                  </p>
+                </div>
+
                 <div>
-                  <h4 className="mb-3 text-sm font-medium">Functions Disponíveis para os Agentes:</h4>
+                  <h4 className="mb-3 text-sm font-medium">Arquitetura:</h4>
+                  <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
+                    <li>Tools são cadastradas na tabela <code className="text-xs">ai_agent_tools</code> via Painel Admin</li>
+                    <li>O <code className="text-xs">ai-chat</code> carrega tools ativas do agente e converte para formato OpenAI</li>
+                    <li>Handler registry em <code className="text-xs">_shared/tool-handlers.ts</code> mapeia <code>handler_type</code> para funções executáveis</li>
+                    <li><strong>Tool Call Loop:</strong> até 3 iterações de function calling antes da resposta final</li>
+                    <li>Após resolver todas as tools, streaming da resposta consolidada via SSE</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas:</h4>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Function</TableHead>
+                        <TableHead>Handler Type</TableHead>
+                        <TableHead>Function Name</TableHead>
                         <TableHead>Descrição</TableHead>
-                        <TableHead>Parâmetros</TableHead>
+                        <TableHead>Requer ERP</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="font-mono text-xs">consultar_fatura</TableCell>
-                        <TableCell className="text-sm">Busca faturas do assinante</TableCell>
-                        <TableCell className="text-sm">cpf, status</TableCell>
+                        <TableCell className="font-mono text-xs">erp_search</TableCell>
+                        <TableCell className="font-mono text-xs">buscar_contrato_cliente</TableCell>
+                        <TableCell className="text-sm">Busca clientes no ERP integrado (IXC/SGP/MK)</TableCell>
+                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell className="font-mono text-xs">verificar_conexao</TableCell>
-                        <TableCell className="text-sm">Testa conexão do equipamento</TableCell>
-                        <TableCell className="text-sm">contrato_id</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">abrir_chamado</TableCell>
-                        <TableCell className="text-sm">Cria OS no ERP</TableCell>
-                        <TableCell className="text-sm">tipo, descricao, prioridade</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">consultar_plano</TableCell>
-                        <TableCell className="text-sm">Retorna dados do plano atual</TableCell>
-                        <TableCell className="text-sm">contrato_id</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">segunda_via_boleto</TableCell>
-                        <TableCell className="text-sm">Gera link de 2ª via</TableCell>
-                        <TableCell className="text-sm">fatura_id</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">agendar_visita</TableCell>
-                        <TableCell className="text-sm">Agenda visita técnica</TableCell>
-                        <TableCell className="text-sm">data, periodo, motivo</TableCell>
+                        <TableCell className="font-mono text-xs">erp_invoice_search</TableCell>
+                        <TableCell className="font-mono text-xs">consultar_faturas</TableCell>
+                        <TableCell className="text-sm">Lista faturas do cliente (mock)</TableCell>
+                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
+                </div>
+
+                <div>
+                  <h4 className="mb-3 text-sm font-medium">Roadmap de Tools (Futuras):</h4>
+                  <div className="rounded-lg bg-muted/50 p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {["verificar_conexao", "abrir_chamado", "consultar_plano", "segunda_via_boleto", "agendar_visita"].map((fn) => (
+                        <Badge key={fn} variant="secondary" className="font-mono text-xs opacity-60">{fn}</Badge>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Futuramente serão adicionadas como novos handlers no registry e registradas via Admin.
+                    </p>
+                  </div>
                 </div>
               </div>
             </AccordionContent>
@@ -546,7 +560,7 @@ Body:
     {
       "type": "function",
       "function": {
-        "name": "consultar_fatura",
+        "name": "buscar_contrato_cliente",
         "parameters": { ... }
       }
     }

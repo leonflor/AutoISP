@@ -54,7 +54,7 @@ const iaFeatures: Feature[] = [
     regrasNegocio: [
       { codigo: "RN-F108-01", descricao: "Templates com scope 'tenant' são disponibilizados para ISPs ativarem", tipo: "Comportamento" },
       { codigo: "RN-F108-02", descricao: "Templates com scope 'platform' são de uso interno do SaaS", tipo: "Comportamento" },
-      { codigo: "RN-F108-03", descricao: "Ordenação padrão por sort_order, depois por nome", tipo: "Comportamento" },
+      { codigo: "RN-F108-03", descricao: "Ordenação alfabética por nome", tipo: "Comportamento" },
     ],
     permissoes: [
       { role: "Super Admin", acoes: "Visualizar, criar, editar, duplicar, ativar/desativar" },
@@ -195,6 +195,159 @@ const iaFeatures: Feature[] = [
       { tabela: "audit_logs", campos: "action, entity_type, entity_id, old_data, new_data", operacoes: "INSERT" },
     ],
   },
+  // === Novas features implementadas ===
+  {
+    codigo: "F-ADMIN-116",
+    nome: "Listar Tools do Agente",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Aba 'Tools' no formulário do template exibe tabela com todas as tools (functions) registradas para o agente. Cada tool define uma função OpenAI que o agente pode invocar durante o atendimento.",
+    criticidade: "alta",
+    regrasNegocio: [
+      { codigo: "RN-F116-01", descricao: "Tools são vinculadas a um agente específico (agent_id)", tipo: "Comportamento" },
+      { codigo: "RN-F116-02", descricao: "Apenas tools ativas (is_active) são injetadas no prompt do ai-chat", tipo: "Comportamento" },
+      { codigo: "RN-F116-03", descricao: "Tools com requires_erp=true só funcionam se ISP tiver ERP configurado", tipo: "Validação" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Visualizar, criar, editar, excluir tools" },
+    ],
+    entidades: [
+      { tabela: "ai_agent_tools", campos: "id, agent_id, name, description, handler_type, is_active, requires_erp, sort_order", operacoes: "SELECT" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-117",
+    nome: "Criar/Editar Tool",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Formulário para criar ou editar uma tool do agente. Define nome, descrição, JSON Schema dos parâmetros, handler_type e handler_config.",
+    criticidade: "alta",
+    regrasNegocio: [
+      { codigo: "RN-F117-01", descricao: "parameters_schema deve ser um JSON Schema válido compatível com OpenAI function calling", tipo: "Validação" },
+      { codigo: "RN-F117-02", descricao: "handler_type mapeia para um handler no registry (_shared/tool-handlers.ts)", tipo: "Comportamento" },
+      { codigo: "RN-F117-03", descricao: "Handlers implementados: erp_search, erp_invoice_search", tipo: "Referência" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Criar e editar tools" },
+    ],
+    entidades: [
+      { tabela: "ai_agent_tools", campos: "name, description, parameters_schema, handler_type, handler_config, is_active, requires_erp, sort_order", operacoes: "INSERT, UPDATE" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-118",
+    nome: "Excluir Tool",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Remove uma tool do agente com confirmação obrigatória. Flow steps vinculados perdem a referência.",
+    criticidade: "media",
+    regrasNegocio: [
+      { codigo: "RN-F118-01", descricao: "Confirmação obrigatória via dialog", tipo: "UX" },
+      { codigo: "RN-F118-02", descricao: "Flow steps com tool_id referenciando a tool excluída ficam com tool_id = null", tipo: "Comportamento" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Excluir tools" },
+    ],
+    entidades: [
+      { tabela: "ai_agent_tools", campos: "id", operacoes: "DELETE" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-119",
+    nome: "Listar Fluxos Conversacionais",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Aba 'Fluxos' no formulário do template exibe tabela com fluxos conversacionais (ex: Cobrança, Suporte, Vendas). Cada fluxo define um cenário estruturado com keywords de ativação e etapas sequenciais.",
+    criticidade: "alta",
+    regrasNegocio: [
+      { codigo: "RN-F119-01", descricao: "Fluxos com is_fixed=true não podem ser excluídos", tipo: "Proteção" },
+      { codigo: "RN-F119-02", descricao: "trigger_keywords define palavras-chave para ativação automática", tipo: "Comportamento" },
+      { codigo: "RN-F119-03", descricao: "trigger_prompt é injetado no system prompt quando o fluxo é ativado", tipo: "Comportamento" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Visualizar, criar, editar, excluir fluxos" },
+    ],
+    entidades: [
+      { tabela: "ai_agent_flows", campos: "id, agent_id, name, slug, description, trigger_keywords, is_active, is_fixed, sort_order", operacoes: "SELECT" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-120",
+    nome: "Criar/Editar Fluxo",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Formulário para criar ou editar um fluxo conversacional com nome, slug, descrição, keywords de ativação, prompt de trigger e status.",
+    criticidade: "alta",
+    regrasNegocio: [
+      { codigo: "RN-F120-01", descricao: "Slug é gerado automaticamente a partir do nome", tipo: "Geração" },
+      { codigo: "RN-F120-02", descricao: "trigger_keywords é um array de strings", tipo: "Formato" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Criar e editar fluxos" },
+    ],
+    entidades: [
+      { tabela: "ai_agent_flows", campos: "name, slug, description, trigger_keywords, trigger_prompt, is_active, is_fixed, sort_order", operacoes: "INSERT, UPDATE" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-121",
+    nome: "Gerenciar Etapas do Fluxo",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Editor de etapas sequenciais dentro de um fluxo. Cada etapa define instrução, input esperado, tool associada, condição de avanço e fallback.",
+    criticidade: "alta",
+    regrasNegocio: [
+      { codigo: "RN-F121-01", descricao: "Etapas ordenadas por step_order (reordenável)", tipo: "Comportamento" },
+      { codigo: "RN-F121-02", descricao: "tool_auto_execute=true executa a tool sem pedir confirmação", tipo: "Comportamento" },
+      { codigo: "RN-F121-03", descricao: "fallback_instruction define resposta caso input não atenda condition_to_advance", tipo: "Comportamento" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Adicionar, editar, reordenar, remover etapas" },
+    ],
+    entidades: [
+      { tabela: "ai_agent_flow_steps", campos: "flow_id, step_order, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance, fallback_instruction, is_active", operacoes: "SELECT, INSERT, UPDATE, DELETE" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-122",
+    nome: "Visualizar Logs de Processamento RAG",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Página para monitorar falhas no pipeline de indexação de documentos. Exibe etapa do erro, código, stack traces e detalhes JSONB. Filtros por ISP, código de erro e período.",
+    criticidade: "media",
+    regrasNegocio: [
+      { codigo: "RN-F122-01", descricao: "Logs somente leitura — não editáveis", tipo: "Comportamento" },
+      { codigo: "RN-F122-02", descricao: "Detalhes exibidos em dialog modal com JSON formatado", tipo: "UX" },
+      { codigo: "RN-F122-03", descricao: "Limite de 100 logs por consulta, ordenados por data desc", tipo: "Performance" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Visualizar logs de processamento" },
+    ],
+    entidades: [
+      { tabela: "document_processing_logs", campos: "id, document_id, isp_id, isp_agent_id, error_code, error_message, error_details, processing_step, created_at", operacoes: "SELECT" },
+      { tabela: "isps", campos: "name", operacoes: "SELECT (join)" },
+      { tabela: "knowledge_documents", campos: "name, original_filename", operacoes: "SELECT (join)" },
+    ],
+  },
+  {
+    codigo: "F-ADMIN-123",
+    nome: "Configurar Personalização do Template",
+    modulo: "IA",
+    plataforma: "Painel Admin",
+    descricao: "Aba 'Personalização' no formulário do template. Define opções de tom de voz (voice_tones) e regras de escalação humana (escalation_options) disponíveis para ISPs.",
+    criticidade: "media",
+    regrasNegocio: [
+      { codigo: "RN-F123-01", descricao: "voice_tones é um array de objetos {value, label} armazenado como JSONB", tipo: "Formato" },
+      { codigo: "RN-F123-02", descricao: "escalation_options define triggers (ex: low_confidence, max_interactions) e ações", tipo: "Comportamento" },
+      { codigo: "RN-F123-03", descricao: "ISPs selecionam um voice_tone e configuram escalação ao ativar o agente", tipo: "Comportamento" },
+    ],
+    permissoes: [
+      { role: "Super Admin", acoes: "Configurar opções de personalização" },
+    ],
+    entidades: [
+      { tabela: "ai_agents", campos: "voice_tones, escalation_options", operacoes: "UPDATE" },
+    ],
+  },
 ];
 
 const getCriticidadeBadge = (criticidade: Feature["criticidade"]) => {
@@ -220,7 +373,7 @@ const IAFeatures = () => {
     <div className="space-y-4">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          8 features documentadas para o módulo de Inteligência Artificial
+          16 features documentadas para o módulo de Inteligência Artificial
         </p>
       </div>
 
