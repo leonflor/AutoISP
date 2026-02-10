@@ -1,6 +1,7 @@
 import { Header } from '@/components/landing/Header';
 import { Hero } from '@/components/landing/Hero';
 import { Benefits } from '@/components/landing/Benefits';
+import { Ecosystem } from '@/components/landing/Ecosystem';
 import { Stats } from '@/components/landing/Stats';
 import { Features } from '@/components/landing/Features';
 import { Plans } from '@/components/landing/Plans';
