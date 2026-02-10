@@ -18,6 +18,7 @@ const Index = () => {
       <main>
         <Hero />
         <Benefits />
+        <Ecosystem />
         <Stats />
         <Features />
         <Plans />
