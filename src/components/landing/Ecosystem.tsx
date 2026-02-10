@@ -2,7 +2,7 @@ import robotEcosystem from '@/assets/robot-ecosystem.png';
 
 export const Ecosystem = () => {
   return (
-    <section className="py-16 md:py-24 bg-background">
+    <section className="py-8 md:py-12 bg-background">
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
           {/* Image */}
@@ -10,7 +10,7 @@ export const Ecosystem = () => {
             <img
               src={robotEcosystem}
               alt="Robô AutoISP conectando Atendimento N1, Vendas Ativas, Monitoramento de Ativos, Integração e Automação"
-              className="w-full max-w-lg drop-shadow-xl"
+              className="w-full max-w-lg scale-110 drop-shadow-xl"
               loading="lazy"
             />
           </div>
