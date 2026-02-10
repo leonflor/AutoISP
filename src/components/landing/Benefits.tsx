@@ -50,7 +50,7 @@ export const Benefits = () => {
   return (
     <section 
       id="benefits" 
-      className="py-16 md:py-24 bg-secondary/30"
+      className="py-10 md:py-16 bg-secondary/30"
       aria-labelledby="benefits-heading"
     >
       <div className="container mx-auto px-4">
