@@ -1,60 +1,75 @@
 
 
-# Corrigir Problemas Criticos de Seguranca
+# Mover pgvector do schema public para extensions
 
-## Problemas identificados
+## Por que isso e importante?
 
-| # | Tabela | Problema | Severidade |
-|---|--------|----------|------------|
-| 1 | ai_security_clauses | SELECT permite leitura sem autenticacao (qualquer usuario anonimo pode ler as regras de seguranca da IA) | Critico |
-| 2 | audit_logs | Sem policies de UPDATE/DELETE -- logs podem ser modificados ou apagados | Aviso |
-| 3 | document_processing_logs | INSERT com `WITH CHECK (true)` -- qualquer autenticado pode inserir logs falsos | Aviso |
+Quando a extensao `pgvector` esta instalada no schema `public`, todas as suas funcoes internas (mais de 80 funcoes como `vector_in`, `vector_out`, `cosine_distance`, etc.) ficam misturadas com as funcoes de negocio da aplicacao (`has_role`, `get_user_isp_id`, `match_document_chunks`). Isso causa:
 
-**Nota:** Os problemas anteriores de `profiles`, `subscribers`, `erp_configs` e `whatsapp_configs` ja foram validados como falsos positivos ou corrigidos. As policies existentes estao corretas (isolamento por ISP, acesso restrito a admins).
+- **Poluicao do namespace**: as funcoes do pgvector aparecem junto com as funcoes do sistema, dificultando manutencao
+- **Risco de colisao de nomes**: funcoes futuras podem conflitar com nomes usados pelo pgvector
+- **Pratica recomendada pelo Supabase**: a documentacao oficial recomenda instalar extensoes no schema `extensions`, que ja existe por padrao em todos os projetos Supabase
 
-## Correcoes
+## O que muda na pratica?
 
-### 1. ai_security_clauses -- Restringir leitura a autenticados
+Para o codigo da aplicacao, **nada muda**. A unica funcao que usa pgvector diretamente e `match_document_chunks`, que continuara funcionando porque o Supabase adiciona automaticamente o schema `extensions` ao `search_path`.
 
-**Problema:** A policy `Authenticated can read active clauses` usa `USING (is_active = true)` sem verificar `auth.role() = 'authenticated'`. Usuarios anonimos conseguem ler as clausulas de seguranca LGPD.
+## Como sera feito
 
-**Correcao:** Alterar a policy para exigir autenticacao.
+Essa alteracao requer executar um comando SQL no banco de dados:
 
-### 2. audit_logs -- Tornar imutavel
+```text
+-- Remover a extensao do schema public
+DROP EXTENSION IF EXISTS vector;
 
-**Problema:** Nao existem policies bloqueando UPDATE e DELETE. Embora nao haja policies permitindo essas operacoes, a melhor pratica e criar policies explicitas com `USING (false)`.
+-- Recriar no schema extensions (padrao recomendado pelo Supabase)
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+```
 
-**Correcao:** Adicionar policies de bloqueio.
+**Importante:** Isso so e seguro se nao houver dados reais com embeddings armazenados. Se ja existirem dados na tabela `document_chunks` com a coluna `embedding` preenchida, sera necessario fazer backup dos dados antes.
 
-### 3. document_processing_logs -- Restringir INSERT
+## Verificacao previa
 
-**Problema:** A policy `Service role can insert logs` usa `WITH CHECK (true)`, permitindo que qualquer usuario autenticado insira logs. Deveria ser restrito ao service_role (Edge Functions).
-
-**Correcao:** Alterar para `WITH CHECK (false)` no nivel RLS (o service_role ja ignora RLS por padrao, entao os Edge Functions continuam funcionando).
+Antes de executar, sera verificado se existem dados na tabela `document_chunks` para garantir que a migracao e segura.
 
 ## Secao tecnica
 
 **Migration SQL:**
 
 ```text
--- 1. ai_security_clauses: exigir autenticacao para leitura
-DROP POLICY "Authenticated can read active clauses" ON ai_security_clauses;
-CREATE POLICY "Authenticated can read active clauses" ON ai_security_clauses
-  FOR SELECT
-  USING (is_active = true AND auth.role() = 'authenticated');
-
--- 2. audit_logs: bloqueio explicito de modificacoes
-CREATE POLICY "audit_logs_no_update" ON audit_logs
-  FOR UPDATE USING (false);
-CREATE POLICY "audit_logs_no_delete" ON audit_logs
-  FOR DELETE USING (false);
-
--- 3. document_processing_logs: restringir INSERT
-DROP POLICY "Service role can insert logs" ON document_processing_logs;
-CREATE POLICY "Service role only insert logs" ON document_processing_logs
-  FOR INSERT WITH CHECK (false);
+-- Dropar e recriar extensao no schema correto
+DROP EXTENSION IF EXISTS vector CASCADE;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 ```
 
-**Nenhum arquivo de codigo precisa ser alterado** -- todas as correcoes sao no banco de dados.
+O `CASCADE` remove objetos dependentes (operadores, tipos). Apos recriar a extensao, a funcao `match_document_chunks` e a coluna `embedding` em `document_chunks` precisarao ser recriadas:
 
-**Impacto:** Zero. O frontend ja usa sessoes autenticadas, entao a restricao em ai_security_clauses nao afeta o uso normal. O service_role (Edge Functions) ignora RLS, entao as restricoes em audit_logs e document_processing_logs nao afetam funcionalidades existentes.
+```text
+-- Recriar coluna embedding (se a tabela existir)
+ALTER TABLE document_chunks
+  ADD COLUMN IF NOT EXISTS embedding extensions.vector(1536);
+
+-- Recriar funcao match_document_chunks referenciando extensions.vector
+CREATE OR REPLACE FUNCTION match_document_chunks(
+  query_embedding extensions.vector,
+  match_isp_agent_id uuid,
+  match_threshold double precision DEFAULT 0.7,
+  match_count integer DEFAULT 5
+) RETURNS TABLE(id uuid, content text, similarity double precision)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT dc.id, dc.content,
+    1 - (dc.embedding <=> query_embedding) as similarity
+  FROM document_chunks dc
+  WHERE dc.isp_agent_id = match_isp_agent_id
+    AND 1 - (dc.embedding <=> query_embedding) > match_threshold
+  ORDER BY dc.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
+```
+
+**Arquivos afetados:** Apenas migration SQL no banco de dados. Nenhum arquivo de codigo frontend precisa ser alterado.
+
