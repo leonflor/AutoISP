@@ -4,56 +4,68 @@
 
 ## Contexto
 
-O sistema ja possui ferramentas e fluxos cadastrados que se encaixam naturalmente em um procedimento de cobranca. Este seed agrupa esses recursos existentes em um procedimento reutilizavel.
+As tabelas de procedimentos (`ai_procedures`, `ai_procedure_tools`, `ai_procedure_flows`, `ai_agent_procedures`) ainda nao existem no banco. Precisamos cria-las e inserir o seed.
 
-## Pre-requisito
+Os recursos existentes foram confirmados:
 
-A tabela `ai_procedures` precisa existir. Como a migration anterior nao foi aplicada, o seed incluira a criacao das tabelas necessarias antes de inserir os dados.
-
-## Dados do Seed
-
-### Procedimento
-
-| Campo | Valor |
+| Recurso | ID |
 |---|---|
-| name | Cobranca e Financeiro |
-| slug | cobranca-financeiro |
-| description | Procedimento completo para identificacao de clientes, consulta de faturas em aberto e negociacao de debitos. Integra ferramentas de busca no ERP com fluxo conversacional estruturado. |
-| icon | receipt |
-| is_active | true |
-| sort_order | 1 |
+| Tool: buscar_contrato_cliente | `fa533441-439f-4f4d-afdb-9f78749ff2de` |
+| Tool: consultar_faturas | `26bd11d1-3909-48ad-869c-280ddabc8daf` |
+| Flow: Cobranca | `ea447503-8a62-467b-b0de-4fb76822a917` |
+| Agent: Atendente Virtual | `599bcd52-350c-47e7-8f96-b919a5e2a8a1` |
+| Agent: Financeiro | `8e08ca74-2cd1-4a11-8b62-c8c3e99b422a` |
 
-### Vinculos com Tools existentes
+## Etapas
 
-| Ferramenta | ID | Justificativa |
-|---|---|---|
-| buscar_contrato_cliente | `fa533441-...` | Localizar o contrato do cliente no ERP |
-| consultar_faturas | `26bd11d1-...` | Listar faturas em aberto para negociacao |
+### 1. Migration -- criar as 4 tabelas
 
-### Vinculo com Flow existente
+Executar migration SQL com `CREATE TABLE IF NOT EXISTS` para:
 
-| Fluxo | ID | Justificativa |
-|---|---|---|
-| Cobranca | `ea447503-...` | Fluxo de 5 etapas: identificar -> buscar contrato -> verificar debitos -> negociar -> encerrar |
+- `ai_procedures` (id, name, slug unique, description, icon, is_active, sort_order, created_at, updated_at)
+- `ai_procedure_tools` (id, procedure_id FK, tool_id FK, sort_order, unique(procedure_id, tool_id))
+- `ai_procedure_flows` (id, procedure_id FK, flow_id FK, sort_order, unique(procedure_id, flow_id))
+- `ai_agent_procedures` (id, agent_id FK, procedure_id FK, is_active, sort_order, unique(agent_id, procedure_id))
 
-### Vinculo com Agentes
+Incluir trigger `update_updated_at_column` em `ai_procedures` e habilitar RLS com policies para `super_admin`.
 
-| Agente | ID | Justificativa |
-|---|---|---|
-| Atendente Virtual | `599bcd52-...` | Agente generalista que precisa lidar com cobranca |
-| Financeiro | `8e08ca74-...` | Agente especializado em financeiro |
+### 2. Seed -- inserir dados
 
-## Secao Tecnica
+Usar INSERT com `ON CONFLICT DO NOTHING` para idempotencia:
 
-**Arquivo a criar:** `docs/migrations/f4-procedure-seed.sql`
+1. Inserir procedimento "Cobranca e Financeiro" (slug: `cobranca-financeiro`, icon: `receipt`)
+2. Vincular as 2 tools ao procedimento
+3. Vincular o flow "Cobranca" ao procedimento
+4. Vincular os agents "Atendente Virtual" e "Financeiro"
 
-O SQL fara:
+### 3. Arquivo de documentacao
 
-1. Criar as 4 tabelas (`ai_procedures`, `ai_procedure_tools`, `ai_procedure_flows`, `ai_agent_procedures`) caso nao existam -- usando `CREATE TABLE IF NOT EXISTS`
-2. Inserir o procedimento "Cobranca e Financeiro"
-3. Vincular as 2 ferramentas existentes ao procedimento via `ai_procedure_tools`
-4. Vincular o fluxo "Cobranca" ao procedimento via `ai_procedure_flows`
-5. Vincular os agentes "Atendente Virtual" e "Financeiro" via `ai_agent_procedures`
+Criar `docs/migrations/f4-procedure-seed.sql` com o SQL completo para referencia.
 
-Todo o seed usara `ON CONFLICT DO NOTHING` para ser idempotente (pode rodar varias vezes sem erro).
+## Secao tecnica
+
+**Migration SQL (resumo):**
+
+```text
+CREATE TABLE IF NOT EXISTS ai_procedures (...)
+CREATE TABLE IF NOT EXISTS ai_procedure_tools (...)
+CREATE TABLE IF NOT EXISTS ai_procedure_flows (...)
+CREATE TABLE IF NOT EXISTS ai_agent_procedures (...)
+
+-- RLS + policies para super_admin
+-- Trigger updated_at
+
+-- Seed inserts com ON CONFLICT DO NOTHING
+INSERT INTO ai_procedures (name, slug, ...) VALUES ('Cobranca e Financeiro', 'cobranca-financeiro', ...)
+INSERT INTO ai_procedure_tools (procedure_id, tool_id) ...
+INSERT INTO ai_procedure_flows (procedure_id, flow_id) ...
+INSERT INTO ai_agent_procedures (agent_id, procedure_id) ...
+```
+
+**Arquivos a criar/modificar:**
+
+| Arquivo | Acao |
+|---|---|
+| `docs/migrations/f4-procedure-seed.sql` | Criar -- SQL de referencia |
+| Migration via ferramenta Supabase | Executar -- criar tabelas + seed |
 
