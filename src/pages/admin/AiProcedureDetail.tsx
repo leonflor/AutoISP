@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Save, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   useAiProcedure,
   useCreateProcedure,
@@ -180,6 +182,7 @@ function ProcedureFlowsSection({ procedureId }: { procedureId: string }) {
   const { data: allFlows, isLoading: loadingFlows } = useGlobalFlows();
   const { data: linkedFlows } = useProcedureFlows(procedureId);
   const toggleFlow = useToggleProcedureFlow();
+  const [expandedFlow, setExpandedFlow] = useState<string | null>(null);
 
   const linkedIds = new Set((linkedFlows || []).map(l => l.flow_id));
 
@@ -187,27 +190,72 @@ function ProcedureFlowsSection({ procedureId }: { procedureId: string }) {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">Selecionar Fluxos</CardTitle>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/admin/ai-flows"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Gerenciar Fluxos</Link>
+        </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {!allFlows?.length ? (
           <p className="text-sm text-muted-foreground">Nenhum fluxo global cadastrado.</p>
         ) : (
           allFlows.map(flow => (
-            <div key={flow.id} className="flex items-start gap-3 p-3 rounded-lg border">
-              <Checkbox
-                checked={linkedIds.has(flow.id)}
-                onCheckedChange={(checked) => {
-                  toggleFlow.mutate({ procedureId, flowId: flow.id, add: !!checked });
-                }}
-              />
-              <div>
-                <p className="font-medium text-sm">{flow.name}</p>
-                <p className="text-xs text-muted-foreground">{flow.description || 'Sem descrição'}</p>
-                <p className="text-xs text-muted-foreground mt-1">{flow.steps?.length || 0} etapas · {flow.is_fixed ? 'Fixo' : 'Flexível'}</p>
+            <Collapsible
+              key={flow.id}
+              open={expandedFlow === flow.id}
+              onOpenChange={open => setExpandedFlow(open ? flow.id : null)}
+            >
+              <div className="flex items-start gap-3 p-3 rounded-lg border">
+                <Checkbox
+                  checked={linkedIds.has(flow.id)}
+                  onCheckedChange={(checked) => {
+                    toggleFlow.mutate({ procedureId, flowId: flow.id, add: !!checked });
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <CollapsibleTrigger asChild>
+                      <button className="flex items-center gap-1.5 text-left">
+                        {expandedFlow === flow.id ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        <span className="font-medium text-sm">{flow.name}</span>
+                      </button>
+                    </CollapsibleTrigger>
+                    <Badge variant={flow.is_fixed ? 'default' : 'secondary'} className="text-xs">
+                      {flow.is_fixed ? 'Fixo' : 'Flexível'}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{flow.steps?.length || 0} etapas</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{flow.description || 'Sem descrição'}</p>
+                  {flow.trigger_keywords && flow.trigger_keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {flow.trigger_keywords.map((kw, i) => <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>)}
+                    </div>
+                  )}
+                  <CollapsibleContent>
+                    <div className="mt-3 space-y-2 border-t pt-3">
+                      {flow.steps && flow.steps.length > 0 ? (
+                        flow.steps.map((step, i) => (
+                          <div key={step.id} className="flex items-start gap-2 text-xs p-2 rounded bg-muted/50">
+                            <Badge variant="outline" className="text-xs shrink-0 mt-0.5">{i + 1}</Badge>
+                            <div className="min-w-0">
+                              <p className="font-medium">{step.name}</p>
+                              <p className="text-muted-foreground line-clamp-2">{step.instruction}</p>
+                              {step.expected_input && <p className="text-muted-foreground mt-0.5">Input: {step.expected_input}</p>}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Nenhuma etapa configurada.</p>
+                      )}
+                      <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                        <Link to="/admin/ai-flows">Editar etapas →</Link>
+                      </Button>
+                    </div>
+                  </CollapsibleContent>
+                </div>
               </div>
-            </div>
+            </Collapsible>
           ))
         )}
       </CardContent>
