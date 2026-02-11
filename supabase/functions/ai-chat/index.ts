@@ -510,73 +510,112 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Load tools and flows for this agent ──
+    // ── Load tools and flows via procedures ──
     let agentTools: AgentToolRecord[] = [];
     let agentFlows: AgentFlowRecord[] = [];
 
-    // Fetch active tools
-    const { data: toolsData } = await supabaseAdmin
-      .from("ai_agent_tools")
-      .select("id, name, description, parameters_schema, handler_type, handler_config, requires_erp")
+    // 1. Get active procedures for this agent
+    const { data: agentProcedures } = await supabaseAdmin
+      .from("ai_agent_procedures")
+      .select("procedure_id")
       .eq("agent_id", template.id)
-      .eq("is_active", true)
-      .order("sort_order");
+      .eq("is_active", true);
 
-    // Check if ISP has active ERP (for conditional tools)
-    let hasActiveErp = false;
-    if (toolsData && toolsData.some((t: any) => t.requires_erp)) {
-      const { data: erpConfig } = await supabaseAdmin
-        .from("erp_configs")
+    const procedureIds = (agentProcedures || []).map((ap: any) => ap.procedure_id);
+
+    if (procedureIds.length > 0) {
+      // Only use active procedures
+      const { data: activeProcedures } = await supabaseAdmin
+        .from("ai_procedures")
         .select("id")
-        .eq("isp_id", body.isp_id)
-        .eq("is_active", true)
-        .eq("is_connected", true)
-        .limit(1)
-        .single();
-      hasActiveErp = !!erpConfig;
-    }
+        .in("id", procedureIds)
+        .eq("is_active", true);
 
-    agentTools = ((toolsData || []) as any[])
-      .filter((t) => !t.requires_erp || hasActiveErp)
-      .map((t) => ({
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        parameters_schema: t.parameters_schema,
-        handler_type: t.handler_type,
-        handler_config: t.handler_config,
-        requires_erp: t.requires_erp,
-      }));
+      const activeProcIds = (activeProcedures || []).map((p: any) => p.id);
 
-    // Fetch active flows with steps
-    const { data: flowsData } = await supabaseAdmin
-      .from("ai_agent_flows")
-      .select("id, name, slug, description, trigger_keywords, trigger_prompt, is_fixed")
-      .eq("agent_id", template.id)
-      .eq("is_active", true)
-      .order("sort_order");
+      if (activeProcIds.length > 0) {
+        // 2. Get tool IDs from procedure_tools junction
+        const { data: procToolLinks } = await supabaseAdmin
+          .from("ai_procedure_tools")
+          .select("tool_id")
+          .in("procedure_id", activeProcIds);
 
-    if (flowsData && flowsData.length > 0) {
-      const flowIds = flowsData.map((f: any) => f.id);
-      const { data: stepsData } = await supabaseAdmin
-        .from("ai_agent_flow_steps")
-        .select("flow_id, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance")
-        .in("flow_id", flowIds)
-        .eq("is_active", true)
-        .order("step_order");
+        const toolIds = [...new Set((procToolLinks || []).map((pt: any) => pt.tool_id))];
 
-      const stepsMap: Record<string, FlowStepRecord[]> = {};
-      for (const s of (stepsData || []) as any[]) {
-        // Skip steps that reference tools removed due to ERP requirement
-        if (s.tool_id && !agentTools.find(t => t.id === s.tool_id)) continue;
-        if (!stepsMap[s.flow_id]) stepsMap[s.flow_id] = [];
-        stepsMap[s.flow_id].push(s);
+        if (toolIds.length > 0) {
+          const { data: toolsData } = await supabaseAdmin
+            .from("ai_agent_tools")
+            .select("id, name, description, parameters_schema, handler_type, handler_config, requires_erp")
+            .in("id", toolIds)
+            .eq("is_active", true)
+            .order("sort_order");
+
+          // Check if ISP has active ERP (for conditional tools)
+          let hasActiveErp = false;
+          if (toolsData && toolsData.some((t: any) => t.requires_erp)) {
+            const { data: erpConfig } = await supabaseAdmin
+              .from("erp_configs")
+              .select("id")
+              .eq("isp_id", body.isp_id)
+              .eq("is_active", true)
+              .eq("is_connected", true)
+              .limit(1)
+              .single();
+            hasActiveErp = !!erpConfig;
+          }
+
+          agentTools = ((toolsData || []) as any[])
+            .filter((t) => !t.requires_erp || hasActiveErp)
+            .map((t) => ({
+              id: t.id,
+              name: t.name,
+              description: t.description,
+              parameters_schema: t.parameters_schema,
+              handler_type: t.handler_type,
+              handler_config: t.handler_config,
+              requires_erp: t.requires_erp,
+            }));
+        }
+
+        // 3. Get flow IDs from procedure_flows junction
+        const { data: procFlowLinks } = await supabaseAdmin
+          .from("ai_procedure_flows")
+          .select("flow_id")
+          .in("procedure_id", activeProcIds);
+
+        const flowIds = [...new Set((procFlowLinks || []).map((pf: any) => pf.flow_id))];
+
+        if (flowIds.length > 0) {
+          const { data: flowsData } = await supabaseAdmin
+            .from("ai_agent_flows")
+            .select("id, name, slug, description, trigger_keywords, trigger_prompt, is_fixed")
+            .in("id", flowIds)
+            .eq("is_active", true)
+            .order("sort_order");
+
+          if (flowsData && flowsData.length > 0) {
+            const activeFlowIds = flowsData.map((f: any) => f.id);
+            const { data: stepsData } = await supabaseAdmin
+              .from("ai_agent_flow_steps")
+              .select("flow_id, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance")
+              .in("flow_id", activeFlowIds)
+              .eq("is_active", true)
+              .order("step_order");
+
+            const stepsMap: Record<string, FlowStepRecord[]> = {};
+            for (const s of (stepsData || []) as any[]) {
+              if (s.tool_id && !agentTools.find(t => t.id === s.tool_id)) continue;
+              if (!stepsMap[s.flow_id]) stepsMap[s.flow_id] = [];
+              stepsMap[s.flow_id].push(s);
+            }
+
+            agentFlows = (flowsData as any[]).map((f) => ({
+              ...f,
+              steps: stepsMap[f.id] || [],
+            }));
+          }
+        }
       }
-
-      agentFlows = (flowsData as any[]).map((f) => ({
-        ...f,
-        steps: stepsMap[f.id] || [],
-      }));
     }
 
     // Build complete system prompt with all layers (hybrid RAG + tools + flows)
