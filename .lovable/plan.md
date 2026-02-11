@@ -1,71 +1,86 @@
 
-# Verificacao Completa de Seguranca do Banco de Dados
 
-## Resultado do Scan
+# Gerenciamento de Fluxos Globais -- Visualizacao e Edicao
 
-| # | Problema | Severidade | Status |
-|---|----------|-----------|--------|
-| 1 | Leaked Password Protection desativada | WARN | Pendente (config Supabase) |
-| 2 | `ai_agents` - leitura publica (anon) | ERROR | **Corrigir** |
-| 3 | `plans` - leitura publica (anon) | ERROR | **Corrigir** |
+## Situacao atual
 
-## Problemas ja resolvidos anteriormente
+A aba "Fluxos" dentro de Procedimentos de IA so mostra checkboxes para vincular/desvincular fluxos. Nao e possivel ver as etapas, keywords de gatilho, instrucoes ou editar nada do conteudo do fluxo. Os hooks de CRUD global ja existem (`useGlobalFlows`, `useSaveGlobalFlowSteps`, `useCreateGlobalFlow`, `useUpdateGlobalFlow`, `useDeleteGlobalFlow`) mas nao estao conectados a nenhuma interface de edicao.
 
-- Policies com `USING (true)` em `ai_limits`, `help_categories`, `sla_configs` -- corrigidas
-- Extensao `pgvector` movida para schema `extensions` -- concluido
-- `audit_logs` imutavel -- ja possui policies `no_update`/`no_delete`
-- `profiles` e `subscribers` -- validados como falsos positivos
+## Proposta: Abordagem hibrida
 
-## Problema 1: Leaked Password Protection (WARN)
+Criar uma pagina dedicada para gerenciar fluxos globais E melhorar a aba de Fluxos nos Procedimentos com visualizacao inline.
 
-Nao pode ser corrigido via codigo. Requer acao manual:
-1. Acesse o Supabase Dashboard
-2. Va em **Authentication > Attack Protection**
-3. Ative **Leaked Password Protection**
+### 1. Pagina dedicada de Fluxos Globais
 
-Isso impede usuarios de criarem contas com senhas que ja vazaram em data breaches.
+**Rota:** `/admin/ai-flows`
 
-## Problemas 2 e 3: Tabelas `ai_agents` e `plans` expostas publicamente
+**Funcionalidades:**
+- Listagem de todos os fluxos globais (nome, descricao, status, quantidade de etapas, keywords)
+- Botao "Novo Fluxo" que abre um dialog/formulario para criar
+- Cada fluxo e expansivel (Collapsible) para mostrar e editar suas etapas
+- Acoes: editar metadados, ativar/desativar, excluir
+- Reutilizar a logica do `AgentFlowStepsEditor` adaptada para o contexto global (sem `agentId`)
 
-### Analise
+**Componentes a criar:**
+- `src/pages/admin/AiFlows.tsx` -- pagina principal
+- `src/components/admin/ai-agents/GlobalFlowForm.tsx` -- dialog para criar/editar metadados do fluxo
+- `src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx` -- editor de etapas adaptado para contexto global
 
-Ambas possuem policy `Anyone can view active [agents/plans]` que permite leitura por usuarios anonimos (`anon`). A landing page **nao usa** essas tabelas (usa dados hardcoded). Todas as queries do frontend sao feitas em contextos autenticados (painel ISP ou admin).
+**Navegacao:** Adicionar item "Fluxos" no `AdminSidebar` dentro da secao de IA.
 
-### Risco
+### 2. Melhorar aba Fluxos no Procedimento
 
-- **ai_agents**: Expoe prompts de sistema, configuracoes de comportamento e logica de negocio dos agentes IA. Concorrentes podem copiar a estrategia completa.
-- **plans**: Expoe limites internos (tokens IA, max assinantes, trial days) que revelam estrutura de custos.
+Na `ProcedureFlowsSection` do `AiProcedureDetail.tsx`:
+- Cada fluxo vinculado tera um botao "Ver detalhes" ou sera expansivel (Collapsible)
+- Ao expandir, mostra as etapas do fluxo em modo somente leitura
+- Link "Editar fluxo" que redireciona para `/admin/ai-flows` ou abre o editor inline
 
-### Correcao
+### 3. Rota no App.tsx
 
-Restringir ambas as policies para exigir autenticacao.
+Adicionar a rota `/admin/ai-flows` no router.
 
 ## Secao tecnica
 
-**Migration SQL:**
+### Arquivos a criar
+
+1. **`src/pages/admin/AiFlows.tsx`**
+   - Usa `useGlobalFlows()` para listar
+   - Usa `useCreateGlobalFlow()`, `useUpdateGlobalFlow()`, `useDeleteGlobalFlow()` para CRUD
+   - Layout com cards expansiveis (Collapsible) igual ao `AgentFlowsTab`
+
+2. **`src/components/admin/ai-agents/GlobalFlowForm.tsx`**
+   - Dialog com campos: nome, slug, descricao, keywords de gatilho, is_fixed, is_active
+   - Baseado no `AgentFlowForm` existente mas sem `agent_id`
+
+3. **`src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx`**
+   - Copia do `AgentFlowStepsEditor` adaptada:
+     - Usa `useSaveGlobalFlowSteps()` em vez de `useSaveFlowSteps()`
+     - Usa `useGlobalTools()` para listar ferramentas disponiveis nos selects
+     - Remove dependencia de `agentId`
+
+### Arquivos a modificar
+
+4. **`src/components/admin/AdminSidebar.tsx`**
+   - Adicionar link "Fluxos" na secao de IA, apontando para `/admin/ai-flows`
+
+5. **`src/App.tsx`**
+   - Adicionar rota `<Route path="ai-flows" element={<AiFlows />} />`
+
+6. **`src/pages/admin/AiProcedureDetail.tsx`**
+   - Na `ProcedureFlowsSection`: adicionar Collapsible em cada fluxo para mostrar etapas em modo leitura
+   - Adicionar botao "Editar" que navega para `/admin/ai-flows`
+
+### Fluxo de uso
 
 ```text
--- 1. ai_agents: restringir leitura a autenticados
-DROP POLICY "Anyone can view active agents" ON ai_agents;
-CREATE POLICY "Authenticated can view active agents" ON ai_agents
-  FOR SELECT TO authenticated
-  USING (is_active = true);
-
--- 2. plans: restringir leitura a autenticados
-DROP POLICY "Anyone can view active plans" ON plans;
-CREATE POLICY "Authenticated can view active plans" ON plans
-  FOR SELECT TO authenticated
-  USING (is_active = true);
+Superadmin
+  |
+  +-- /admin/ai-flows -----------> Cria/edita fluxos globais com etapas
+  |
+  +-- /admin/ai-procedures/:id
+       |
+       +-- Aba "Fluxos" --------> Vincula fluxos ao procedimento (checkbox)
+                                   Visualiza etapas em modo leitura (Collapsible)
+                                   Link para editar em /admin/ai-flows
 ```
 
-**Impacto:** Nenhum no uso normal. A landing page usa dados hardcoded. O painel admin e painel ISP ja exigem login. Apenas bloqueia acesso anonimo direto a API do Supabase.
-
-**Arquivos afetados:** Apenas migration SQL. Nenhum codigo frontend precisa ser alterado.
-
-## Resumo pos-correcao
-
-Apos aplicar esta migration, o banco tera:
-- **0 tabelas** com leitura anonima
-- **0 policies** usando `USING (true)`
-- **Todas as tabelas** com RLS ativo
-- **1 item pendente**: Leaked Password Protection (acao manual no Dashboard)
