@@ -174,6 +174,45 @@ export type Database = {
           },
         ]
       }
+      ai_agent_procedures: {
+        Row: {
+          agent_id: string
+          id: string
+          is_active: boolean
+          procedure_id: string
+          sort_order: number
+        }
+        Insert: {
+          agent_id: string
+          id?: string
+          is_active?: boolean
+          procedure_id: string
+          sort_order?: number
+        }
+        Update: {
+          agent_id?: string
+          id?: string
+          is_active?: boolean
+          procedure_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_procedures_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_procedures_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "ai_procedures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_tools: {
         Row: {
           agent_id: string
@@ -355,6 +394,114 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_procedure_flows: {
+        Row: {
+          flow_id: string
+          id: string
+          procedure_id: string
+          sort_order: number
+        }
+        Insert: {
+          flow_id: string
+          id?: string
+          procedure_id: string
+          sort_order?: number
+        }
+        Update: {
+          flow_id?: string
+          id?: string
+          procedure_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_procedure_flows_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_procedure_flows_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "ai_procedures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_procedure_tools: {
+        Row: {
+          id: string
+          procedure_id: string
+          sort_order: number
+          tool_id: string
+        }
+        Insert: {
+          id?: string
+          procedure_id: string
+          sort_order?: number
+          tool_id: string
+        }
+        Update: {
+          id?: string
+          procedure_id?: string
+          sort_order?: number
+          tool_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_procedure_tools_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "ai_procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_procedure_tools_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_procedures: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       ai_security_clauses: {
         Row: {
