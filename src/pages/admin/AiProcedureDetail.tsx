@@ -45,7 +45,6 @@ export default function AiProcedureDetail() {
     }
   }, [procedure]);
 
-  // Auto-generate slug
   useEffect(() => {
     if (isNew && form.name) {
       const slug = form.name
@@ -68,13 +67,16 @@ export default function AiProcedureDetail() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/admin/ai-procedures')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">{isNew ? 'Novo Procedimento' : procedure?.name || 'Carregando...'}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{isNew ? 'Novo Procedimento' : procedure?.name || 'Carregando...'}</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {isNew ? 'Configure as informações básicas do procedimento' : 'Gerencie configurações, ferramentas e fluxos'}
+          </p>
         </div>
       </div>
 
@@ -85,33 +87,42 @@ export default function AiProcedureDetail() {
           <TabsTrigger value="flows" disabled={isNew}>Fluxos</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="basic" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Nome</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Cobrança" />
-            </div>
-            <div className="space-y-2">
-              <Label>Slug</Label>
-              <Input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="cobranca" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Descrição</Label>
-            <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
-          </div>
-          <div className="space-y-2">
-            <Label>Ícone (nome lucide)</Label>
-            <Input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="receipt" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={form.is_active} onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} />
-            <Label>Ativo</Label>
-          </div>
-          <Button onClick={handleSave} disabled={createProcedure.isPending || updateProcedure.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {isNew ? 'Criar Procedimento' : 'Salvar'}
-          </Button>
+        <TabsContent value="basic" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Informações do Procedimento</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Nome</Label>
+                  <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Cobrança" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Slug</Label>
+                  <Input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="cobranca" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label>Ícone (nome lucide)</Label>
+                <Input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="receipt" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch checked={form.is_active} onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} />
+                <Label>Ativo</Label>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button onClick={handleSave} disabled={createProcedure.isPending || updateProcedure.isPending}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {isNew ? 'Criar Procedimento' : 'Salvar'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="tools" className="mt-4">
