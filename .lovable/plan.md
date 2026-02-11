@@ -1,63 +1,60 @@
 
 
-# Criar tabelas de Procedimentos + Seed "Cobranca e Financeiro"
+# Corrigir Problemas Criticos de Seguranca
 
-## O que sera feito
+## Problemas identificados
 
-1. Criar as 4 tabelas necessarias para o sistema de procedimentos
-2. Inserir o procedimento de exemplo "Cobranca e Financeiro" com todos os vinculos
-3. Criar arquivo de documentacao SQL para referencia
+| # | Tabela | Problema | Severidade |
+|---|--------|----------|------------|
+| 1 | ai_security_clauses | SELECT permite leitura sem autenticacao (qualquer usuario anonimo pode ler as regras de seguranca da IA) | Critico |
+| 2 | audit_logs | Sem policies de UPDATE/DELETE -- logs podem ser modificados ou apagados | Aviso |
+| 3 | document_processing_logs | INSERT com `WITH CHECK (true)` -- qualquer autenticado pode inserir logs falsos | Aviso |
 
-## Tabelas a criar
+**Nota:** Os problemas anteriores de `profiles`, `subscribers`, `erp_configs` e `whatsapp_configs` ja foram validados como falsos positivos ou corrigidos. As policies existentes estao corretas (isolamento por ISP, acesso restrito a admins).
 
-| Tabela | Funcao |
-|---|---|
-| ai_procedures | Catalogo de procedimentos reutilizaveis |
-| ai_procedure_tools | Vincula ferramentas a procedimentos |
-| ai_procedure_flows | Vincula fluxos a procedimentos |
-| ai_agent_procedures | Vincula procedimentos a agentes |
+## Correcoes
 
-Todas com RLS habilitado (leitura para autenticados, gestao para super_admin) e triggers de updated_at.
+### 1. ai_security_clauses -- Restringir leitura a autenticados
 
-## Seed de exemplo
+**Problema:** A policy `Authenticated can read active clauses` usa `USING (is_active = true)` sem verificar `auth.role() = 'authenticated'`. Usuarios anonimos conseguem ler as clausulas de seguranca LGPD.
 
-**Procedimento:** Cobranca e Financeiro (slug: `cobranca-financeiro`, icone: `receipt`)
+**Correcao:** Alterar a policy para exigir autenticacao.
 
-**Descricao:** Procedimento completo para identificacao de clientes, consulta de faturas em aberto e negociacao de debitos.
+### 2. audit_logs -- Tornar imutavel
 
-**Vinculos:**
-- 2 ferramentas: `buscar_contrato_cliente` + `consultar_faturas`
-- 1 fluxo: `Cobranca` (5 etapas)
-- 2 agentes: `Atendente Virtual` + `Financeiro`
+**Problema:** Nao existem policies bloqueando UPDATE e DELETE. Embora nao haja policies permitindo essas operacoes, a melhor pratica e criar policies explicitas com `USING (false)`.
 
-## Arquivo de documentacao
+**Correcao:** Adicionar policies de bloqueio.
 
-Criar `docs/migrations/f4-procedure-seed.sql` com o SQL completo.
+### 3. document_processing_logs -- Restringir INSERT
+
+**Problema:** A policy `Service role can insert logs` usa `WITH CHECK (true)`, permitindo que qualquer usuario autenticado insira logs. Deveria ser restrito ao service_role (Edge Functions).
+
+**Correcao:** Alterar para `WITH CHECK (false)` no nivel RLS (o service_role ja ignora RLS por padrao, entao os Edge Functions continuam funcionando).
 
 ## Secao tecnica
 
 **Migration SQL:**
 
 ```text
--- Tabelas
-CREATE TABLE IF NOT EXISTS ai_procedures (id uuid PK, name, slug UNIQUE, description, icon, is_active, sort_order, created_at, updated_at)
-CREATE TABLE IF NOT EXISTS ai_procedure_tools (id uuid PK, procedure_id FK, tool_id FK, sort_order, UNIQUE(procedure_id, tool_id))
-CREATE TABLE IF NOT EXISTS ai_procedure_flows (id uuid PK, procedure_id FK, flow_id FK, sort_order, UNIQUE(procedure_id, flow_id))
-CREATE TABLE IF NOT EXISTS ai_agent_procedures (id uuid PK, agent_id FK, procedure_id FK, is_active, sort_order, UNIQUE(agent_id, procedure_id))
+-- 1. ai_security_clauses: exigir autenticacao para leitura
+DROP POLICY "Authenticated can read active clauses" ON ai_security_clauses;
+CREATE POLICY "Authenticated can read active clauses" ON ai_security_clauses
+  FOR SELECT
+  USING (is_active = true AND auth.role() = 'authenticated');
 
--- RLS + policies (authenticated read, super_admin ALL)
--- Trigger handle_updated_at em ai_procedures
+-- 2. audit_logs: bloqueio explicito de modificacoes
+CREATE POLICY "audit_logs_no_update" ON audit_logs
+  FOR UPDATE USING (false);
+CREATE POLICY "audit_logs_no_delete" ON audit_logs
+  FOR DELETE USING (false);
 
--- Seed com ON CONFLICT DO NOTHING
-INSERT INTO ai_procedures VALUES ('Cobranca e Financeiro', 'cobranca-financeiro', ...)
-INSERT INTO ai_procedure_tools -- 2 tools
-INSERT INTO ai_procedure_flows -- 1 flow
-INSERT INTO ai_agent_procedures -- 2 agents
+-- 3. document_processing_logs: restringir INSERT
+DROP POLICY "Service role can insert logs" ON document_processing_logs;
+CREATE POLICY "Service role only insert logs" ON document_processing_logs
+  FOR INSERT WITH CHECK (false);
 ```
 
-**Arquivos:**
+**Nenhum arquivo de codigo precisa ser alterado** -- todas as correcoes sao no banco de dados.
 
-| Arquivo | Acao |
-|---|---|
-| Migration SQL (via Supabase) | Criar tabelas + RLS + seed |
-| `docs/migrations/f4-procedure-seed.sql` | Criar arquivo de referencia |
+**Impacto:** Zero. O frontend ja usa sessoes autenticadas, entao a restricao em ai_security_clauses nao afeta o uso normal. O service_role (Edge Functions) ignora RLS, entao as restricoes em audit_logs e document_processing_logs nao afetam funcionalidades existentes.
