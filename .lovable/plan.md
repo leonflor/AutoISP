@@ -1,51 +1,51 @@
 
 
-# Corrigir Politicas RLS com `true`
+# Reprocessar documento que perdeu embedding
 
-## Situacao atual
+## O que aconteceu
 
-| Problema | Status |
-|----------|--------|
-| audit_logs imutavel | Ja corrigido (policies `no_update` e `no_delete` com `USING (false)`) |
-| Conversas restritas por role | Ja correto (scoped por `is_isp_member`) |
-| Tickets restritos por role | Ja correto (scoped por `is_isp_member` / `is_isp_admin`) |
-| Politicas com `true` | **3 tabelas precisam correcao** |
+Na migração do `pgvector` para o schema `extensions`, o `DROP EXTENSION ... CASCADE` removeu a coluna `embedding` e seus dados. A coluna foi recriada, mas o vetor do chunk existente foi perdido.
 
-## O que sera corrigido
+## Documento afetado
 
-Tres tabelas permitem leitura por usuarios anonimos (sem autenticacao) porque usam `USING (true)`:
+| Campo | Valor |
+|-------|-------|
+| Documento | "base de conhecimento" |
+| ID | `eb4815a4-3f60-47ff-a613-ef203aaafc68` |
+| Chunk ID | `7924a1b9-42b2-4fcf-a7c5-6820dce605dc` |
+| ISP Agent | `3f9f6fe5-8531-4f40-b547-dc63f88807c7` |
+| Status atual | `indexed` (incorreto, pois embedding esta NULL) |
 
-| Tabela | Policy | Risco |
-|--------|--------|-------|
-| ai_limits | "Anyone can view limits" | Usuarios anonimos veem limites de IA por plano |
-| help_categories | "Authenticated users can view categories" | Nome diz "authenticated" mas a policy usa `true` |
-| sla_configs | "Anyone can view SLA configs" | Usuarios anonimos veem configuracoes de SLA |
+## Plano de execucao
 
-## Correcao
+1. **Atualizar status do documento** para `pending` e limpar `error_message` no banco, sinalizando que precisa ser reprocessado.
 
-Restringir as 3 policies para exigir autenticacao (`auth.role() = 'authenticated'`). Isso nao afeta o funcionamento normal porque o frontend sempre usa sessoes autenticadas.
+2. **Deletar chunks existentes** (o chunk com embedding NULL) para que o reprocessamento gere novos chunks com embeddings validos.
+
+3. **Chamar a Edge Function `process-document`** passando o `document_id` e `isp_agent_id` para re-extrair o texto e gerar novos embeddings via OpenAI.
 
 ## Secao tecnica
 
-**Migration SQL:**
-
+**Passo 1 - Migration SQL:**
 ```text
--- 1. ai_limits: restringir a autenticados
-DROP POLICY "Anyone can view limits" ON ai_limits;
-CREATE POLICY "Authenticated can view limits" ON ai_limits
-  FOR SELECT USING (auth.role() = 'authenticated');
+UPDATE knowledge_documents 
+SET status = 'pending', error_message = NULL, chunk_count = 0
+WHERE id = 'eb4815a4-3f60-47ff-a613-ef203aaafc68';
 
--- 2. help_categories: corrigir policy que diz "authenticated" mas usa true
-DROP POLICY "Authenticated users can view categories" ON help_categories;
-CREATE POLICY "Authenticated users can view categories" ON help_categories
-  FOR SELECT USING (auth.role() = 'authenticated');
-
--- 3. sla_configs: restringir a autenticados
-DROP POLICY "Anyone can view SLA configs" ON sla_configs;
-CREATE POLICY "Authenticated can view SLA configs" ON sla_configs
-  FOR SELECT USING (auth.role() = 'authenticated');
+DELETE FROM document_chunks 
+WHERE document_id = 'eb4815a4-3f60-47ff-a613-ef203aaafc68';
 ```
 
-**Impacto:** Nenhum no uso normal. Todas as paginas que consultam essas tabelas ja exigem login. Apenas bloqueia acesso anonimo direto a API.
+**Passo 2 - Chamar Edge Function:**
+Invocar `process-document` com:
+```text
+{
+  "document_id": "eb4815a4-3f60-47ff-a613-ef203aaafc68",
+  "isp_agent_id": "3f9f6fe5-8531-4f40-b547-dc63f88807c7"
+}
+```
 
-**Arquivos afetados:** Apenas migration SQL. Nenhum codigo frontend precisa ser alterado.
+**Pre-requisito:** A chave OpenAI deve estar configurada na tabela `platform_config` (integracao `integration_openai`) para que a Edge Function consiga gerar os embeddings.
+
+**Resultado esperado:** O documento voltara ao status `indexed` com chunks contendo embeddings validos de 1536 dimensoes.
+
