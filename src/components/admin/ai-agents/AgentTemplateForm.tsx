@@ -38,8 +38,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { FeatureTagsSelector } from './FeatureTagsSelector';
 import { PersonalizationTab } from './PersonalizationTab';
-import { AgentToolsTab } from './AgentToolsTab';
-import { AgentFlowsTab } from './AgentFlowsTab';
+import { AgentProceduresTab } from './AgentProceduresTab';
 import { TemplateAvatarUpload } from './TemplateAvatarUpload';
 import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS, DEFAULT_VOICE_TONES, DEFAULT_ESCALATION_OPTIONS } from './constants';
 import type { AiAgent } from '@/hooks/admin/useAiAgentTemplates';
@@ -205,11 +204,8 @@ export function AgentTemplateForm({
               <TabsTrigger value="personalization" className="flex-1" disabled={scope === 'platform'}>
                 Personalização
               </TabsTrigger>
-              <TabsTrigger value="tools" className="flex-1" disabled={isNewAgent}>
-                Tools
-              </TabsTrigger>
-              <TabsTrigger value="flows" className="flex-1" disabled={isNewAgent}>
-                Fluxos
+              <TabsTrigger value="procedures" className="flex-1" disabled={isNewAgent}>
+                Procedimentos
               </TabsTrigger>
             </TabsList>
 
@@ -535,22 +531,12 @@ export function AgentTemplateForm({
               <PersonalizationTab form={form} scope={scope as 'tenant' | 'platform'} />
             </TabsContent>
 
-            <TabsContent value="tools" className="mt-6">
+            <TabsContent value="procedures" className="mt-6">
               {agent ? (
-                <AgentToolsTab agentId={agent.id} />
+                <AgentProceduresTab agentId={agent.id} />
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p>Salve o agente primeiro para configurar tools.</p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="flows" className="mt-6">
-              {agent ? (
-                <AgentFlowsTab agentId={agent.id} />
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>Salve o agente primeiro para configurar fluxos.</p>
+                  <p>Salve o agente primeiro para vincular procedimentos.</p>
                 </div>
               )}
             </TabsContent>
