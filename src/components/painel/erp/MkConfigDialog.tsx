@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -58,9 +68,10 @@ interface MkConfigDialogProps {
 }
 
 export function MkConfigDialog({ open, config, onClose }: MkConfigDialogProps) {
-  const { saveConfig, testConnection } = useErpConfigs();
+  const { saveConfig, testConnection, removeConfig } = useErpConfigs();
   const [showApiKey, setShowApiKey] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -108,7 +119,7 @@ export function MkConfigDialog({ open, config, onClose }: MkConfigDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <DialogContent
         className="max-w-lg max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => e.preventDefault()}
@@ -267,7 +278,18 @@ export function MkConfigDialog({ open, config, onClose }: MkConfigDialogProps) {
               </CollapsibleContent>
             </Collapsible>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              {config?.is_connected && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="sm:mr-auto"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir Integração
+                </Button>
+              )}
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
@@ -279,6 +301,27 @@ export function MkConfigDialog({ open, config, onClose }: MkConfigDialogProps) {
           </form>
         </Form>
       </DialogContent>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Integração MK-Solutions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é irreversível. Todos os procedimentos de IA que dependem de integração com ERP deixarão de funcionar.
+              Consultas de clientes, faturas e dados financeiros via agentes de IA serão interrompidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => removeConfig.mutate('mk_solutions', { onSuccess: () => onClose() })}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
