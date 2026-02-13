@@ -234,6 +234,8 @@ const AdminSecuritySection = () => {
                 { nome: "ASAAS_API_KEY", uso: "Cobranças e faturas", local: "Supabase Secrets" },
                 { nome: "OPENAI_API_KEY", uso: "Agentes IA template", local: "Supabase Secrets" },
                 { nome: "RESEND_API_KEY", uso: "Emails transacionais", local: "Supabase Secrets" },
+                { nome: "WHATSAPP_ACCESS_TOKEN", uso: "WhatsApp Business API", local: "DB (AES-256-GCM)" },
+                { nome: "WHATSAPP_APP_SECRET", uso: "HMAC webhook validation", local: "Supabase Secrets" },
                 { nome: "MASTER_ADMIN_EMAIL", uso: "Seed inicial", local: "Env vars (deploy)" },
                 { nome: "MASTER_ADMIN_PASSWORD", uso: "Seed inicial", local: "Env vars (deploy)" },
               ].map((secret) => (
@@ -290,6 +292,8 @@ const AdminSecuritySection = () => {
                 { logica: "Geração de faturas", onde: "Edge Function (Asaas webhook)" },
                 { logica: "Alteração de planos", onde: "Edge Function" },
                 { logica: "CRUD de roles", onde: "Edge Function (Super Admin)" },
+                { logica: "Config WhatsApp", onde: "Edge Function (save-whatsapp-config)" },
+                { logica: "Teste conexão WhatsApp", onde: "Edge Function (test-whatsapp-connection)" },
               ].map((item) => (
                 <div key={item.logica} className="flex items-center justify-between rounded-lg border border-border bg-background p-2">
                   <span className="text-xs text-foreground">{item.logica}</span>
@@ -330,6 +334,11 @@ const AdminSecuritySection = () => {
                   integracao: "Resend", 
                   autenticacao: "API Key Header", 
                   webhook: "N/A (outbound)" 
+                },
+                { 
+                  integracao: "WhatsApp Business", 
+                  autenticacao: "Bearer Token (AES-256)", 
+                  webhook: "HMAC SHA-256 + Rate Limiting" 
                 },
               ].map((item) => (
                 <div key={item.integracao} className="rounded-lg border border-border bg-background p-3">

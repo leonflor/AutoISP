@@ -123,7 +123,41 @@ const WhatsAppIntegration = () => {
                   │ • whatsapp_messages    │
                   │ • whatsapp_webhooks    │
                   │ • tickets (integração) │
-                  └────────────────────────┘`}
+                  └────────────────────────┘
+
+  ── Fluxo de Configuração (Seguro) ──
+
+  ┌──────────┐     ┌────────────────────────┐     ┌──────────────┐
+  │  Admin/  │────►│ save-whatsapp-config   │────►│  Supabase DB │
+  │  ISP UI  │     │ Edge Function          │     │  (AES-256)   │
+  └──────────┘     └────────┬───────────────┘     └──────────────┘
+                            │
+                            ▼
+                  ┌──────────────────────┐
+                  │ 1. Validar JWT       │
+                  │ 2. AES-256-GCM      │
+                  │    encrypt token     │
+                  │ 3. Gerar IV único    │
+                  │ 4. Mascarar token    │
+                  │ 5. Salvar no DB      │
+                  └──────────────────────┘
+
+  ┌──────────┐     ┌────────────────────────┐     ┌──────────────┐
+  │  Admin/  │────►│ test-whatsapp-         │────►│  Meta Graph  │
+  │  ISP UI  │     │ connection             │     │  API (v18.0) │
+  └──────────┘     │ Edge Function          │     └──────────────┘
+                   └────────┬───────────────┘
+                            │
+                            ▼
+                  ┌──────────────────────┐
+                  │ 1. Buscar config DB  │
+                  │ 2. Decrypt token     │
+                  │    server-side       │
+                  │ 3. GET /me na Meta   │
+                  │ 4. Retornar status   │
+                  │ 5. Atualizar         │
+                  │    is_connected      │
+                  └──────────────────────┘`}
               </pre>
             </div>
           </AccordionContent>
@@ -680,6 +714,68 @@ serve(async (req) => {
               </div>
             </div>
 
+            {/* Edge Function: save-whatsapp-config */}
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-foreground">Edge Function: save-whatsapp-config</h4>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Criptografa credenciais WhatsApp (access_token e verify_token) com AES-256-GCM antes de armazenar no banco.
+                Funciona para ambos os contextos: Admin (<code className="bg-muted px-1 rounded">admin_whatsapp_config</code>) e ISP (<code className="bg-muted px-1 rounded">whatsapp_configs</code>).
+              </p>
+              <div className="rounded-lg bg-muted/50 p-4">
+                <pre className="overflow-x-auto text-xs text-muted-foreground">
+{`// supabase/functions/save-whatsapp-config/index.ts
+// Fluxo:
+// 1. Valida JWT (manual, verify_jwt=false)
+// 2. Detecta contexto: admin (super_admin) ou ISP (isp_id no body)
+// 3. Se access_token preenchido:
+//    a. Gera IV aleatório (12 bytes)
+//    b. Criptografa com AES-256-GCM + ENCRYPTION_KEY (32 bytes)
+//    c. Armazena ciphertext em api_key_encrypted, IV em encryption_iv
+//    d. Gera masked_key (ex: "EAAG...xYz4") para exibição na UI
+// 4. Se access_token vazio: mantém credencial existente
+// 5. Salva demais campos (phone_number_id, webhook_url, etc.)
+// 6. Retorna { success: true, masked_key }
+//
+// Segurança:
+// - Token nunca retorna ao frontend após salvamento
+// - ENCRYPTION_KEY validada (32 bytes) antes de criptografar
+// - IV único por operação impede ataques de repetição`}
+                </pre>
+              </div>
+            </div>
+
+            {/* Edge Function: test-whatsapp-connection */}
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-foreground">Edge Function: test-whatsapp-connection</h4>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Testa a conexão com a Meta Graph API de forma segura, descriptografando o token apenas no servidor.
+                Credenciais nunca são expostas no browser (Network Tab).
+              </p>
+              <div className="rounded-lg bg-muted/50 p-4">
+                <pre className="overflow-x-auto text-xs text-muted-foreground">
+{`// supabase/functions/test-whatsapp-connection/index.ts
+// Fluxo:
+// 1. Valida JWT (manual)
+// 2. Detecta contexto (admin ou ISP)
+// 3. Busca configuração no DB
+// 4. Descriptografa access_token com AES-256-GCM + IV armazenado
+// 5. GET https://graph.facebook.com/v18.0/{phone_number_id}
+//    Headers: Authorization: Bearer {decrypted_token}
+// 6. Se sucesso (HTTP 200):
+//    - Atualiza is_connected = true, connected_at = now()
+//    - Retorna { connected: true, phone_display }
+// 7. Se erro:
+//    - Atualiza is_connected = false
+//    - Retorna { connected: false, error: "mensagem segura" }
+//
+// Segurança:
+// - Token descriptografado apenas em memória do Edge Runtime
+// - Resposta ao frontend contém APENAS status (sem credenciais)
+// - Erros da Meta API são sanitizados antes de retornar`}
+                </pre>
+              </div>
+            </div>
+
             {/* Frontend Hook */}
             <div>
               <h4 className="mb-2 text-sm font-medium text-foreground">Frontend: Hook useWhatsApp</h4>
@@ -821,7 +917,12 @@ await sendTemplate.mutateAsync({
                 <tbody className="text-muted-foreground">
                   <tr className="border-b border-border/50">
                     <td className="py-2">Token Encryption</td>
-                    <td className="py-2">Access tokens criptografados no DB com chave do Vault</td>
+                    <td className="py-2">AES-256-GCM via Edge Function <code className="bg-muted px-1 rounded text-xs">save-whatsapp-config</code>. IV único por operação. Token mascarado na UI.</td>
+                    <td className="py-2"><Badge variant="destructive" className="text-xs">Crítico</Badge></td>
+                  </tr>
+                  <tr className="border-b border-border/50">
+                    <td className="py-2">Teste Conexão Server-side</td>
+                    <td className="py-2">Via Edge Function <code className="bg-muted px-1 rounded text-xs">test-whatsapp-connection</code>. Credenciais nunca expostas no browser.</td>
                     <td className="py-2"><Badge variant="destructive" className="text-xs">Crítico</Badge></td>
                   </tr>
                   <tr className="border-b border-border/50">
@@ -842,6 +943,11 @@ await sendTemplate.mutateAsync({
                   <tr className="border-b border-border/50">
                     <td className="py-2">Phone Validation</td>
                     <td className="py-2">Validação de formato E.164 antes de envio</td>
+                    <td className="py-2"><Badge className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Alto</Badge></td>
+                  </tr>
+                  <tr className="border-b border-border/50">
+                    <td className="py-2">Token Masking na UI</td>
+                    <td className="py-2">Frontend nunca pré-preenche campo com token real. Exibe apenas máscara (ex: EAAG...xYz4).</td>
                     <td className="py-2"><Badge className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Alto</Badge></td>
                   </tr>
                   <tr>
