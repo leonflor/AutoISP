@@ -2,7 +2,6 @@ import {
   LayoutDashboard, 
   Users, 
   MessageSquare,
-  MessageCircle,
   BarChart3,
   Settings,
   LogOut,
@@ -35,7 +34,7 @@ const menuItems = [
   { title: 'Dashboard', url: '/painel', icon: LayoutDashboard },
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
-  { title: 'WhatsApp', url: '/painel/whatsapp', icon: MessageCircle },
+  
   { title: 'Agentes IA', url: '/painel/agentes', icon: Bot },
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
