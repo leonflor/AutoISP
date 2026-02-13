@@ -13,6 +13,7 @@ interface TestRequest {
   credentials?: {
     token?: string;
     username?: string;
+    password?: string;
     api_key?: string;
   };
 }
@@ -56,7 +57,8 @@ async function decrypt(
 // Test IXC connection
 async function testIxcConnection(
   apiUrl: string,
-  token: string
+  username: string,
+  password: string
 ): Promise<TestResult> {
   try {
     // Normalizar URL - remover /webservice/v1 se já presente
@@ -67,7 +69,8 @@ async function testIxcConnection(
 
     console.log(`[IXC] Testing connection to: ${baseUrl}`);
 
-    const authHeader = token.startsWith("Basic ") ? token : `Basic ${token}`;
+    const token = btoa(`${username}:${password}`);
+    const authHeader = `Basic ${token}`;
 
     const response = await fetch(`${baseUrl}/webservice/v1/cliente`, {
       method: "POST",
@@ -90,7 +93,7 @@ async function testIxcConnection(
     if (response.status === 401) {
       return {
         success: false,
-        message: "Token inválido ou expirado. Gere um novo no IXC.",
+        message: "Login ou senha inválidos. Verifique as credenciais no IXC.",
       };
     }
 
@@ -337,7 +340,7 @@ Deno.serve(async (req) => {
     }
 
     let apiUrl: string;
-    let credentials: { token?: string; username?: string; api_key?: string };
+    let credentials: { token?: string; username?: string; password?: string; api_key?: string };
 
     // If credentials are provided, use them (testing before save)
     if (body.api_url && body.credentials) {
@@ -385,11 +388,20 @@ Deno.serve(async (req) => {
           encryptionKey
         );
 
-        if (body.provider === "ixc" || body.provider === "sgp") {
+        if (body.provider === "sgp") {
           credentials.token = decrypted;
-        } else {
+        } else if (body.provider !== "ixc") {
           credentials.api_key = decrypted;
         }
+      }
+
+      // Decrypt password for IXC
+      if (body.provider === "ixc" && config.password_encrypted && config.encryption_iv) {
+        credentials.password = await decrypt(
+          config.password_encrypted,
+          config.encryption_iv,
+          encryptionKey
+        );
       }
     }
 
@@ -398,16 +410,16 @@ Deno.serve(async (req) => {
 
     switch (body.provider) {
       case "ixc":
-        if (!credentials.token) {
+        if (!credentials.username || !credentials.password) {
           return new Response(
-            JSON.stringify({ error: "Token não configurado" }),
+            JSON.stringify({ error: "Credenciais não configuradas" }),
             {
               status: 400,
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             }
           );
         }
-        result = await testIxcConnection(apiUrl, credentials.token);
+        result = await testIxcConnection(apiUrl, credentials.username, credentials.password);
         break;
 
       case "mk_solutions":

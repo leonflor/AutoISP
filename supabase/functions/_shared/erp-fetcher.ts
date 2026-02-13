@@ -41,14 +41,15 @@ export async function decrypt(
 }
 
 // ── IXC ──
-export async function fetchIxcClients(apiUrl: string, token: string): Promise<ErpClient[]> {
+export async function fetchIxcClients(apiUrl: string, username: string, password: string): Promise<ErpClient[]> {
   // Normalizar URL - remover /webservice/v1 se já presente
   let baseUrl = apiUrl.replace(/\/+$/, '');
   if (baseUrl.endsWith('/webservice/v1')) {
     baseUrl = baseUrl.slice(0, -'/webservice/v1'.length);
   }
 
-  const authHeader = token.startsWith("Basic ") ? token : `Basic ${token}`;
+  const token = btoa(`${username}:${password}`);
+  const authHeader = `Basic ${token}`;
 
   const clientesResp = await fetch(`${baseUrl}/webservice/v1/cliente`, {
     method: "POST",
@@ -224,10 +225,16 @@ export async function searchErpClient(
         decryptedKey = await decrypt(config.api_key_encrypted, config.encryption_iv, encryptionKey);
       }
 
+      // Decrypt password for IXC
+      let decryptedPassword = "";
+      if (config.provider === "ixc" && config.password_encrypted && config.encryption_iv) {
+        decryptedPassword = await decrypt(config.password_encrypted, config.encryption_iv, encryptionKey);
+      }
+
       let clients: ErpClient[] = [];
       switch (config.provider) {
         case "ixc":
-          clients = await fetchIxcClients(config.api_url, decryptedKey);
+          clients = await fetchIxcClients(config.api_url, config.username || "", decryptedPassword);
           break;
         case "sgp":
           clients = await fetchSgpClients(config.api_url, decryptedKey, config.username || "");
