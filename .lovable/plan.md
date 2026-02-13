@@ -1,86 +1,152 @@
 
 
-# Gerenciamento de Fluxos Globais -- Visualizacao e Edicao
+# Integracao WhatsApp -- Backend + Frontend (ISP e Admin independentes)
 
-## Situacao atual
+## Principio de Seguranca
 
-A aba "Fluxos" dentro de Procedimentos de IA so mostra checkboxes para vincular/desvincular fluxos. Nao e possivel ver as etapas, keywords de gatilho, instrucoes ou editar nada do conteudo do fluxo. Os hooks de CRUD global ja existem (`useGlobalFlows`, `useSaveGlobalFlowSteps`, `useCreateGlobalFlow`, `useUpdateGlobalFlow`, `useDeleteGlobalFlow`) mas nao estao conectados a nenhuma interface de edicao.
+As credenciais WhatsApp de cada ISP sao **privadas**. O SaaS Admin nao tem acesso, nao visualiza e nao gerencia a integracao dos ISPs. Admin e ISP possuem integracoes **completamente independentes**.
 
-## Proposta: Abordagem hibrida
+## O que existe hoje
 
-Criar uma pagina dedicada para gerenciar fluxos globais E melhorar a aba de Fluxos nos Procedimentos com visualizacao inline.
+| Componente | Status |
+|-----------|--------|
+| `whatsapp_configs` (tabela, per ISP) | Existe |
+| `whatsapp-webhook` (Edge Function, recebe msgs) | Existe |
+| `conversations` (tabela, historico de chat) | Existe |
+| Painel ISP: `/painel/whatsapp` (config credenciais) | Existe |
+| Painel ISP: `/painel/comunicacao` (campanhas - mock) | Existe |
+| Coluna `settings` em `whatsapp_configs` | **Falta** |
+| `whatsapp_messages` (tabela de rastreamento) | **Falta** |
+| `send-whatsapp` (Edge Function de envio) | **Falta** |
+| ISP: envio de msgs e historico no painel | **Falta** |
+| Admin: integracao WhatsApp propria | **Falta** |
 
-### 1. Pagina dedicada de Fluxos Globais
+## Escopo da Implementacao
 
-**Rota:** `/admin/ai-flows`
+### Parte 1: Migration -- Novas tabelas e colunas
+
+**1a. Coluna `settings` em `whatsapp_configs`**
+Armazenar `phone_number_id`, `verify_token`, `business_account_id` em JSONB. O frontend ISP ja usa isso via cast `(config as any).settings` -- isso vai resolver o type safety.
+
+**1b. Tabela `whatsapp_messages`**
+Rastrear cada mensagem enviada/recebida com status, custo e metadados:
+
+```text
+whatsapp_messages
+- id (UUID PK)
+- isp_id (FK isps, nullable para msgs do admin)
+- wamid (TEXT UNIQUE) -- WhatsApp Message ID
+- direction (TEXT: inbound/outbound)
+- message_type (TEXT: template/text/image/audio/document)
+- recipient_phone (TEXT)
+- sender_phone (TEXT)
+- template_name (TEXT, nullable)
+- template_params (JSONB, nullable)
+- content (TEXT)
+- status (TEXT: pending/sent/delivered/read/failed)
+- status_updated_at (TIMESTAMPTZ)
+- error_code (TEXT, nullable)
+- error_message (TEXT, nullable)
+- conversation_id (FK conversations, nullable)
+- subscriber_id (FK subscribers, nullable)
+- conversation_type (TEXT: authentication/utility/marketing/service)
+- cost_usd (DECIMAL(10,4), nullable)
+- created_at, sent_at, delivered_at, read_at (TIMESTAMPTZ)
+```
+
+**1c. Tabela `admin_whatsapp_config`**
+Configuracao WhatsApp exclusiva do SaaS Admin (sem FK para ISP):
+
+```text
+admin_whatsapp_config
+- id (UUID PK)
+- provider (TEXT DEFAULT 'meta')
+- api_url (TEXT)
+- api_key_encrypted (TEXT)
+- encryption_iv (TEXT)
+- phone_number (TEXT)
+- phone_number_id (TEXT)
+- verify_token (TEXT)
+- webhook_url (TEXT)
+- is_connected (BOOLEAN DEFAULT false)
+- connected_at (TIMESTAMPTZ)
+- created_at, updated_at (TIMESTAMPTZ)
+```
+
+RLS: `whatsapp_messages` isolada por `isp_id` via `isp_members` (para ISPs) e por role `superadmin` (para msgs sem isp_id). `admin_whatsapp_config` acessivel apenas por `superadmin`.
+
+### Parte 2: Edge Function `send-whatsapp`
+
+Funcao unificada para envio de mensagens (ISP e Admin):
+- Validacao JWT manual (mesmo padrao das demais)
+- Determina contexto: se usuario e superadmin e nao passa `isp_id`, usa `admin_whatsapp_config`; caso contrario, busca config do ISP do usuario
+- Decripta access token (AES-256-GCM)
+- Envia via WhatsApp Cloud API v18.0
+- Registra na tabela `whatsapp_messages`
+- Suporta envio de texto livre e template messages
+
+### Parte 3: Atualizar `whatsapp-webhook`
+
+- Registrar msgs inbound na tabela `whatsapp_messages` (alem de `conversations`)
+- Registrar msgs outbound (respostas da IA) na tabela `whatsapp_messages`
+- Processar status callbacks (delivered, read) e atualizar `whatsapp_messages`
+
+### Parte 4: Painel ISP -- Envio e Historico
+
+Melhorar a pagina existente `/painel/whatsapp`:
+- **Aba "Configuracao"**: manter o formulario atual de credenciais
+- **Aba "Enviar Mensagem"**: formulario para envio de texto/template para um numero
+- **Aba "Historico"**: tabela filtravel de `whatsapp_messages` do ISP (direcao, status, destinatario, data)
+
+Criar hook `useWhatsAppMessages` para queries da tabela `whatsapp_messages`.
+
+### Parte 5: Painel Admin -- Integracao WhatsApp Propria
+
+**Rota:** `/admin/whatsapp`
 
 **Funcionalidades:**
-- Listagem de todos os fluxos globais (nome, descricao, status, quantidade de etapas, keywords)
-- Botao "Novo Fluxo" que abre um dialog/formulario para criar
-- Cada fluxo e expansivel (Collapsible) para mostrar e editar suas etapas
-- Acoes: editar metadados, ativar/desativar, excluir
-- Reutilizar a logica do `AgentFlowStepsEditor` adaptada para o contexto global (sem `agentId`)
+- **Aba "Configuracao"**: formulario para credenciais do WhatsApp do SaaS (usa `admin_whatsapp_config`, mesmo layout do ISP)
+- **Aba "Enviar Mensagem"**: envio de texto/template para um numero (usa a mesma Edge Function `send-whatsapp`)
+- **Aba "Historico"**: mensagens enviadas/recebidas pelo admin (filtro `isp_id IS NULL`)
 
-**Componentes a criar:**
-- `src/pages/admin/AiFlows.tsx` -- pagina principal
-- `src/components/admin/ai-agents/GlobalFlowForm.tsx` -- dialog para criar/editar metadados do fluxo
-- `src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx` -- editor de etapas adaptado para contexto global
+Navegacao: adicionar "WhatsApp" no `AdminSidebar`.
 
-**Navegacao:** Adicionar item "Fluxos" no `AdminSidebar` dentro da secao de IA.
-
-### 2. Melhorar aba Fluxos no Procedimento
-
-Na `ProcedureFlowsSection` do `AiProcedureDetail.tsx`:
-- Cada fluxo vinculado tera um botao "Ver detalhes" ou sera expansivel (Collapsible)
-- Ao expandir, mostra as etapas do fluxo em modo somente leitura
-- Link "Editar fluxo" que redireciona para `/admin/ai-flows` ou abre o editor inline
-
-### 3. Rota no App.tsx
-
-Adicionar a rota `/admin/ai-flows` no router.
-
-## Secao tecnica
+## Secao Tecnica
 
 ### Arquivos a criar
 
-1. **`src/pages/admin/AiFlows.tsx`**
-   - Usa `useGlobalFlows()` para listar
-   - Usa `useCreateGlobalFlow()`, `useUpdateGlobalFlow()`, `useDeleteGlobalFlow()` para CRUD
-   - Layout com cards expansiveis (Collapsible) igual ao `AgentFlowsTab`
-
-2. **`src/components/admin/ai-agents/GlobalFlowForm.tsx`**
-   - Dialog com campos: nome, slug, descricao, keywords de gatilho, is_fixed, is_active
-   - Baseado no `AgentFlowForm` existente mas sem `agent_id`
-
-3. **`src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx`**
-   - Copia do `AgentFlowStepsEditor` adaptada:
-     - Usa `useSaveGlobalFlowSteps()` em vez de `useSaveFlowSteps()`
-     - Usa `useGlobalTools()` para listar ferramentas disponiveis nos selects
-     - Remove dependencia de `agentId`
+1. **Migration SQL** -- `whatsapp_messages`, `admin_whatsapp_config`, coluna `settings`
+2. **`supabase/functions/send-whatsapp/index.ts`** -- Edge Function de envio
+3. **`src/hooks/painel/useWhatsAppMessages.ts`** -- hook para historico ISP
+4. **`src/hooks/admin/useAdminWhatsAppConfig.ts`** -- hook para config admin
+5. **`src/hooks/admin/useAdminWhatsAppMessages.ts`** -- hook para historico admin
+6. **`src/pages/admin/WhatsApp.tsx`** -- pagina admin com tabs
+7. **`src/components/painel/whatsapp/SendMessageForm.tsx`** -- formulario de envio reutilizavel
+8. **`src/components/painel/whatsapp/MessageHistory.tsx`** -- tabela de historico reutilizavel
 
 ### Arquivos a modificar
 
-4. **`src/components/admin/AdminSidebar.tsx`**
-   - Adicionar link "Fluxos" na secao de IA, apontando para `/admin/ai-flows`
+9. **`src/pages/painel/WhatsAppConfig.tsx`** -- adicionar tabs (Config / Enviar / Historico)
+10. **`supabase/functions/whatsapp-webhook/index.ts`** -- registrar msgs na nova tabela
+11. **`src/components/admin/AdminSidebar.tsx`** -- adicionar link WhatsApp
+12. **`src/App.tsx`** -- adicionar rota `/admin/whatsapp`
+13. **`supabase/config.toml`** -- adicionar `[functions.send-whatsapp]`
+14. **`src/hooks/painel/useWhatsAppConfig.ts`** -- remover casts `as any` (coluna `settings` existira)
 
-5. **`src/App.tsx`**
-   - Adicionar rota `<Route path="ai-flows" element={<AiFlows />} />`
+### Ordem de implementacao
 
-6. **`src/pages/admin/AiProcedureDetail.tsx`**
-   - Na `ProcedureFlowsSection`: adicionar Collapsible em cada fluxo para mostrar etapas em modo leitura
-   - Adicionar botao "Editar" que navega para `/admin/ai-flows`
+1. Migration (DB: tabelas + coluna + RLS)
+2. Edge Function `send-whatsapp`
+3. Atualizar `whatsapp-webhook` para registrar em `whatsapp_messages`
+4. Componentes reutilizaveis (SendMessageForm, MessageHistory)
+5. Painel ISP: tabs de envio e historico
+6. Painel Admin: pagina completa + sidebar + rota
+7. Atualizar hook ISP para remover type casts
 
-### Fluxo de uso
+### Isolamento de dados
 
-```text
-Superadmin
-  |
-  +-- /admin/ai-flows -----------> Cria/edita fluxos globais com etapas
-  |
-  +-- /admin/ai-procedures/:id
-       |
-       +-- Aba "Fluxos" --------> Vincula fluxos ao procedimento (checkbox)
-                                   Visualiza etapas em modo leitura (Collapsible)
-                                   Link para editar em /admin/ai-flows
-```
+- ISP so ve suas proprias mensagens (`isp_id` filtrado por RLS)
+- Admin so ve mensagens do admin (`isp_id IS NULL`)
+- Credenciais do ISP sao invisíveis para o admin e vice-versa
+- Tabelas separadas para configs: `whatsapp_configs` (ISP) vs `admin_whatsapp_config` (Admin)
 
