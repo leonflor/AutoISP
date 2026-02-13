@@ -42,9 +42,15 @@ export async function decrypt(
 
 // ── IXC ──
 export async function fetchIxcClients(apiUrl: string, token: string): Promise<ErpClient[]> {
+  // Normalizar URL - remover /webservice/v1 se já presente
+  let baseUrl = apiUrl.replace(/\/+$/, '');
+  if (baseUrl.endsWith('/webservice/v1')) {
+    baseUrl = baseUrl.slice(0, -'/webservice/v1'.length);
+  }
+
   const authHeader = token.startsWith("Basic ") ? token : `Basic ${token}`;
 
-  const clientesResp = await fetch(`${apiUrl}/webservice/v1/cliente`, {
+  const clientesResp = await fetch(`${baseUrl}/webservice/v1/cliente`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -66,7 +72,7 @@ export async function fetchIxcClients(apiUrl: string, token: string): Promise<Er
 
   let contratos: Record<string, any> = {};
   try {
-    const contratosResp = await fetch(`${apiUrl}/webservice/v1/cliente_contrato`, {
+    const contratosResp = await fetch(`${baseUrl}/webservice/v1/cliente_contrato`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
