@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
+  ArrowLeft,
   MessageCircle,
   Copy,
   Check,
@@ -48,6 +50,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export default function AdminWhatsApp() {
+  const navigate = useNavigate();
   const { config, isLoading, saveConfig, testConnection, webhookUrl } = useAdminWhatsAppConfig();
   const { messages, isLoading: messagesLoading, sendMessage } = useAdminWhatsAppMessages();
   const [showToken, setShowToken] = useState(false);
@@ -105,6 +108,9 @@ export default function AdminWhatsApp() {
   return (
     <div className="space-y-6">
       <div>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/config')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <MessageCircle className="h-6 w-6 text-primary" />
           WhatsApp SaaS
