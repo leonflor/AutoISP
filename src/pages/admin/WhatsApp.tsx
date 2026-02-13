@@ -40,9 +40,9 @@ import { ptBR } from 'date-fns/locale';
 
 const formSchema = z.object({
   phone_number_id: z.string().min(1, 'Phone Number ID é obrigatório'),
-  access_token: z.string().min(1, 'Access Token é obrigatório'),
+  access_token: z.string().optional().default(''),
   phone_number: z.string().min(1, 'Número do WhatsApp é obrigatório'),
-  verify_token: z.string().min(8, 'Token deve ter pelo menos 8 caracteres'),
+  verify_token: z.string().optional().default(''),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -67,12 +67,15 @@ export default function AdminWhatsApp() {
     if (config) {
       form.reset({
         phone_number_id: config.phone_number_id || '',
-        access_token: config.api_key_encrypted || '',
+        access_token: '',
         phone_number: config.phone_number || '',
-        verify_token: config.verify_token || '',
+        verify_token: '',
       });
     }
   }, [config, form]);
+
+  const hasExistingToken = !!config?.api_key_encrypted;
+  const hasExistingVerifyToken = !!config?.verify_token;
 
   const onSubmit = (data: FormData) => {
     saveConfig.mutate({
@@ -181,7 +184,7 @@ export default function AdminWhatsApp() {
                         <FormLabel>Access Token</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Input type={showToken ? 'text' : 'password'} placeholder="Token de acesso" {...field} />
+                            <Input type={showToken ? 'text' : 'password'} placeholder={hasExistingToken ? '••••••••  (deixe vazio para manter)' : 'Token de acesso'} {...field} />
                             <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowToken(!showToken)}>
                               {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
@@ -200,7 +203,7 @@ export default function AdminWhatsApp() {
                     <FormField control={form.control} name="verify_token" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Verify Token</FormLabel>
-                        <FormControl><Input placeholder="Token secreto" {...field} /></FormControl>
+                        <FormControl><Input placeholder={hasExistingVerifyToken ? '••••••••  (deixe vazio para manter)' : 'Token secreto para webhook'} {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />

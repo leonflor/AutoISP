@@ -25,6 +25,7 @@ interface UpdateConfigData {
   verify_token: string;
 }
 
+const SUPABASE_URL = 'https://zvxcwwhsjtdliihlvvof.supabase.co';
 const SUPABASE_PROJECT_ID = 'zvxcwwhsjtdliihlvvof';
 
 export function useAdminWhatsAppConfig() {
@@ -36,82 +37,73 @@ export function useAdminWhatsAppConfig() {
     queryKey: ['admin-whatsapp-config'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('admin_whatsapp_config' as any)
+        .from('admin_whatsapp_config')
         .select('*')
         .limit(1)
         .maybeSingle();
 
       if (error) throw error;
-      return data as unknown as AdminWhatsAppConfig | null;
+      return data as AdminWhatsAppConfig | null;
     },
   });
 
   const saveConfig = useMutation({
     mutationFn: async (data: UpdateConfigData) => {
-      const configData = {
-        provider: 'meta',
-        api_url: 'https://graph.facebook.com/v18.0',
-        api_key_encrypted: data.access_token,
-        phone_number: data.phone_number,
-        phone_number_id: data.phone_number_id,
-        verify_token: data.verify_token,
-        webhook_url: webhookUrl,
-        updated_at: new Date().toISOString(),
-      };
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error('Não autenticado');
 
-      if (config?.id) {
-        const { error } = await supabase
-          .from('admin_whatsapp_config' as any)
-          .update(configData)
-          .eq('id', config.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('admin_whatsapp_config' as any)
-          .insert(configData);
-        if (error) throw error;
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/save-whatsapp-config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          context: 'admin',
+          phone_number_id: data.phone_number_id,
+          access_token: data.access_token || undefined,
+          phone_number: data.phone_number,
+          verify_token: data.verify_token || undefined,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Erro ao salvar configurações');
       }
-      return true;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-whatsapp-config'] });
       toast.success('Configurações salvas com sucesso!');
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error saving config:', error);
-      toast.error('Erro ao salvar configurações');
+      toast.error(error.message || 'Erro ao salvar configurações');
     },
   });
 
   const testConnection = useMutation({
     mutationFn: async () => {
-      if (!config?.phone_number_id || !config?.api_key_encrypted) {
-        throw new Error('Credenciais não configuradas');
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error('Não autenticado');
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/test-whatsapp-connection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ context: 'admin' }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Falha na conexão');
       }
-
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${config.phone_number_id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${config.api_key_encrypted}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Falha na conexão');
-      }
-
-      await supabase
-        .from('admin_whatsapp_config' as any)
-        .update({
-          is_connected: true,
-          connected_at: new Date().toISOString(),
-        })
-        .eq('id', config.id);
-
-      return true;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-whatsapp-config'] });

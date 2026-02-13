@@ -9,6 +9,7 @@ interface WhatsAppConfig {
   provider: string | null;
   api_url: string | null;
   api_key_encrypted: string | null;
+  encryption_iv: string | null;
   phone_number: string | null;
   webhook_url: string | null;
   is_connected: boolean | null;
@@ -27,6 +28,7 @@ interface UpdateConfigData {
   verify_token: string;
 }
 
+const SUPABASE_URL = 'https://zvxcwwhsjtdliihlvvof.supabase.co';
 const SUPABASE_PROJECT_ID = 'zvxcwwhsjtdliihlvvof';
 
 export function useWhatsAppConfig() {
@@ -34,8 +36,8 @@ export function useWhatsAppConfig() {
   const { membership } = useIspMembership();
   const ispId = membership?.ispId;
 
-  const generateWebhookUrl = (ispId: string) => {
-    return `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/whatsapp-webhook?isp=${ispId}`;
+  const generateWebhookUrl = (id: string) => {
+    return `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/whatsapp-webhook?isp=${id}`;
   };
 
   const { data: config, isLoading, error } = useQuery({
@@ -59,82 +61,64 @@ export function useWhatsAppConfig() {
     mutationFn: async (data: UpdateConfigData) => {
       if (!ispId) throw new Error('ISP não encontrado');
 
-      const webhookUrl = generateWebhookUrl(ispId);
-      
-      const configData = {
-        isp_id: ispId,
-        provider: 'meta',
-        api_url: 'https://graph.facebook.com/v18.0',
-        api_key_encrypted: data.access_token,
-        phone_number: data.phone_number,
-        webhook_url: webhookUrl,
-        settings: {
-          phone_number_id: data.phone_number_id,
-          verify_token: data.verify_token,
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error('Não autenticado');
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/save-whatsapp-config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        updated_at: new Date().toISOString(),
-      };
+        body: JSON.stringify({
+          context: 'isp',
+          isp_id: ispId,
+          phone_number_id: data.phone_number_id,
+          access_token: data.access_token || undefined,
+          phone_number: data.phone_number,
+          verify_token: data.verify_token || undefined,
+        }),
+      });
 
-      if (config?.id) {
-        const { error } = await supabase
-          .from('whatsapp_configs')
-          .update(configData)
-          .eq('id', config.id);
-        
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('whatsapp_configs')
-          .insert(configData);
-        
-        if (error) throw error;
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Erro ao salvar configurações');
       }
-
-      return true;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-config', ispId] });
       toast.success('Configurações salvas com sucesso!');
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error saving config:', error);
-      toast.error('Erro ao salvar configurações');
+      toast.error(error.message || 'Erro ao salvar configurações');
     },
   });
 
   const testConnection = useMutation({
     mutationFn: async () => {
-      if (!config?.settings?.phone_number_id || !config?.api_key_encrypted) {
-        throw new Error('Credenciais não configuradas');
+      if (!ispId) throw new Error('ISP não encontrado');
+
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error('Não autenticado');
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/test-whatsapp-connection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ context: 'isp', isp_id: ispId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Falha na conexão');
       }
-
-      const phoneNumberId = config.settings.phone_number_id;
-      const accessToken = config.api_key_encrypted;
-
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${phoneNumberId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Falha na conexão');
-      }
-
-      // Update connection status
-      await supabase
-        .from('whatsapp_configs')
-        .update({
-          is_connected: true,
-          connected_at: new Date().toISOString(),
-        })
-        .eq('id', config.id);
-
-      return true;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-config', ispId] });
