@@ -1,38 +1,53 @@
 
-## Adicionar Botão de Voltar na Configuração WhatsApp
+## Corrigir Botao X do Modal ERP e Implementar Exclusao de Integracao
 
-### Contexto
-As páginas de configuração WhatsApp (`src/pages/admin/WhatsApp.tsx` e `src/pages/painel/WhatsAppConfig.tsx`) atualmente não possuem um botão de navegação para voltar. Outras páginas de detalhe/configuração no projeto (como `AiAgentDetail.tsx`, `SupportTicketDetail.tsx`, `ErpIntegrations.tsx`) implementam esse padrão usando:
-- Ícone `ArrowLeft` do lucide-react
-- Hook `useNavigate` do react-router-dom
-- Botão com variant "ghost" ou "outline"
+### Problema 1: Botao X nao funciona
 
-### Alterações Propostas
+Os tres modais de configuracao ERP (IXC, MK, SGP) usam `onOpenChange={() => {}}` no componente `Dialog`, o que ignora qualquer tentativa de fechar -- incluindo o botao X nativo do Radix. A intencao original era impedir fechamento acidental (clique fora, Esc), mas o efeito colateral e que o X tambem para de funcionar.
 
-**1. `src/pages/admin/WhatsApp.tsx`**
-- Importar `useNavigate` do react-router-dom e `ArrowLeft` do lucide-react
-- Adicionar um botão de voltar antes do título principal (dentro da `<div>` que contém a navegação)
-- Navegação para `/admin/config` (a página de configurações do SaaS Admin)
-- Padrão: `<Button variant="ghost" onClick={() => navigate('/admin/config')}>`
+**Correcao**: Mudar `onOpenChange={() => {}}` para `onOpenChange={(open) => { if (!open) onClose(); }}` nos tres modais. Isso permite que o X funcione enquanto `onInteractOutside` e `onEscapeKeyDown` continuam bloqueados.
 
-**2. `src/pages/painel/WhatsAppConfig.tsx`**
-- Importar `useNavigate` do react-router-dom e `ArrowLeft` do lucide-react
-- Adicionar um botão de voltar antes do título principal
-- Navegação para `/painel/configuracoes` (a página de configurações do Painel ISP, onde WhatsApp está listado nas Integrações)
-- Padrão: `<Button variant="ghost" onClick={() => navigate('/painel/configuracoes')}>`
+### Problema 2: Exclusao de integracao ERP com impacto em procedimentos
 
-### Layout
-Ambos os botões seguirão o padrão encontrado em `ErpIntegrations.tsx`:
+**Fluxo proposto:**
+
+1. Adicionar botao "Excluir Integracao" (vermelho, com icone Trash) no footer de cada modal de configuracao, visivel apenas quando `config?.is_connected` for true
+2. Ao clicar, abrir um `AlertDialog` de confirmacao com:
+   - Titulo: "Excluir Integracao {Nome do ERP}?"
+   - Descricao alertando que procedimentos de IA que dependem de ERP (`requires_erp=true`) deixarao de funcionar
+   - Botao "Cancelar" e botao "Excluir" (destructive)
+3. A exclusao chama `removeConfig.mutate(provider)` do hook `useErpConfigs` (ja existente)
+4. O registro de auditoria e feito automaticamente pelo trigger `log_audit_event()` que ja esta configurado na tabela `erp_configs` -- a exclusao gera um evento `delete` com `old_data` contendo o provider e ISP
+
+### Arquivos alterados
+
+| Arquivo | Alteracao |
+|---|---|
+| `src/components/painel/erp/IxcConfigDialog.tsx` | Corrigir onOpenChange + adicionar botao excluir com AlertDialog |
+| `src/components/painel/erp/MkConfigDialog.tsx` | Corrigir onOpenChange + adicionar botao excluir com AlertDialog |
+| `src/components/painel/erp/SgpConfigDialog.tsx` | Corrigir onOpenChange + adicionar botao excluir com AlertDialog |
+
+### Detalhes tecnicos
+
+**Correcao do X (nos 3 modais):**
 ```
-<Button variant="ghost" size="icon">
-  <ArrowLeft className="h-4 w-4" />
-</Button>
+// De:
+<Dialog open={open} onOpenChange={() => {}}>
+
+// Para:
+<Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
 ```
 
-Posicionado logo acima do título (h1), antes do ícone e texto do heading, permitindo uma navegação intuitiva de volta para a página anterior.
+**Botao de exclusao (no DialogFooter, antes do Cancelar):**
+- Importar `Trash2` do lucide-react
+- Importar componentes `AlertDialog*` do ui/alert-dialog
+- Estado local `showDeleteConfirm` para controlar o AlertDialog
+- Importar `removeConfig` do `useErpConfigs()`
+- Botao visivel apenas se `config?.is_connected`
+- AlertDialog com texto explicando impacto nos procedimentos de IA dependentes de ERP
+- Ao confirmar: `removeConfig.mutate(provider, { onSuccess: () => onClose() })`
 
-### Resultado Esperado
-- Usuários podem voltar facilmente das páginas de configuração WhatsApp para as páginas pai de configurações
-- Consistência visual com outras páginas de detalhe/configuração do projeto
-- Melhoria na navegabilidade e UX
-
+**Auditoria:**
+- O trigger `log_audit_event()` do banco ja captura DELETE em `erp_configs` automaticamente
+- O `old_data` registrado inclui provider, isp_id, api_url (sem campos criptografados, que sao filtrados)
+- Nao e necessaria nenhuma alteracao no backend para auditoria
