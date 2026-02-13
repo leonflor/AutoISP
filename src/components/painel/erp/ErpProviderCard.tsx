@@ -28,7 +28,7 @@ export function ErpProviderCard({ provider, config, onConfigure, onTest, isTesti
   return (
     <Card
       className={cn(
-        'transition-all hover:shadow-md flex flex-col min-h-[340px]',
+        'transition-all hover:shadow-md flex flex-col min-h-[220px]',
         isConfigured && 'border-green-500/30 bg-green-500/5'
       )}
     >
@@ -50,7 +50,7 @@ export function ErpProviderCard({ provider, config, onConfigure, onTest, isTesti
         <CardDescription>{provider.description}</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-3 flex-1 flex flex-col justify-between">
+      <CardContent className="space-y-3 flex-1 flex flex-col">
         {isConfigured && config && (
           <div className="text-sm text-muted-foreground space-y-1">
             <div className="flex items-center gap-2">
@@ -75,7 +75,7 @@ export function ErpProviderCard({ provider, config, onConfigure, onTest, isTesti
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto">
           <Button
             variant={isConfigured ? 'outline' : 'default'}
             className="flex-1"
