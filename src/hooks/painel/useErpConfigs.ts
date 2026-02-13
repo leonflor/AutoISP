@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useIspMembership } from '@/hooks/useIspMembership';
 import { toast } from 'sonner';
@@ -77,9 +78,20 @@ export function useErpConfigs() {
         { body: data }
       );
 
-      if (error) throw error;
-      
-      if (result.error) {
+      if (error) {
+        if (error instanceof FunctionsHttpError) {
+          try {
+            const errorBody = await error.context.json();
+            throw new Error(errorBody.error || 'Erro ao salvar configuração');
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Erro ao salvar configuração') throw e;
+            throw new Error('Erro ao salvar configuração');
+          }
+        }
+        throw error;
+      }
+
+      if (result?.error) {
         throw new Error(result.error);
       }
 
