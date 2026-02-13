@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.fetch-erp-clients]
 verify_jwt = false
+
+[functions.send-whatsapp]
+verify_jwt = false

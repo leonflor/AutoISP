@@ -55,6 +55,7 @@ const AiProceduresPage = lazy(() => import("./pages/admin/AiProcedures"));
 const AiProcedureDetailPage = lazy(() => import("./pages/admin/AiProcedureDetail"));
 const AiFlowsPage = lazy(() => import("./pages/admin/AiFlows"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
+const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -108,6 +109,7 @@ const App = () => (
                 <Route path="ai-flows" element={<AiFlowsPage />} />
                 <Route path="ai-logs" element={<AiProcessingLogsPage />} />
                 <Route path="ai-security" element={<AiSecurityPage />} />
+                <Route path="whatsapp" element={<AdminWhatsApp />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
               </Route>
