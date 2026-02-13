@@ -2,9 +2,18 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { 
-  MessageCircle, Copy, Check, Loader2, ExternalLink,
-  Wifi, WifiOff, Eye, EyeOff, RefreshCw, Info
+import {
+  MessageCircle,
+  Copy,
+  Check,
+  Loader2,
+  ExternalLink,
+  Wifi,
+  WifiOff,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Info,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,10 +23,16 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
-import { useWhatsAppConfig } from '@/hooks/painel/useWhatsAppConfig';
-import { useWhatsAppMessages } from '@/hooks/painel/useWhatsAppMessages';
+import { useAdminWhatsAppConfig } from '@/hooks/admin/useAdminWhatsAppConfig';
+import { useAdminWhatsAppMessages } from '@/hooks/admin/useAdminWhatsAppMessages';
 import { SendMessageForm } from '@/components/painel/whatsapp/SendMessageForm';
 import { MessageHistory } from '@/components/painel/whatsapp/MessageHistory';
 import { format } from 'date-fns';
@@ -32,9 +47,9 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-export default function WhatsAppConfig() {
-  const { config, isLoading, saveConfig, testConnection, generateWebhookUrl } = useWhatsAppConfig();
-  const { messages, isLoading: messagesLoading, sendMessage } = useWhatsAppMessages();
+export default function AdminWhatsApp() {
+  const { config, isLoading, saveConfig, testConnection, webhookUrl } = useAdminWhatsAppConfig();
+  const { messages, isLoading: messagesLoading, sendMessage } = useAdminWhatsAppMessages();
   const [showToken, setShowToken] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -50,12 +65,11 @@ export default function WhatsAppConfig() {
 
   useEffect(() => {
     if (config) {
-      const settings = (config as any).settings as Record<string, any> | undefined;
       form.reset({
-        phone_number_id: settings?.phone_number_id || '',
+        phone_number_id: config.phone_number_id || '',
         access_token: config.api_key_encrypted || '',
         phone_number: config.phone_number || '',
-        verify_token: settings?.verify_token || '',
+        verify_token: config.verify_token || '',
       });
     }
   }, [config, form]);
@@ -75,8 +89,7 @@ export default function WhatsAppConfig() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const webhookUrl = generateWebhookUrl();
-  const verifyToken = form.watch('verify_token') || ((config as any)?.settings?.verify_token) || '';
+  const verifyToken = form.watch('verify_token') || config?.verify_token || '';
 
   if (isLoading) {
     return (
@@ -91,10 +104,10 @@ export default function WhatsAppConfig() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <MessageCircle className="h-6 w-6 text-primary" />
-          Configuração WhatsApp
+          WhatsApp SaaS
         </h1>
         <p className="text-muted-foreground">
-          Configure a integração com WhatsApp Cloud API para atendimento automatizado
+          Integração WhatsApp própria do SaaS Admin — independente dos ISPs
         </p>
       </div>
 
@@ -111,11 +124,11 @@ export default function WhatsAppConfig() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center justify-between">
                 Status da Conexão
-                {config?.is_connected ? (
-                  <Badge variant="default">
-                    <Wifi className="h-3 w-3 mr-1" /> Conectado
-                  </Badge>
-                ) : (
+              {config?.is_connected ? (
+                <Badge variant="default">
+                  <Wifi className="h-3 w-3 mr-1" /> Conectado
+                </Badge>
+              ) : (
                   <Badge variant="secondary">
                     <WifiOff className="h-3 w-3 mr-1" /> Desconectado
                   </Badge>
@@ -130,11 +143,16 @@ export default function WhatsAppConfig() {
                     : 'Nunca conectado'}
                 </div>
                 <Button
-                  variant="outline" size="sm"
+                  variant="outline"
+                  size="sm"
                   onClick={() => testConnection.mutate()}
                   disabled={testConnection.isPending || !config?.api_key_encrypted}
                 >
-                  {testConnection.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  {testConnection.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
                   Testar Conexão
                 </Button>
               </div>
@@ -142,11 +160,11 @@ export default function WhatsAppConfig() {
           </Card>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Credentials Card */}
+            {/* Credentials */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Credenciais</CardTitle>
-                <CardDescription>Configure as credenciais da WhatsApp Cloud API</CardDescription>
+                <CardDescription>Credenciais da WhatsApp Cloud API do SaaS</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
@@ -154,8 +172,7 @@ export default function WhatsAppConfig() {
                     <FormField control={form.control} name="phone_number_id" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone Number ID</FormLabel>
-                        <FormControl><Input placeholder="Ex: 123456789012345" {...field} /></FormControl>
-                        <FormDescription>ID do número no Meta Business</FormDescription>
+                        <FormControl><Input placeholder="123456789012345" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -164,13 +181,12 @@ export default function WhatsAppConfig() {
                         <FormLabel>Access Token</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Input type={showToken ? 'text' : 'password'} placeholder="Token de acesso permanente" {...field} />
+                            <Input type={showToken ? 'text' : 'password'} placeholder="Token de acesso" {...field} />
                             <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowToken(!showToken)}>
                               {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
                           </div>
                         </FormControl>
-                        <FormDescription>Token permanente do System User</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -178,15 +194,13 @@ export default function WhatsAppConfig() {
                       <FormItem>
                         <FormLabel>Número do WhatsApp</FormLabel>
                         <FormControl><Input placeholder="+55 11 99999-9999" {...field} /></FormControl>
-                        <FormDescription>Número conectado ao WhatsApp Business</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />
                     <FormField control={form.control} name="verify_token" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Verify Token</FormLabel>
-                        <FormControl><Input placeholder="Token secreto para webhook" {...field} /></FormControl>
-                        <FormDescription>Token para verificação do webhook</FormDescription>
+                        <FormControl><Input placeholder="Token secreto" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -199,11 +213,11 @@ export default function WhatsAppConfig() {
               </CardContent>
             </Card>
 
-            {/* Webhook Card */}
+            {/* Webhook */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Configuração do Webhook</CardTitle>
-                <CardDescription>Configure estes valores no Meta Business Manager</CardDescription>
+                <CardTitle className="text-lg">Webhook</CardTitle>
+                <CardDescription>Configure no Meta Business Manager</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -224,42 +238,16 @@ export default function WhatsAppConfig() {
                     </Button>
                   </div>
                 </div>
-                <Separator className="my-4" />
+                <Separator />
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    Configure a URL do webhook e o Verify Token no Meta Business Manager: <strong>WhatsApp → Configuração → Webhook</strong>
+                    Configure a URL e o Verify Token no Meta Business Manager: <strong>WhatsApp → Configuração → Webhook</strong>
                   </AlertDescription>
                 </Alert>
               </CardContent>
             </Card>
           </div>
-
-          {/* Instructions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">📖 Como Configurar</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                <li>Acesse <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">developers.facebook.com <ExternalLink className="h-3 w-3" /></a></li>
-                <li>Crie um App do tipo "Business" ou use um existente</li>
-                <li>Adicione o produto "WhatsApp" ao seu App</li>
-                <li>Em "API Setup", copie o <strong>Phone Number ID</strong></li>
-                <li>Crie um <strong>System User</strong> com acesso ao WhatsApp</li>
-                <li>Gere um <strong>Access Token permanente</strong></li>
-                <li>Em "Configuration" → "Webhook", configure a URL e Token acima</li>
-                <li>Inscreva-se nos eventos: <code>messages</code></li>
-              </ol>
-              <div className="mt-4">
-                <Button variant="outline" asChild>
-                  <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4 mr-2" /> Ver Documentação Oficial
-                  </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="send">

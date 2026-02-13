@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_whatsapp_config: {
+        Row: {
+          api_key_encrypted: string | null
+          api_url: string | null
+          connected_at: string | null
+          created_at: string
+          encryption_iv: string | null
+          id: string
+          is_connected: boolean | null
+          phone_number: string | null
+          phone_number_id: string | null
+          provider: string
+          updated_at: string
+          verify_token: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          connected_at?: string | null
+          created_at?: string
+          encryption_iv?: string | null
+          id?: string
+          is_connected?: boolean | null
+          phone_number?: string | null
+          phone_number_id?: string | null
+          provider?: string
+          updated_at?: string
+          verify_token?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          api_key_encrypted?: string | null
+          api_url?: string | null
+          connected_at?: string | null
+          created_at?: string
+          encryption_iv?: string | null
+          id?: string
+          is_connected?: boolean | null
+          phone_number?: string | null
+          phone_number_id?: string | null
+          provider?: string
+          updated_at?: string
+          verify_token?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       agent_knowledge_base: {
         Row: {
           answer: string
@@ -2038,6 +2086,7 @@ export type Database = {
           phone_number: string | null
           provider: string
           qr_code: string | null
+          settings: Json | null
           updated_at: string | null
           webhook_url: string | null
         }
@@ -2054,6 +2103,7 @@ export type Database = {
           phone_number?: string | null
           provider: string
           qr_code?: string | null
+          settings?: Json | null
           updated_at?: string | null
           webhook_url?: string | null
         }
@@ -2070,6 +2120,7 @@ export type Database = {
           phone_number?: string | null
           provider?: string
           qr_code?: string | null
+          settings?: Json | null
           updated_at?: string | null
           webhook_url?: string | null
         }
@@ -2079,6 +2130,103 @@ export type Database = {
             columns: ["isp_id"]
             isOneToOne: true
             referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_messages: {
+        Row: {
+          content: string | null
+          conversation_id: string | null
+          conversation_type: string | null
+          cost_usd: number | null
+          created_at: string
+          delivered_at: string | null
+          direction: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          isp_id: string | null
+          message_type: string
+          read_at: string | null
+          recipient_phone: string | null
+          sender_phone: string | null
+          sent_at: string | null
+          status: string
+          status_updated_at: string | null
+          subscriber_id: string | null
+          template_name: string | null
+          template_params: Json | null
+          wamid: string | null
+        }
+        Insert: {
+          content?: string | null
+          conversation_id?: string | null
+          conversation_type?: string | null
+          cost_usd?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          direction: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          isp_id?: string | null
+          message_type?: string
+          read_at?: string | null
+          recipient_phone?: string | null
+          sender_phone?: string | null
+          sent_at?: string | null
+          status?: string
+          status_updated_at?: string | null
+          subscriber_id?: string | null
+          template_name?: string | null
+          template_params?: Json | null
+          wamid?: string | null
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string | null
+          conversation_type?: string | null
+          cost_usd?: number | null
+          created_at?: string
+          delivered_at?: string | null
+          direction?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          isp_id?: string | null
+          message_type?: string
+          read_at?: string | null
+          recipient_phone?: string | null
+          sender_phone?: string | null
+          sent_at?: string | null
+          status?: string
+          status_updated_at?: string | null
+          subscriber_id?: string | null
+          template_name?: string | null
+          template_params?: Json | null
+          wamid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
             referencedColumns: ["id"]
           },
         ]

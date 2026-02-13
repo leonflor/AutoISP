@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Bot, Shield, FileWarning, Workflow, GitBranch } from 'lucide-react';
+import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Bot, Shield, FileWarning, Workflow, GitBranch, MessageCircle } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -61,6 +61,7 @@ const menuItems: MenuItem[] = [
       { title: 'Cláusulas LGPD', url: '/admin/ai-security', icon: Shield },
     ]
   },
+  { title: 'WhatsApp', url: '/admin/whatsapp', icon: MessageCircle },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
 ];

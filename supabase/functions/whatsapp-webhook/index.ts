@@ -333,6 +333,34 @@ Deno.serve(async (req) => {
           const phoneNumberId = value.metadata.phone_number_id;
           const messages = value.messages || [];
           const contacts = value.contacts || [];
+          const statuses = value.statuses || [];
+
+          // Process status updates
+          for (const statusUpdate of statuses) {
+            const statusMap: Record<string, { status: string; field: string }> = {
+              sent: { status: "sent", field: "sent_at" },
+              delivered: { status: "delivered", field: "delivered_at" },
+              read: { status: "read", field: "read_at" },
+              failed: { status: "failed", field: "status_updated_at" },
+            };
+
+            const mapped = statusMap[statusUpdate.status];
+            if (mapped) {
+              const updateData: Record<string, unknown> = {
+                status: mapped.status,
+                status_updated_at: new Date().toISOString(),
+                [mapped.field]: new Date().toISOString(),
+              };
+
+              await supabase
+                .from("whatsapp_messages")
+                .update(updateData)
+                .eq("wamid", statusUpdate.id)
+                .then(({ error }) => {
+                  if (error) console.error("Error updating message status:", error);
+                });
+            }
+          }
 
           if (messages.length === 0) continue;
 
@@ -482,6 +510,27 @@ Deno.serve(async (req) => {
               .update({ messages: updatedMessages })
               .eq("id", conversation.id);
 
+            // Register inbound message in whatsapp_messages
+            await supabase
+              .from("whatsapp_messages")
+              .insert({
+                isp_id: ispId,
+                wamid: message.id,
+                direction: "inbound",
+                message_type: messageType,
+                recipient_phone: value.metadata.display_phone_number,
+                sender_phone: senderPhone,
+                content: messageContent,
+                status: "delivered",
+                status_updated_at: new Date().toISOString(),
+                conversation_id: conversation.id,
+                subscriber_id: subscriber?.id || null,
+                delivered_at: new Date().toISOString(),
+              })
+              .then(({ error }) => {
+                if (error) console.error("Error logging inbound message:", error);
+              });
+
             // Check if AI agent should respond (only for text messages)
             if (message.type === "text" && messageContent.trim()) {
               await processWithAI(
@@ -561,7 +610,10 @@ async function processWithAI(
       await sendWhatsAppMessage(
         whatsappConfig,
         recipientPhone,
-        "Obrigado por entrar em contato! Um de nossos atendentes irá responder em breve."
+        "Obrigado por entrar em contato! Um de nossos atendentes irá responder em breve.",
+        supabase,
+        ispId,
+        conversation.id
       );
       return;
     }
@@ -603,7 +655,10 @@ async function processWithAI(
       await sendWhatsAppMessage(
         whatsappConfig,
         recipientPhone,
-        "Desculpe, estou com dificuldades no momento. Por favor, tente novamente em alguns instantes."
+        "Desculpe, estou com dificuldades no momento. Por favor, tente novamente em alguns instantes.",
+        supabase,
+        ispId,
+        conversation.id
       );
       return;
     }
@@ -632,7 +687,7 @@ async function processWithAI(
       .eq("id", conversation.id);
 
     // Send response via WhatsApp
-    await sendWhatsAppMessage(whatsappConfig, recipientPhone, assistantMessage);
+    await sendWhatsAppMessage(whatsappConfig, recipientPhone, assistantMessage, supabase, ispId, conversation.id);
 
     console.log("AI response sent successfully");
   } catch (error) {
@@ -642,12 +697,14 @@ async function processWithAI(
     await sendWhatsAppMessage(
       whatsappConfig,
       recipientPhone,
-      "Obrigado pela mensagem! Estamos processando sua solicitação."
+      "Obrigado pela mensagem! Estamos processando sua solicitação.",
+      supabase,
+      ispId
     );
   }
 }
 
-async function sendWhatsAppMessage(config: any, to: string, text: string): Promise<boolean> {
+async function sendWhatsAppMessage(config: any, to: string, text: string, supabaseClient?: any, ispId?: string, conversationId?: string): Promise<boolean> {
   try {
     const phoneNumberId = config.instance_name; // Using instance_name as phone_number_id
 
@@ -723,7 +780,30 @@ async function sendWhatsAppMessage(config: any, to: string, text: string): Promi
       }
 
       const result = await response.json();
-      console.log("Message sent:", result.messages?.[0]?.id);
+      const wamid = result.messages?.[0]?.id;
+      console.log("Message sent:", wamid);
+
+      // Register outbound message in whatsapp_messages
+      if (supabaseClient && wamid) {
+        await supabaseClient
+          .from("whatsapp_messages")
+          .insert({
+            isp_id: ispId || null,
+            wamid,
+            direction: "outbound",
+            message_type: "text",
+            recipient_phone: to,
+            sender_phone: config.phone_number || null,
+            content: part,
+            status: "sent",
+            status_updated_at: new Date().toISOString(),
+            sent_at: new Date().toISOString(),
+            conversation_id: conversationId || null,
+          })
+          .then(({ error: insertErr }: { error: any }) => {
+            if (insertErr) console.error("Error logging outbound message:", insertErr);
+          });
+      }
     }
 
     return true;
