@@ -1,36 +1,38 @@
 
-
-## Atualizar Guia do Projeto com Edge Functions de Seguranca do WhatsApp
+## Adicionar Botão de Voltar na Configuração WhatsApp
 
 ### Contexto
+As páginas de configuração WhatsApp (`src/pages/admin/WhatsApp.tsx` e `src/pages/painel/WhatsAppConfig.tsx`) atualmente não possuem um botão de navegação para voltar. Outras páginas de detalhe/configuração no projeto (como `AiAgentDetail.tsx`, `SupportTicketDetail.tsx`, `ErpIntegrations.tsx`) implementam esse padrão usando:
+- Ícone `ArrowLeft` do lucide-react
+- Hook `useNavigate` do react-router-dom
+- Botão com variant "ghost" ou "outline"
 
-Foram implementadas duas novas Edge Functions (`save-whatsapp-config` e `test-whatsapp-connection`) que adicionam criptografia AES-256-GCM e teste de conexao server-side para a integracao WhatsApp. O guia do projeto precisa ser atualizado para refletir essas mudancas.
+### Alterações Propostas
 
-### Alteracoes
+**1. `src/pages/admin/WhatsApp.tsx`**
+- Importar `useNavigate` do react-router-dom e `ArrowLeft` do lucide-react
+- Adicionar um botão de voltar antes do título principal (dentro da `<div>` que contém a navegação)
+- Navegação para `/admin/config` (a página de configurações do SaaS Admin)
+- Padrão: `<Button variant="ghost" onClick={() => navigate('/admin/config')}>`
 
-**1. `src/components/guia-projeto/integracoes/WhatsAppIntegration.tsx`**
+**2. `src/pages/painel/WhatsAppConfig.tsx`**
+- Importar `useNavigate` do react-router-dom e `ArrowLeft` do lucide-react
+- Adicionar um botão de voltar antes do título principal
+- Navegação para `/painel/configuracoes` (a página de configurações do Painel ISP, onde WhatsApp está listado nas Integrações)
+- Padrão: `<Button variant="ghost" onClick={() => navigate('/painel/configuracoes')}>`
 
-- **Diagrama de arquitetura (linhas ~93-127)**: Adicionar os blocos `save-whatsapp-config` e `test-whatsapp-connection` ao diagrama ASCII, mostrando o fluxo de configuracao separado do fluxo de envio/recebimento
-- **Secao "Implementacao" (linhas ~444-750)**: Adicionar documentacao das duas novas Edge Functions:
-  - `save-whatsapp-config`: criptografia AES-256-GCM, validacao JWT, suporte a contextos admin e ISP, mascaramento de token
-  - `test-whatsapp-connection`: decriptacao server-side, chamada para Meta Graph API, atualizacao de status de conexao
-- **Secao "Seguranca" (linhas ~803-856)**: Atualizar a linha "Token Encryption" para referenciar o fluxo concreto via `save-whatsapp-config` com AES-256-GCM + IV unico. Adicionar linha sobre "Teste de Conexao Server-side" via `test-whatsapp-connection` (credenciais nunca expostas no browser)
+### Layout
+Ambos os botões seguirão o padrão encontrado em `ErpIntegrations.tsx`:
+```
+<Button variant="ghost" size="icon">
+  <ArrowLeft className="h-4 w-4" />
+</Button>
+```
 
-**2. `src/components/guia-projeto/seguranca/AdminSecuritySection.tsx`**
+Posicionado logo acima do título (h1), antes do ícone e texto do heading, permitindo uma navegação intuitiva de volta para a página anterior.
 
-- **Card "Integracoes & Webhooks" (linhas ~319-345)**: Adicionar entrada para WhatsApp Business com autenticacao "Bearer Token (AES-256)" e webhook "HMAC SHA-256 + Rate Limiting"
-- **Card "Gestao de Segredos" (linhas ~233-249)**: Adicionar `WHATSAPP_ACCESS_TOKEN` com uso "WhatsApp Business API" e local "DB (AES-256-GCM)"
-- **Card "Logica Sensivel" (linhas ~278-305)**: Adicionar entrada para "Config WhatsApp" com "Edge Function (save-whatsapp-config)"
-
-**3. `src/components/guia-projeto/seguranca/ClienteSecuritySection.tsx`**
-
-- **Card "Logica Sensivel" (linhas ~307-330)**: A entrada "Disparo WhatsApp" ja existe mas nao menciona a configuracao segura. Atualizar a validacao para incluir "Credenciais criptografadas, config via Edge Function"
-
-### Resumo
-
-| Arquivo | O que muda |
-|---|---|
-| `WhatsAppIntegration.tsx` | Diagrama + 2 novas Edge Functions na doc + seguranca detalhada |
-| `AdminSecuritySection.tsx` | WhatsApp nos cards de integracoes, segredos e logica sensivel |
-| `ClienteSecuritySection.tsx` | Referencia a config segura na logica sensivel |
+### Resultado Esperado
+- Usuários podem voltar facilmente das páginas de configuração WhatsApp para as páginas pai de configurações
+- Consistência visual com outras páginas de detalhe/configuração do projeto
+- Melhoria na navegabilidade e UX
 
