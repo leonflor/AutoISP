@@ -1,42 +1,56 @@
 
 
-## Corrigir URL Duplicada na Integracao IXC
+## Alterar Autenticacao IXC para Login + Senha
 
-### Problema
-O codigo concatena `/webservice/v1/cliente` a URL fornecida pelo usuario. Se o usuario informar `https://central.supernetfibra.com.br/webservice/v1`, a URL final fica com o caminho duplicado: `.../webservice/v1/webservice/v1/cliente`.
+### Problema Atual
+O formulario IXC pede um unico campo "Token de Acesso", mas a API do IXC usa autenticacao **Basic Auth** no formato `base64(login:senha)`. O usuario precisa informar **login** e **senha** separadamente, e o sistema deve montar o token automaticamente.
 
-### Solucao
-Normalizar a URL base antes de montar o endpoint, removendo `/webservice/v1` do final se ja estiver presente. Isso sera aplicado nos 3 arquivos que fazem requisicoes IXC.
+### Alteracoes
 
-### Arquivos a Modificar
-
-| Arquivo | Funcao afetada |
+| Arquivo | O que muda |
 |---|---|
-| `supabase/functions/save-erp-config/index.ts` | `testIxcConnection` (linhas 66-131) |
-| `supabase/functions/test-erp/index.ts` | `testIxcConnection` (linhas 57-129) |
-| `supabase/functions/_shared/erp-fetcher.ts` | `fetchIxcClients` (linhas 48-101) |
+| `src/components/painel/erp/IxcConfigDialog.tsx` | Substituir campo "Token" por dois campos: "Login" e "Senha" |
+| `supabase/functions/save-erp-config/index.ts` | Receber `username` + `password` ao inves de `token`, montar o Basic auth header com `btoa(login:senha)` |
+| `supabase/functions/test-erp/index.ts` | Mesma alteracao na funcao `testIxcConnection` |
+| `supabase/functions/_shared/erp-fetcher.ts` | Atualizar `fetchIxcClients` para receber e usar login+senha decodificados ou o token montado |
 
-### Implementacao
+### Detalhes Tecnicos
 
-Adicionar normalizacao no inicio de cada funcao IXC:
+**1. IxcConfigDialog.tsx**
+- Remover campo `token` do schema Zod
+- Adicionar campos `login` (string obrigatoria) e `senha` (string obrigatoria)
+- No `onSubmit`, enviar `credentials: { username: data.login, password: data.senha }` ao inves de `credentials: { token }`
+- Atualizar labels, placeholders e instrucoes de ajuda
 
-```ts
-// Normalizar URL - remover /webservice/v1 se já presente
-let baseUrl = apiUrl.replace(/\/+$/, '');
-if (baseUrl.endsWith('/webservice/v1')) {
-  baseUrl = baseUrl.slice(0, -'/webservice/v1'.length);
-}
+**2. save-erp-config/index.ts**
+- Na validacao do case `ixc`, exigir `username` e `password` ao inves de `token`
+- Na funcao `testIxcConnection`, receber `username` e `password`, montar o token com:
+  ```ts
+  const token = btoa(`${username}:${password}`);
+  const authHeader = `Basic ${token}`;
+  ```
+- Criptografar a `password` separadamente e salvar `username` em texto claro (igual ao MK)
+- Ajustar `keyToEncrypt` para usar a password
 
-// Usar baseUrl no lugar de apiUrl
-const response = await fetch(`${baseUrl}/webservice/v1/cliente`, { ... });
+**3. test-erp/index.ts**
+- Atualizar `testIxcConnection` com a mesma logica de montar Basic auth a partir de username+password descriptografados do banco
+
+**4. erp-fetcher.ts**
+- Na funcao `fetchIxcClients`, receber `username` e `password` ao inves de `token`, montar o Basic auth header internamente
+
+### Fluxo de Autenticacao
+
+O token Basic Auth sera montado assim:
+```
+Authorization: Basic base64(login:senha)
 ```
 
-A mesma logica ja existe para o SGP (que remove `/api` do final). Apenas replicamos o padrao para o IXC.
+Exemplo: login `admin`, senha `123456` resulta em:
+```
+Authorization: Basic YWRtaW46MTIzNDU2
+```
 
-### Resultado
-Com a URL `https://central.supernetfibra.com.br/webservice/v1`, o sistema montara corretamente:
-- `https://central.supernetfibra.com.br/webservice/v1/cliente`
-
-E se o usuario informar apenas `https://central.supernetfibra.com.br`, tambem funcionara:
-- `https://central.supernetfibra.com.br/webservice/v1/cliente`
-
+### Armazenamento
+- `username` salvo em texto claro na coluna `username` da tabela `erp_configs`
+- `password` criptografada com AES-256-GCM na coluna `password_encrypted`
+- `masked_key` exibira os primeiros/ultimos caracteres do login para identificacao visual
