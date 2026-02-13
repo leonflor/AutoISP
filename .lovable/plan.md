@@ -1,53 +1,63 @@
 
-## Corrigir Botao X do Modal ERP e Implementar Exclusao de Integracao
+## Padronizar Altura dos Cards de Integração ERP
 
-### Problema 1: Botao X nao funciona
+### Problema Identificado
 
-Os tres modais de configuracao ERP (IXC, MK, SGP) usam `onOpenChange={() => {}}` no componente `Dialog`, o que ignora qualquer tentativa de fechar -- incluindo o botao X nativo do Radix. A intencao original era impedir fechamento acidental (clique fora, Esc), mas o efeito colateral e que o X tambem para de funcionar.
+Os cards de integração ERP (IXC, MK-Solutions, SGP e Hubsoft) apresentam alturas diferentes porque:
 
-**Correcao**: Mudar `onOpenChange={() => {}}` para `onOpenChange={(open) => { if (!open) onClose(); }}` nos tres modais. Isso permite que o X funcione enquanto `onInteractOutside` e `onEscapeKeyDown` continuam bloqueados.
+1. **Conteúdo Dinâmico**: Cards não configurados mostram apenas os botões, enquanto cards configurados exibem:
+   - URL da API
+   - Data de conexão
+   - Chave mascarada
+   
+2. **Falta de Altura Fixa**: O componente `Card` e `CardContent` usam altura automática (height: auto), permitindo que o conteúdo expanda ou contraia livremente
 
-### Problema 2: Exclusao de integracao ERP com impacto em procedimentos
+3. **Impacto Visual**: Especialmente em layouts de grid (`lg:grid-cols-4`), a variação de altura prejudica a alinhamento visual
 
-**Fluxo proposto:**
+### Solução Proposta
 
-1. Adicionar botao "Excluir Integracao" (vermelho, com icone Trash) no footer de cada modal de configuracao, visivel apenas quando `config?.is_connected` for true
-2. Ao clicar, abrir um `AlertDialog` de confirmacao com:
-   - Titulo: "Excluir Integracao {Nome do ERP}?"
-   - Descricao alertando que procedimentos de IA que dependem de ERP (`requires_erp=true`) deixarao de funcionar
-   - Botao "Cancelar" e botao "Excluir" (destructive)
-3. A exclusao chama `removeConfig.mutate(provider)` do hook `useErpConfigs` (ja existente)
-4. O registro de auditoria e feito automaticamente pelo trigger `log_audit_event()` que ja esta configurado na tabela `erp_configs` -- a exclusao gera um evento `delete` com `old_data` contendo o provider e ISP
+Adicionar altura mínima padronizada ao componente `ErpProviderCard` para garantir que todos os cards tenham o mesmo tamanho, independentemente do estado (configurado ou não).
 
-### Arquivos alterados
+**Abordagem**:
+- Envolver o `Card` com um `div` que tenha `h-full` (height: 100%) 
+- Usar `min-h-[340px]` ou similar no Card para garantir uma altura mínima consistente
+- Usar `flex flex-col` no Card para estruturar o conteúdo verticalmente
+- Usar `flex-1` no `CardContent` para preencher o espaço disponível
 
-| Arquivo | Alteracao |
+**Benefícios**:
+- Todos os cards ficam com mesma altura, criando alinhamento visual perfeito
+- O espaço extra é preenchido naturalmente no CardContent
+- Responsivo: a altura pode ser ajustada para mobile se necessário
+- Sem impacto na funcionalidade existente
+
+### Arquivo a Modificar
+
+| Arquivo | Alteração |
 |---|---|
-| `src/components/painel/erp/IxcConfigDialog.tsx` | Corrigir onOpenChange + adicionar botao excluir com AlertDialog |
-| `src/components/painel/erp/MkConfigDialog.tsx` | Corrigir onOpenChange + adicionar botao excluir com AlertDialog |
-| `src/components/painel/erp/SgpConfigDialog.tsx` | Corrigir onOpenChange + adicionar botao excluir com AlertDialog |
+| `src/components/painel/erp/ErpProviderCard.tsx` | Adicionar `min-h-[340px] flex flex-col` ao Card e `flex-1` ao CardContent |
 
-### Detalhes tecnicos
+### Implementação Técnica
 
-**Correcao do X (nos 3 modais):**
-```
+```tsx
 // De:
-<Dialog open={open} onOpenChange={() => {}}>
+<Card className={cn('transition-all hover:shadow-md', isConfigured && 'border-green-500/30 bg-green-500/5')}>
+  <CardHeader className="pb-3">
+    ...
+  </CardHeader>
+  <CardContent className="space-y-3">
+    ...
+  </CardContent>
+</Card>
 
 // Para:
-<Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+<Card className={cn('transition-all hover:shadow-md flex flex-col min-h-[340px]', isConfigured && 'border-green-500/30 bg-green-500/5')}>
+  <CardHeader className="pb-3">
+    ...
+  </CardHeader>
+  <CardContent className="space-y-3 flex-1 flex flex-col justify-between">
+    ...
+  </CardContent>
+</Card>
 ```
 
-**Botao de exclusao (no DialogFooter, antes do Cancelar):**
-- Importar `Trash2` do lucide-react
-- Importar componentes `AlertDialog*` do ui/alert-dialog
-- Estado local `showDeleteConfirm` para controlar o AlertDialog
-- Importar `removeConfig` do `useErpConfigs()`
-- Botao visivel apenas se `config?.is_connected`
-- AlertDialog com texto explicando impacto nos procedimentos de IA dependentes de ERP
-- Ao confirmar: `removeConfig.mutate(provider, { onSuccess: () => onClose() })`
-
-**Auditoria:**
-- O trigger `log_audit_event()` do banco ja captura DELETE em `erp_configs` automaticamente
-- O `old_data` registrado inclui provider, isp_id, api_url (sem campos criptografados, que sao filtrados)
-- Nao e necessaria nenhuma alteracao no backend para auditoria
+Resultado esperado: todos os 4 cards da grid terão exatamente a mesma altura, criando um alinhamento visual perfeito na página de Integração ERP.
