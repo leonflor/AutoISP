@@ -68,11 +68,17 @@ async function testIxcConnection(
   token: string
 ): Promise<TestResult> {
   try {
-    console.log(`[IXC] Testing connection to: ${apiUrl}`);
+    // Normalizar URL - remover /webservice/v1 se já presente
+    let baseUrl = apiUrl.replace(/\/+$/, '');
+    if (baseUrl.endsWith('/webservice/v1')) {
+      baseUrl = baseUrl.slice(0, -'/webservice/v1'.length);
+    }
+
+    console.log(`[IXC] Testing connection to: ${baseUrl}`);
 
     const authHeader = token.startsWith("Basic ") ? token : `Basic ${token}`;
 
-    const response = await fetch(`${apiUrl}/webservice/v1/cliente`, {
+    const response = await fetch(`${baseUrl}/webservice/v1/cliente`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
