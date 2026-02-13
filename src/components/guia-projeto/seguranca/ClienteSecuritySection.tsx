@@ -316,7 +316,8 @@ const ClienteSecuritySection = () => {
             <div className="space-y-2">
               {[
                 { logica: "Sincronização ERP", validacao: "Credenciais decriptadas no servidor" },
-                { logica: "Disparo WhatsApp", validacao: "Rate limit, validar template" },
+                { logica: "Disparo WhatsApp", validacao: "Credenciais criptografadas (AES-256-GCM), config via Edge Function, rate limit" },
+                { logica: "Config WhatsApp", validacao: "Edge Function (save-whatsapp-config), teste server-side" },
                 { logica: "Respostas da IA", validacao: "Sanitizar antes de exibir" },
                 { logica: "Transferência humano", validacao: "Validar operador ativo" },
                 { logica: "Ações monitoramento", validacao: "Validar asset pertence ao ISP" },
