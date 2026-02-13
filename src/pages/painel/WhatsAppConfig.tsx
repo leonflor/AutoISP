@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
-  MessageCircle, Copy, Check, Loader2, ExternalLink,
+  ArrowLeft, MessageCircle, Copy, Check, Loader2, ExternalLink,
   Wifi, WifiOff, Eye, EyeOff, RefreshCw, Info
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export default function WhatsAppConfig() {
+  const navigate = useNavigate();
   const { config, isLoading, saveConfig, testConnection, generateWebhookUrl } = useWhatsAppConfig();
   const { messages, isLoading: messagesLoading, sendMessage } = useWhatsAppMessages();
   const [showToken, setShowToken] = useState(false);
@@ -92,6 +94,9 @@ export default function WhatsAppConfig() {
   return (
     <div className="space-y-6">
       <div>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/painel/configuracoes')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <MessageCircle className="h-6 w-6 text-primary" />
           Configuração WhatsApp
