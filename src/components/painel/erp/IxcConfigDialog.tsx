@@ -56,7 +56,8 @@ import { ErpConfig, useErpConfigs } from '@/hooks/painel/useErpConfigs';
 
 const formSchema = z.object({
   api_url: z.string().url('URL inválida').min(1, 'URL é obrigatória'),
-  token: z.string().min(1, 'Token é obrigatório'),
+  login: z.string().min(1, 'Login é obrigatório'),
+  senha: z.string().min(1, 'Senha é obrigatória'),
   self_signed_cert: z.boolean().default(false),
 });
 
@@ -70,7 +71,7 @@ interface IxcConfigDialogProps {
 
 export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps) {
   const { saveConfig, testConnection, removeConfig } = useErpConfigs();
-  const [showToken, setShowToken] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -78,7 +79,8 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
     resolver: zodResolver(formSchema),
     defaultValues: {
       api_url: '',
-      token: '',
+      login: '',
+      senha: '',
       self_signed_cert: false,
     },
   });
@@ -88,7 +90,8 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
     if (open) {
       form.reset({
         api_url: config?.api_url || '',
-        token: '', // Never fill encrypted token
+        login: config?.username || '',
+        senha: '', // Never fill encrypted password
         self_signed_cert: (config?.sync_config as Record<string, unknown>)?.self_signed_cert as boolean || false,
       });
       setFormError(null);
@@ -101,7 +104,7 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
       {
         provider: 'ixc',
         api_url: data.api_url,
-        credentials: { token: data.token },
+        credentials: { username: data.login, password: data.senha },
         options: { self_signed_cert: data.self_signed_cert },
       },
       {
@@ -189,7 +192,7 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
                     <Input placeholder="https://erp.seuprovedor.com.br" {...field} />
                   </FormControl>
                   <FormDescription>
-                    URL base do seu servidor IXC
+                    URL base do seu servidor IXC (ex: https://central.seuprovedor.com.br/webservice/v1)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -198,15 +201,32 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
 
             <FormField
               control={form.control}
-              name="token"
+              name="login"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Token de Acesso *</FormLabel>
+                  <FormLabel>Login *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Usuário de integração do IXC" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Usuário com acesso ao webservice do IXC
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="senha"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Senha *</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
-                        type={showToken ? 'text' : 'password'}
-                        placeholder={config?.masked_key ? 'Digite novo token para atualizar' : 'Cole o token aqui'}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder={config?.masked_key ? 'Digite nova senha para atualizar' : 'Senha do usuário'}
                         {...field}
                       />
                       <Button
@@ -214,9 +234,9 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
                         variant="ghost"
                         size="sm"
                         className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowToken(!showToken)}
+                        onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showToken ? (
+                        {showPassword ? (
                           <EyeOff className="h-4 w-4" />
                         ) : (
                           <Eye className="h-4 w-4" />
@@ -225,7 +245,7 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
                     </div>
                   </FormControl>
                   <FormDescription>
-                    Token gerado no painel do IXC
+                    Senha do usuário de integração
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -256,14 +276,14 @@ export function IxcConfigDialog({ open, config, onClose }: IxcConfigDialogProps)
             <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <HelpCircle className="h-4 w-4" />
-                Como obter o token?
+                Como obter as credenciais?
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-3 space-y-2">
                 <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
                   <li>Acesse o IXC {">"} Configurações {">"} Usuários</li>
                   <li>Crie ou edite um usuário para integração</li>
                   <li>Marque "Permite acesso ao webservice"</li>
-                  <li>Após salvar, copie o Token gerado</li>
+                  <li>Use o login e senha desse usuário aqui</li>
                 </ol>
                 <Button variant="link" className="p-0 h-auto" asChild>
                   <a

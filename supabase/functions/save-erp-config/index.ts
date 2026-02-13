@@ -65,7 +65,8 @@ function maskApiKey(key: string): string {
 // Test IXC connection
 async function testIxcConnection(
   apiUrl: string,
-  token: string
+  username: string,
+  password: string
 ): Promise<TestResult> {
   try {
     // Normalizar URL - remover /webservice/v1 se já presente
@@ -76,7 +77,8 @@ async function testIxcConnection(
 
     console.log(`[IXC] Testing connection to: ${baseUrl}`);
 
-    const authHeader = token.startsWith("Basic ") ? token : `Basic ${token}`;
+    const token = btoa(`${username}:${password}`);
+    const authHeader = `Basic ${token}`;
 
     const response = await fetch(`${baseUrl}/webservice/v1/cliente`, {
       method: "POST",
@@ -99,7 +101,7 @@ async function testIxcConnection(
     if (response.status === 401) {
       return {
         success: false,
-        message: "Token inválido ou expirado. Gere um novo no IXC.",
+        message: "Login ou senha inválidos. Verifique as credenciais no IXC.",
       };
     }
 
@@ -383,9 +385,9 @@ Deno.serve(async (req) => {
 
     switch (body.provider) {
       case "ixc":
-        if (!body.credentials.token) {
+        if (!body.credentials.username || !body.credentials.password) {
           return new Response(
-            JSON.stringify({ error: "Token é obrigatório para IXC" }),
+            JSON.stringify({ error: "Login e senha são obrigatórios para IXC" }),
             {
               status: 400,
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -394,9 +396,10 @@ Deno.serve(async (req) => {
         }
         testResult = await testIxcConnection(
           body.api_url,
-          body.credentials.token
+          body.credentials.username,
+          body.credentials.password
         );
-        keyToEncrypt = body.credentials.token;
+        keyToEncrypt = null; // IXC no longer uses api_key_encrypted
         break;
 
       case "mk_solutions":
@@ -482,6 +485,11 @@ Deno.serve(async (req) => {
       const encrypted = await encrypt(body.credentials.password, encryptionKey);
       passwordEncrypted = encrypted.ciphertext;
       if (!encryptionIv) encryptionIv = encrypted.iv;
+    }
+
+    // For IXC, use username for masked_key display
+    if (body.provider === 'ixc' && body.credentials.username) {
+      maskedKey = maskApiKey(body.credentials.username);
     }
 
     // Upsert config
