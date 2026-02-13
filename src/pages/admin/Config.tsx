@@ -11,6 +11,7 @@ import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 import { IntegrationConfigDialog, type IntegrationType } from "@/components/admin/integrations";
 import { useIntegrationCheck } from "@/hooks/admin/useIntegrationCheck";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { 
   Palette, 
   Building2, 
@@ -29,12 +30,14 @@ import {
   CheckCircle2,
   Settings2,
   Loader2,
-  Zap
+  Zap,
+  MessageCircle
 } from "lucide-react";
 
 const Config = () => {
   const { configMap, isLoading, getValue, batchUpdate, updateConfig, isUpdating } = usePlatformConfig();
   const { checkIntegration, isChecking, checkingIntegration } = useIntegrationCheck();
+  const navigate = useNavigate();
   const { toast } = useToast();
   
   // Dialog state for integration configuration
@@ -103,6 +106,13 @@ const Config = () => {
       icon: Bell, 
       configured: configMap?.integration_push?.configured ?? false, 
       description: "Notificações push" 
+    },
+    { 
+      name: "WhatsApp Business", 
+      key: "integration_whatsapp",
+      icon: MessageCircle, 
+      configured: configMap?.integration_whatsapp?.configured ?? false, 
+      description: "Comunicação via WhatsApp Cloud API" 
     },
   ];
 
@@ -391,7 +401,16 @@ const Config = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {integration.configured ? (
+                        {integration.key === "integration_whatsapp" ? (
+                          <Button 
+                            size="sm"
+                            variant={integration.configured ? "outline" : "default"}
+                            onClick={() => navigate("/admin/whatsapp")}
+                          >
+                            <Settings2 className="h-4 w-4 mr-2" />
+                            {integration.configured ? "Gerenciar" : "Configurar"}
+                          </Button>
+                        ) : integration.configured ? (
                           <>
                             <Button 
                               variant="outline" 
