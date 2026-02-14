@@ -90,11 +90,17 @@ Deno.serve(async (req) => {
           decryptedKey = await decrypt(config.api_key_encrypted, config.encryption_iv, encryptionKey);
         }
 
+        // Decrypt password for IXC
+        let decryptedPassword = "";
+        if (config.provider === "ixc" && config.password_encrypted && config.encryption_iv) {
+          decryptedPassword = await decrypt(config.password_encrypted, config.encryption_iv, encryptionKey);
+        }
+
         let clients: ErpClient[] = [];
 
         switch (config.provider) {
           case "ixc":
-            clients = await fetchIxcClients(config.api_url, decryptedKey);
+            clients = await fetchIxcClients(config.api_url, config.username || "", decryptedPassword);
             break;
           case "sgp":
             clients = await fetchSgpClients(config.api_url, decryptedKey, config.username || "");
