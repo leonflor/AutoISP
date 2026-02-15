@@ -63,7 +63,7 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
       query: "S",
       oper: "=",
       page: "1",
-      rp: "500",
+      rp: "5000",
     }),
   });
 
