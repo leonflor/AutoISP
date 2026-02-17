@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIspMembership } from "@/hooks/useIspMembership";
 
+export type SignalQuality = 'critical' | 'weak' | 'acceptable' | 'excellent' | 'ideal' | 'saturated' | 'low' | 'unknown';
+
 export interface ErpClient {
   erp_id: string;
   provider: "ixc" | "mk_solutions" | "sgp";
@@ -13,6 +15,8 @@ export interface ErpClient {
   login: string | null;
   status_contrato: string;
   conectado: boolean;
+  signal_db: number | null;
+  signal_quality: SignalQuality;
 }
 
 interface FetchResponse {

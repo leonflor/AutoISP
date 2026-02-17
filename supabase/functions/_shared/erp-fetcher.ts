@@ -1,4 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { classifySignalDb, type SignalQuality } from "./onu-signal-analyzer.ts";
 
 export interface ErpClient {
   erp_id: string;
@@ -11,6 +12,10 @@ export interface ErpClient {
   login: string | null;
   status_contrato: string;
   conectado: boolean;
+  /** Single signal value from /radusuarios (IXC) — used for list badges */
+  signal_db: number | null;
+  /** Classified quality derived from signal_db */
+  signal_quality: SignalQuality;
 }
 
 // Decryption helper
@@ -40,6 +45,14 @@ export async function decrypt(
   return new TextDecoder().decode(decrypted);
 }
 
+// ── IXC: tipo para sessão RADIUS ──
+interface IxcRadusuario {
+  id_cliente: string;
+  login: string;
+  online: string; // "S" or "N"
+  signal_db: string | null;
+}
+
 // ── IXC ──
 export async function fetchIxcClients(apiUrl: string, username: string, password: string): Promise<ErpClient[]> {
   // Normalizar URL - remover /webservice/v1 se já presente
@@ -51,25 +64,60 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
   const token = btoa(`${username}:${password}`);
   const authHeader = `Basic ${token}`;
 
-  const clientesResp = await fetch(`${baseUrl}/webservice/v1/cliente`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authHeader,
-      ixcsoft: "listar",
-    },
-    body: JSON.stringify({
-      qtype: "cliente.ativo",
-      query: "S",
-      oper: "=",
-      page: "1",
-      rp: "5000",
+  // Fetch clientes + radusuarios em paralelo
+  const [clientesResp, radusuariosResp] = await Promise.all([
+    fetch(`${baseUrl}/webservice/v1/cliente`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+        ixcsoft: "listar",
+      },
+      body: JSON.stringify({
+        qtype: "cliente.ativo",
+        query: "S",
+        oper: "=",
+        page: "1",
+        rp: "5000",
+      }),
     }),
-  });
+    fetch(`${baseUrl}/webservice/v1/radusuarios`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+        ixcsoft: "listar",
+      },
+      body: JSON.stringify({
+        qtype: "radusuarios.id",
+        query: "1",
+        oper: ">",
+        page: "1",
+        rp: "5000",
+      }),
+    }).catch(() => null), // non-blocking — if radusuarios fails, we still return clients
+  ]);
 
   if (!clientesResp.ok) throw new Error(`IXC HTTP ${clientesResp.status}`);
   const clientesData = await clientesResp.json();
   const registros = clientesData.registros || [];
+
+  // Build radusuarios lookup by id_cliente
+  const radusuariosMap: Record<string, IxcRadusuario> = {};
+  if (radusuariosResp && radusuariosResp.ok) {
+    try {
+      const radData = await radusuariosResp.json();
+      for (const r of radData.registros || []) {
+        // Keep the latest entry per client (overwrite)
+        radusuariosMap[String(r.id_cliente)] = {
+          id_cliente: String(r.id_cliente),
+          login: r.login || "",
+          online: r.online || "N",
+          signal_db: r.signal_db ?? null,
+        };
+      }
+    } catch { /* non-blocking */ }
+  }
 
   let contratos: Record<string, any> = {};
   try {
@@ -98,7 +146,15 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
 
   return registros.map((r: any) => {
     const contrato = contratos[String(r.id)];
+    const rad = radusuariosMap[String(r.id)];
     const statusMap: Record<string, string> = { S: "ativo", N: "cancelado" };
+
+    // Real-time connection status from RADIUS session
+    const isOnlineRadius = rad?.online === "S";
+    // Signal from radusuarios
+    const signalDb = rad?.signal_db ? parseFloat(String(rad.signal_db)) : null;
+    const validSignalDb = signalDb !== null && !isNaN(signalDb) ? signalDb : null;
+
     return {
       erp_id: String(r.id),
       provider: "ixc" as const,
@@ -107,14 +163,16 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
       cpf_cnpj: r.cnpj_cpf || "",
       data_vencimento: r.dia_vencimento ? `Dia ${r.dia_vencimento}` : null,
       plano: contrato?.contrato || contrato?.id_vd_contrato || null,
-      login: contrato?.login || r.login || null,
+      login: rad?.login || contrato?.login || r.login || null,
       status_contrato: contrato?.status
         ? contrato.status === "A" ? "ativo"
           : contrato.status === "S" ? "suspenso"
           : contrato.status === "C" ? "cancelado"
           : contrato.status
         : statusMap[r.ativo] || "desconhecido",
-      conectado: contrato?.status === "A" || r.ativo === "S",
+      conectado: isOnlineRadius || (contrato?.status === "A" && r.ativo === "S"),
+      signal_db: validSignalDb,
+      signal_quality: classifySignalDb(validSignalDb),
     };
   });
 }
@@ -150,6 +208,8 @@ export async function fetchSgpClients(apiUrl: string, token: string, app: string
     login: r.login || r.usuario || null,
     status_contrato: r.status || r.situacao || "ativo",
     conectado: r.online === true || r.online === "S" || r.conectado === true,
+    signal_db: null,
+    signal_quality: "unknown" as SignalQuality,
   }));
 }
 
@@ -189,6 +249,8 @@ export async function fetchMkClients(apiUrl: string, username: string, apiKey: s
     login: r.LoginConexao || r.login || null,
     status_contrato: (r.Situacao || r.status || "ativo").toLowerCase(),
     conectado: r.Conectado === "S" || r.online === true,
+    signal_db: null,
+    signal_quality: "unknown" as SignalQuality,
   }));
 }
 
