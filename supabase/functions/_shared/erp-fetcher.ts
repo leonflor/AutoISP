@@ -50,7 +50,12 @@ interface IxcRadusuario {
   id_cliente: string;
   login: string;
   online: string; // "S" or "N"
-  signal_db: string | null;
+}
+
+// ── IXC: sinal do botao_rel_22991 ──
+interface IxcSignalRecord {
+  id_cliente: string;
+  rx: string | null;
 }
 
 // ── IXC ──
@@ -106,19 +111,11 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     try {
       const radData = await radusuariosResp.json();
       const radRegistros = radData.registros || [];
-      
-      // LOG: mostrar campos do primeiro registro para debug
-      if (radRegistros.length > 0) {
-        console.log("[IXC] radusuarios sample keys:", Object.keys(radRegistros[0]));
-        console.log("[IXC] radusuarios sample record:", JSON.stringify(radRegistros[0]));
-      }
-      
       for (const r of radRegistros) {
         radusuariosMap[String(r.id_cliente)] = {
           id_cliente: String(r.id_cliente),
           login: r.login || "",
           online: r.online || "N",
-          signal_db: r.signal_db ?? r.rx ?? r.sinal ?? r.onu_rx ?? r.potencia ?? null,
         };
       }
     } catch { /* non-blocking */ }
@@ -145,6 +142,47 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     }
   } catch { /* non-blocking */ }
 
+  // Fetch signal per-client from botao_rel_22991 (parallel, max 10 concurrent)
+  const signalMap: Record<string, number | null> = {};
+  const clientIds = registros.map((r: any) => String(r.id));
+  const CONCURRENCY = 10;
+  
+  for (let i = 0; i < clientIds.length; i += CONCURRENCY) {
+    const batch = clientIds.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(async (clientId: string) => {
+        try {
+          const resp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
+            method: "POST",
+            headers: ixcHeaders,
+            body: JSON.stringify({
+              qtype: "botao_rel_22991.id_cliente",
+              query: clientId,
+              oper: "=",
+              page: "1",
+              rp: "1",
+            }),
+          });
+          if (!resp.ok) return;
+          const data = await resp.json();
+          const regs = data.registros || [];
+          if (regs.length > 0) {
+            const rx = regs[0].rx ?? regs[0].signal_db ?? regs[0].sinal ?? null;
+            if (rx !== null && rx !== "") {
+              signalMap[clientId] = parseFloat(String(rx));
+            }
+          }
+        } catch { /* non-blocking */ }
+      })
+    );
+  }
+
+  if (Object.keys(signalMap).length > 0) {
+    console.log("[IXC] botao_rel_22991 signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 3)));
+  } else {
+    console.log("[IXC] botao_rel_22991: no signal data returned for any client");
+  }
+
   return registros.map((r: any) => {
     const contrato = contratos[String(r.id)];
     const rad = radusuariosMap[String(r.id)];
@@ -152,9 +190,9 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
 
     // Real-time connection status from RADIUS session
     const isOnlineRadius = rad?.online === "S";
-    // Signal from radusuarios (trying multiple field names)
-    const signalDb = rad?.signal_db ? parseFloat(String(rad.signal_db)) : null;
-    const validSignalDb = signalDb !== null && !isNaN(signalDb) ? signalDb : null;
+    // Signal from botao_rel_22991
+    const rawSignal = signalMap[String(r.id)] ?? null;
+    const validSignalDb = rawSignal !== null && !isNaN(rawSignal) ? rawSignal : null;
 
     return {
       erp_id: String(r.id),
