@@ -1,56 +1,88 @@
 
+# Implementacao UI: Sinal ONU na Lista de Assinantes
 
-## Alterar Autenticacao IXC para Login + Senha
+## Resumo
 
-### Problema Atual
-O formulario IXC pede um unico campo "Token de Acesso", mas a API do IXC usa autenticacao **Basic Auth** no formato `base64(login:senha)`. O usuario precisa informar **login** e **senha** separadamente, e o sistema deve montar o token automaticamente.
+O backend ja esta completo (`onu-signal-analyzer.ts`, `fetch-erp-clients` com `signal_db`/`signal_quality`, `fetch-onu-signal` para diagnostico detalhado). Agora implementaremos a camada de UI seguindo os padroes existentes do SaaS.
 
-### Alteracoes
+---
 
-| Arquivo | O que muda |
-|---|---|
-| `src/components/painel/erp/IxcConfigDialog.tsx` | Substituir campo "Token" por dois campos: "Login" e "Senha" |
-| `supabase/functions/save-erp-config/index.ts` | Receber `username` + `password` ao inves de `token`, montar o Basic auth header com `btoa(login:senha)` |
-| `supabase/functions/test-erp/index.ts` | Mesma alteracao na funcao `testIxcConnection` |
-| `supabase/functions/_shared/erp-fetcher.ts` | Atualizar `fetchIxcClients` para receber e usar login+senha decodificados ou o token montado |
+## 1. Componente SignalBadge
 
-### Detalhes Tecnicos
+**Arquivo**: `src/components/painel/subscribers/SignalBadge.tsx`
 
-**1. IxcConfigDialog.tsx**
-- Remover campo `token` do schema Zod
-- Adicionar campos `login` (string obrigatoria) e `senha` (string obrigatoria)
-- No `onSubmit`, enviar `credentials: { username: data.login, password: data.senha }` ao inves de `credentials: { token }`
-- Atualizar labels, placeholders e instrucoes de ajuda
+Componente reutilizavel que recebe `signal_quality` e `signal_db` e renderiza um badge colorido com tooltip. Segue o padrao de cores ja usado no projeto (statusColors, providerColors).
 
-**2. save-erp-config/index.ts**
-- Na validacao do case `ixc`, exigir `username` e `password` ao inves de `token`
-- Na funcao `testIxcConnection`, receber `username` e `password`, montar o token com:
-  ```ts
-  const token = btoa(`${username}:${password}`);
-  const authHeader = `Basic ${token}`;
-  ```
-- Criptografar a `password` separadamente e salvar `username` em texto claro (igual ao MK)
-- Ajustar `keyToEncrypt` para usar a password
+| Qualidade | Cor | Icone |
+|-----------|-----|-------|
+| excellent / ideal | Verde | Sinal cheio |
+| acceptable | Amarelo | Sinal medio |
+| weak | Laranja | Sinal fraco |
+| critical / saturated | Vermelho | Alerta |
+| unknown | Cinza | Traco |
 
-**3. test-erp/index.ts**
-- Atualizar `testIxcConnection` com a mesma logica de montar Basic auth a partir de username+password descriptografados do banco
+---
 
-**4. erp-fetcher.ts**
-- Na funcao `fetchIxcClients`, receber `username` e `password` ao inves de `token`, montar o Basic auth header internamente
+## 2. Coluna "Sinal" na tabela de Assinantes
 
-### Fluxo de Autenticacao
+**Arquivo**: `src/pages/painel/Subscribers.tsx`
 
-O token Basic Auth sera montado assim:
-```
-Authorization: Basic base64(login:senha)
-```
+- Adicionar coluna "Sinal" entre "Status" e "Conexao"
+- Renderizar `SignalBadge` com `client.signal_quality` e `client.signal_db`
+- Clientes de provedores sem suporte a sinal (SGP, MK) exibem traco
 
-Exemplo: login `admin`, senha `123456` resulta em:
-```
-Authorization: Basic YWRtaW46MTIzNDU2
-```
+---
 
-### Armazenamento
-- `username` salvo em texto claro na coluna `username` da tabela `erp_configs`
-- `password` criptografada com AES-256-GCM na coluna `password_encrypted`
-- `masked_key` exibira os primeiros/ultimos caracteres do login para identificacao visual
+## 3. Dialog de Diagnostico Detalhado (on-demand)
+
+**Arquivo**: `src/components/painel/subscribers/SignalDiagnosticsDialog.tsx`
+
+- Abre ao clicar no `SignalBadge` de um cliente IXC
+- Chama a Edge Function `fetch-onu-signal` com `client_id`
+- Exibe TX e RX separados com classificacao, diagnostico e acao recomendada
+- Usa os componentes existentes: `Dialog`, `Card`, `Badge`, `Skeleton`
+
+---
+
+## 4. Hook useOnuSignal
+
+**Arquivo**: `src/hooks/painel/useOnuSignal.ts`
+
+- Hook que encapsula a chamada a `fetch-onu-signal`
+- Recebe `clientId` (erp_id do IXC)
+- Retorna `{ signal, report, loading, error, fetch }`
+- Usa `useQuery` com `enabled: false` (manual trigger)
+
+---
+
+## 5. Alerta de sinal critico nos stats cards
+
+**Arquivo**: `src/pages/painel/Subscribers.tsx`
+
+- Adicionar um sexto card de stats: "Sinal Critico"
+- Conta clientes com `signal_quality === 'critical' || signal_quality === 'weak'`
+- Cor vermelha/laranja conforme quantidade
+
+---
+
+## Detalhes tecnicos
+
+### Arquivos criados (3):
+1. `src/components/painel/subscribers/SignalBadge.tsx` -- badge com tooltip
+2. `src/components/painel/subscribers/SignalDiagnosticsDialog.tsx` -- dialog de diagnostico TX/RX
+3. `src/hooks/painel/useOnuSignal.ts` -- hook para Edge Function fetch-onu-signal
+
+### Arquivos editados (1):
+1. `src/pages/painel/Subscribers.tsx` -- coluna Sinal + card stats + integracao do dialog
+
+### Nenhuma dependencia nova
+Todos os componentes UI ja existem no projeto (Dialog, Badge, Tooltip, Card, Skeleton).
+
+### Nenhuma tabela nova
+Dados vem 100% das Edge Functions ja implementadas.
+
+### Padrao mantido
+- SignalQuality type reutilizado do hook `useErpClients`
+- Cores seguem o mapa `statusColors` / `providerColors` existente
+- Hook segue o padrao `useErpClients` com react-query
+- Dialog segue o padrao do projeto (Dialog do radix-ui)
