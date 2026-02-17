@@ -147,9 +147,10 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
   const clientIds = registros.map((r: any) => String(r.id));
   const CONCURRENCY = 10;
   
+  let firstClientLogged = false;
   for (let i = 0; i < clientIds.length; i += CONCURRENCY) {
     const batch = clientIds.slice(i, i + CONCURRENCY);
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       batch.map(async (clientId: string) => {
         try {
           const resp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
@@ -163,6 +164,24 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
               rp: "1",
             }),
           });
+          if (!firstClientLogged) {
+            firstClientLogged = true;
+            const text = await resp.text();
+            console.log(`[IXC] botao_rel_22991 status=${resp.status} for client=${clientId}, body=${text.substring(0, 500)}`);
+            // Try to parse it
+            try {
+              const data = JSON.parse(text);
+              const regs = data.registros || [];
+              if (regs.length > 0) {
+                console.log("[IXC] botao_rel_22991 first record keys:", Object.keys(regs[0]));
+                const rx = regs[0].rx ?? regs[0].signal_db ?? regs[0].sinal ?? null;
+                if (rx !== null && rx !== "") {
+                  signalMap[clientId] = parseFloat(String(rx));
+                }
+              }
+            } catch { /* parse error already logged via body */ }
+            return;
+          }
           if (!resp.ok) return;
           const data = await resp.json();
           const regs = data.registros || [];
@@ -172,7 +191,12 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
               signalMap[clientId] = parseFloat(String(rx));
             }
           }
-        } catch { /* non-blocking */ }
+        } catch (e) {
+          if (!firstClientLogged) {
+            firstClientLogged = true;
+            console.error(`[IXC] botao_rel_22991 error for client=${clientId}:`, e);
+          }
+        }
       })
     );
   }
