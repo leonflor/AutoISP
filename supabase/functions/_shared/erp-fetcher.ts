@@ -50,13 +50,7 @@ interface IxcRadusuario {
   id_cliente: string;
   login: string;
   online: string; // "S" or "N"
-}
-
-// ── IXC: sinal do botao_rel_22991 ──
-interface IxcSignalRecord {
-  id_cliente: string;
-  rx: string | null;
-  tx: string | null;
+  signal_db: string | null;
 }
 
 // ── IXC ──
@@ -76,8 +70,8 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     ixcsoft: "listar",
   };
 
-  // Fetch clientes + radusuarios + sinal em paralelo
-  const [clientesResp, radusuariosResp, signalResp] = await Promise.all([
+  // Fetch clientes + radusuarios em paralelo
+  const [clientesResp, radusuariosResp] = await Promise.all([
     fetch(`${baseUrl}/webservice/v1/cliente`, {
       method: "POST",
       headers: ixcHeaders,
@@ -100,17 +94,6 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
         rp: "5000",
       }),
     }).catch(() => null),
-    fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
-      method: "POST",
-      headers: ixcHeaders,
-      body: JSON.stringify({
-        qtype: "botao_rel_22991.id",
-        query: "1",
-        oper: ">",
-        page: "1",
-        rp: "5000",
-      }),
-    }).catch(() => null),
   ]);
 
   if (!clientesResp.ok) throw new Error(`IXC HTTP ${clientesResp.status}`);
@@ -122,32 +105,23 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
   if (radusuariosResp && radusuariosResp.ok) {
     try {
       const radData = await radusuariosResp.json();
-      for (const r of radData.registros || []) {
+      const radRegistros = radData.registros || [];
+      
+      // LOG: mostrar campos do primeiro registro para debug
+      if (radRegistros.length > 0) {
+        console.log("[IXC] radusuarios sample keys:", Object.keys(radRegistros[0]));
+        console.log("[IXC] radusuarios sample record:", JSON.stringify(radRegistros[0]));
+      }
+      
+      for (const r of radRegistros) {
         radusuariosMap[String(r.id_cliente)] = {
           id_cliente: String(r.id_cliente),
           login: r.login || "",
           online: r.online || "N",
+          signal_db: r.signal_db ?? r.rx ?? r.sinal ?? r.onu_rx ?? r.potencia ?? null,
         };
       }
     } catch { /* non-blocking */ }
-  }
-
-  // Build signal lookup by id_cliente from botao_rel_22991
-  const signalMap: Record<string, IxcSignalRecord> = {};
-  if (signalResp && signalResp.ok) {
-    try {
-      const sigData = await signalResp.json();
-      for (const r of sigData.registros || []) {
-        // Keep the latest entry per client (overwrite)
-        signalMap[String(r.id_cliente)] = {
-          id_cliente: String(r.id_cliente),
-          rx: r.rx ?? null,
-          tx: r.tx ?? null,
-        };
-      }
-    } catch (e) {
-      console.error("[IXC] botao_rel_22991 parse error:", e);
-    }
   }
 
   let contratos: Record<string, any> = {};
@@ -174,15 +148,13 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
   return registros.map((r: any) => {
     const contrato = contratos[String(r.id)];
     const rad = radusuariosMap[String(r.id)];
-    const sig = signalMap[String(r.id)];
     const statusMap: Record<string, string> = { S: "ativo", N: "cancelado" };
 
     // Real-time connection status from RADIUS session
     const isOnlineRadius = rad?.online === "S";
-
-    // Signal from botao_rel_22991 (RX value used for badge)
-    const rxValue = sig?.rx ? parseFloat(String(sig.rx)) : null;
-    const validSignalDb = rxValue !== null && !isNaN(rxValue) ? rxValue : null;
+    // Signal from radusuarios (trying multiple field names)
+    const signalDb = rad?.signal_db ? parseFloat(String(rad.signal_db)) : null;
+    const validSignalDb = signalDb !== null && !isNaN(signalDb) ? signalDb : null;
 
     return {
       erp_id: String(r.id),
