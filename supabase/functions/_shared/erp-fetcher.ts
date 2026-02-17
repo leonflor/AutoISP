@@ -142,67 +142,85 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     }
   } catch { /* non-blocking */ }
 
-  // Fetch signal per-client from botao_rel_22991 (parallel, max 10 concurrent)
+  // Fetch signal per-client from botao_rel_22991
+  // Try multiple identifiers: id_contrato from radusuarios, then login
   const signalMap: Record<string, number | null> = {};
+  
+  // Build lookup: client_id -> { id_contrato, login }
+  const clientLookup: Record<string, { id_contrato?: string; login?: string }> = {};
+  if (radusuariosResp) {
+    // radusuariosMap already built - extract id_contrato from raw data
+    // Re-parse to get id_contrato (we need raw data)
+  }
+  // Use contratos for id_contrato mapping
+  for (const [clientId, contrato] of Object.entries(contratos)) {
+    clientLookup[clientId] = { 
+      id_contrato: String((contrato as any).id || ""),
+      login: radusuariosMap[clientId]?.login || (contrato as any).login || ""
+    };
+  }
+  // Also add from radusuarios for clients without contratos
+  for (const [clientId, rad] of Object.entries(radusuariosMap)) {
+    if (!clientLookup[clientId]) {
+      clientLookup[clientId] = { login: rad.login };
+    }
+  }
+
   const clientIds = registros.map((r: any) => String(r.id));
   const CONCURRENCY = 10;
-  
-  let firstClientLogged = false;
+  let firstLogged = false;
+
   for (let i = 0; i < clientIds.length; i += CONCURRENCY) {
     const batch = clientIds.slice(i, i + CONCURRENCY);
     await Promise.allSettled(
       batch.map(async (clientId: string) => {
-        try {
-          const resp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
-            method: "POST",
-            headers: ixcHeaders,
-            body: JSON.stringify({
-              qtype: "botao_rel_22991.id_cliente",
-              query: clientId,
-              oper: "=",
-              page: "1",
-              rp: "1",
-            }),
-          });
-          if (!firstClientLogged) {
-            firstClientLogged = true;
+        const lookup = clientLookup[clientId];
+        // Try id_contrato first, then login, then id_cliente
+        const attempts = [
+          lookup?.id_contrato ? { qtype: "botao_rel_22991.id_contrato", query: lookup.id_contrato } : null,
+          lookup?.login ? { qtype: "botao_rel_22991.login", query: lookup.login } : null,
+          { qtype: "botao_rel_22991.id_cliente", query: clientId },
+        ].filter(Boolean) as { qtype: string; query: string }[];
+
+        for (const attempt of attempts) {
+          try {
+            const resp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
+              method: "POST",
+              headers: ixcHeaders,
+              body: JSON.stringify({
+                qtype: attempt.qtype,
+                query: attempt.query,
+                oper: "=",
+                page: "1",
+                rp: "1",
+              }),
+            });
             const text = await resp.text();
-            console.log(`[IXC] botao_rel_22991 status=${resp.status} for client=${clientId}, body=${text.substring(0, 500)}`);
-            // Try to parse it
-            try {
-              const data = JSON.parse(text);
-              const regs = data.registros || [];
-              if (regs.length > 0) {
-                console.log("[IXC] botao_rel_22991 first record keys:", Object.keys(regs[0]));
-                const rx = regs[0].rx ?? regs[0].signal_db ?? regs[0].sinal ?? null;
-                if (rx !== null && rx !== "") {
-                  signalMap[clientId] = parseFloat(String(rx));
-                }
-              }
-            } catch { /* parse error already logged via body */ }
-            return;
-          }
-          if (!resp.ok) return;
-          const data = await resp.json();
-          const regs = data.registros || [];
-          if (regs.length > 0) {
-            const rx = regs[0].rx ?? regs[0].signal_db ?? regs[0].sinal ?? null;
-            if (rx !== null && rx !== "") {
-              signalMap[clientId] = parseFloat(String(rx));
+            if (!firstLogged) {
+              firstLogged = true;
+              console.log(`[IXC] botao_rel_22991 attempt qtype=${attempt.qtype} query=${attempt.query} status=${resp.status} body=${text.substring(0, 500)}`);
             }
-          }
-        } catch (e) {
-          if (!firstClientLogged) {
-            firstClientLogged = true;
-            console.error(`[IXC] botao_rel_22991 error for client=${clientId}:`, e);
-          }
+            if (!text || text.trim() === "") continue;
+            const data = JSON.parse(text);
+            const regs = data.registros || [];
+            if (regs.length > 0) {
+              if (!firstLogged || Object.keys(signalMap).length === 0) {
+                console.log("[IXC] botao_rel_22991 record keys:", Object.keys(regs[0]));
+              }
+              const rx = regs[0].rx ?? regs[0].signal_db ?? regs[0].sinal ?? regs[0].onu_rx ?? null;
+              if (rx !== null && rx !== "") {
+                signalMap[clientId] = parseFloat(String(rx));
+                return; // Found signal, stop trying other qtypes
+              }
+            }
+          } catch { /* try next attempt */ }
         }
       })
     );
   }
 
   if (Object.keys(signalMap).length > 0) {
-    console.log("[IXC] botao_rel_22991 signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 3)));
+    console.log("[IXC] botao_rel_22991 signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 5)));
   } else {
     console.log("[IXC] botao_rel_22991: no signal data returned for any client");
   }
