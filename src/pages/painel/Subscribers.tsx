@@ -6,9 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useErpClients } from '@/hooks/painel/useErpClients';
-import { Search, Users, UserCheck, UserX, Wifi, WifiOff, RefreshCw, AlertTriangle, Database } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, Wifi, WifiOff, RefreshCw, AlertTriangle, Database, SignalLow } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { SignalBadge } from '@/components/painel/subscribers/SignalBadge';
+import { SignalDiagnosticsDialog } from '@/components/painel/subscribers/SignalDiagnosticsDialog';
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
@@ -36,14 +38,19 @@ export default function SubscribersPage() {
   const [provider, setProvider] = useState('all');
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+  const [diagClient, setDiagClient] = useState<{ id: string; name: string } | null>(null);
 
-  const { clients, loading, error, errors, stats, total, totalPages, refetch } = useErpClients({
+  const { clients, allClients, loading, error, errors, stats, total, totalPages, refetch } = useErpClients({
     search,
     status,
     provider,
     page,
     limit: 15,
   });
+
+  const signalCriticalCount = (allClients || []).filter(
+    (c) => c.signal_quality === 'critical' || c.signal_quality === 'weak'
+  ).length;
 
   const handleRefresh = async () => {
     await refetch();
@@ -72,7 +79,7 @@ export default function SubscribersPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -116,6 +123,17 @@ export default function SubscribersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.conectados}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Sinal Crítico</CardTitle>
+            <SignalLow className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${signalCriticalCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              {signalCriticalCount}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -196,6 +214,7 @@ export default function SubscribersPage() {
                       <TableHead>Plano</TableHead>
                       <TableHead>Login</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Sinal</TableHead>
                       <TableHead className="text-center">Conexão</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -216,6 +235,18 @@ export default function SubscribersPage() {
                           <Badge variant="outline" className={statusColors[client.status_contrato] || statusColors.desconhecido}>
                             {client.status_contrato}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <SignalBadge
+                            signalQuality={client.signal_quality}
+                            signalDb={client.signal_db}
+                            clickable={client.provider === 'ixc' && client.signal_quality !== 'unknown'}
+                            onClick={() => {
+                              if (client.provider === 'ixc' && client.signal_quality !== 'unknown') {
+                                setDiagClient({ id: client.erp_id, name: client.nome });
+                              }
+                            }}
+                          />
                         </TableCell>
                         <TableCell className="text-center">
                           {client.conectado ? (
@@ -261,6 +292,15 @@ export default function SubscribersPage() {
           )}
         </CardContent>
       </Card>
+
+      {diagClient && (
+        <SignalDiagnosticsDialog
+          open={!!diagClient}
+          onOpenChange={(open) => !open && setDiagClient(null)}
+          clientId={diagClient.id}
+          clientName={diagClient.name}
+        />
+      )}
     </div>
   );
 }
