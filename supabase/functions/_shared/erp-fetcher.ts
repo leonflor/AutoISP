@@ -50,7 +50,13 @@ interface IxcRadusuario {
   id_cliente: string;
   login: string;
   online: string; // "S" or "N"
-  signal_db: string | null;
+}
+
+// ── IXC: sinal do botao_rel_22991 ──
+interface IxcSignalRecord {
+  id_cliente: string;
+  rx: string | null;
+  tx: string | null;
 }
 
 // ── IXC ──
@@ -64,15 +70,17 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
   const token = btoa(`${username}:${password}`);
   const authHeader = `Basic ${token}`;
 
-  // Fetch clientes + radusuarios em paralelo
-  const [clientesResp, radusuariosResp] = await Promise.all([
+  const ixcHeaders = {
+    "Content-Type": "application/json",
+    Authorization: authHeader,
+    ixcsoft: "listar",
+  };
+
+  // Fetch clientes + radusuarios + sinal em paralelo
+  const [clientesResp, radusuariosResp, signalResp] = await Promise.all([
     fetch(`${baseUrl}/webservice/v1/cliente`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader,
-        ixcsoft: "listar",
-      },
+      headers: ixcHeaders,
       body: JSON.stringify({
         qtype: "cliente.ativo",
         query: "S",
@@ -83,11 +91,7 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     }),
     fetch(`${baseUrl}/webservice/v1/radusuarios`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader,
-        ixcsoft: "listar",
-      },
+      headers: ixcHeaders,
       body: JSON.stringify({
         qtype: "radusuarios.id",
         query: "1",
@@ -95,7 +99,18 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
         page: "1",
         rp: "5000",
       }),
-    }).catch(() => null), // non-blocking — if radusuarios fails, we still return clients
+    }).catch(() => null),
+    fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
+      method: "POST",
+      headers: ixcHeaders,
+      body: JSON.stringify({
+        qtype: "botao_rel_22991.id",
+        query: "1",
+        oper: ">",
+        page: "1",
+        rp: "5000",
+      }),
+    }).catch(() => null),
   ]);
 
   if (!clientesResp.ok) throw new Error(`IXC HTTP ${clientesResp.status}`);
@@ -108,26 +123,38 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     try {
       const radData = await radusuariosResp.json();
       for (const r of radData.registros || []) {
-        // Keep the latest entry per client (overwrite)
         radusuariosMap[String(r.id_cliente)] = {
           id_cliente: String(r.id_cliente),
           login: r.login || "",
           online: r.online || "N",
-          signal_db: r.signal_db ?? null,
         };
       }
     } catch { /* non-blocking */ }
+  }
+
+  // Build signal lookup by id_cliente from botao_rel_22991
+  const signalMap: Record<string, IxcSignalRecord> = {};
+  if (signalResp && signalResp.ok) {
+    try {
+      const sigData = await signalResp.json();
+      for (const r of sigData.registros || []) {
+        // Keep the latest entry per client (overwrite)
+        signalMap[String(r.id_cliente)] = {
+          id_cliente: String(r.id_cliente),
+          rx: r.rx ?? null,
+          tx: r.tx ?? null,
+        };
+      }
+    } catch (e) {
+      console.error("[IXC] botao_rel_22991 parse error:", e);
+    }
   }
 
   let contratos: Record<string, any> = {};
   try {
     const contratosResp = await fetch(`${baseUrl}/webservice/v1/cliente_contrato`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader,
-        ixcsoft: "listar",
-      },
+      headers: ixcHeaders,
       body: JSON.stringify({
         qtype: "cliente_contrato.id",
         query: "1",
@@ -147,13 +174,15 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
   return registros.map((r: any) => {
     const contrato = contratos[String(r.id)];
     const rad = radusuariosMap[String(r.id)];
+    const sig = signalMap[String(r.id)];
     const statusMap: Record<string, string> = { S: "ativo", N: "cancelado" };
 
     // Real-time connection status from RADIUS session
     const isOnlineRadius = rad?.online === "S";
-    // Signal from radusuarios
-    const signalDb = rad?.signal_db ? parseFloat(String(rad.signal_db)) : null;
-    const validSignalDb = signalDb !== null && !isNaN(signalDb) ? signalDb : null;
+
+    // Signal from botao_rel_22991 (RX value used for badge)
+    const rxValue = sig?.rx ? parseFloat(String(sig.rx)) : null;
+    const validSignalDb = rxValue !== null && !isNaN(rxValue) ? rxValue : null;
 
     return {
       erp_id: String(r.id),
