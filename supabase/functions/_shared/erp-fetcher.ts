@@ -201,7 +201,7 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
 
     // Real-time connection status from RADIUS session
     const isOnlineRadius = rad?.online === "S";
-    // Signal from botao_rel_22991
+    // Signal from radpop_radio_cliente_fibra
     const rawSignal = signalMap[String(r.id)] ?? null;
     const validSignalDb = rawSignal !== null && !isNaN(rawSignal) ? rawSignal : null;
 
