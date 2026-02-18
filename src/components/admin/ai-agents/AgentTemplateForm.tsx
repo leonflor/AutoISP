@@ -38,7 +38,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { FeatureTagsSelector } from './FeatureTagsSelector';
 import { PersonalizationTab } from './PersonalizationTab';
-import { AgentProceduresTab } from './AgentProceduresTab';
+import { AgentFlowLinksTab } from './AgentFlowLinksTab';
 import { TemplateAvatarUpload } from './TemplateAvatarUpload';
 import { AI_MODELS, AGENT_TYPES, AGENT_SCOPES, DATA_ACCESS_OPTIONS, DEFAULT_VOICE_TONES, DEFAULT_ESCALATION_OPTIONS } from './constants';
 import type { AiAgent } from '@/hooks/admin/useAiAgentTemplates';
@@ -204,8 +204,8 @@ export function AgentTemplateForm({
               <TabsTrigger value="personalization" className="flex-1" disabled={scope === 'platform'}>
                 Personalização
               </TabsTrigger>
-              <TabsTrigger value="procedures" className="flex-1" disabled={isNewAgent}>
-                Procedimentos
+              <TabsTrigger value="flows" className="flex-1" disabled={isNewAgent}>
+                Fluxos
               </TabsTrigger>
             </TabsList>
 
@@ -531,12 +531,12 @@ export function AgentTemplateForm({
               <PersonalizationTab form={form} scope={scope as 'tenant' | 'platform'} />
             </TabsContent>
 
-            <TabsContent value="procedures" className="mt-6">
+            <TabsContent value="flows" className="mt-6">
               {agent ? (
-                <AgentProceduresTab agentId={agent.id} />
+                <AgentFlowLinksTab agentId={agent.id} />
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p>Salve o agente primeiro para vincular procedimentos.</p>
+                  <p>Salve o agente primeiro para vincular fluxos.</p>
                 </div>
               )}
             </TabsContent>

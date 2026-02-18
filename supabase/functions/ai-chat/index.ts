@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { executeToolHandler, type ToolExecutionContext } from "../_shared/tool-handlers.ts";
+import { TOOL_CATALOG, buildOpenAITools } from "../_shared/tool-catalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -144,22 +145,12 @@ async function generateQueryEmbedding(query: string, apiKey: string): Promise<nu
   return data.data[0].embedding;
 }
 
-// Interfaces for tools and flows
-interface AgentToolRecord {
-  id: string;
-  name: string;
-  description: string;
-  parameters_schema: Record<string, unknown>;
-  handler_type: string;
-  handler_config: Record<string, unknown> | null;
-  requires_erp: boolean;
-}
-
+// Interfaces for flows (tools now come from hardcoded catalog)
 interface FlowStepRecord {
   name: string;
   instruction: string;
   expected_input: string | null;
-  tool_id: string | null;
+  tool_handler: string | null;
   tool_auto_execute: boolean;
   condition_to_advance: string | null;
 }
@@ -183,7 +174,7 @@ function buildSystemPrompt(
   knowledgeBase: KnowledgeItem[],
   documentChunks: DocumentChunk[],
   ispName: string,
-  agentTools: AgentToolRecord[],
+  hasErp: boolean,
   agentFlows: AgentFlowRecord[]
 ): string {
   const parts: string[] = [];
@@ -225,10 +216,11 @@ function buildSystemPrompt(
     parts.push(`\n## REGRAS OBRIGATÓRIAS DE SEGURANÇA\nVocê DEVE seguir estas regras em todas as interações:\n${clausesText}`);
   }
 
-  // 5.5 Tools section
-  if (agentTools.length > 0) {
-    const toolsList = agentTools
-      .map((t) => `- ${t.name}: ${t.description}`)
+  // 5.5 Tools section (from hardcoded catalog)
+  const availableTools = Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasErp);
+  if (availableTools.length > 0) {
+    const toolsList = availableTools
+      .map((t) => `- ${t.handler}: ${t.description}`)
       .join("\n");
     parts.push(`\n## Ferramentas Disponíveis\nVocê tem acesso às seguintes funções. Use-as quando necessário:\n${toolsList}`);
   }
@@ -243,9 +235,9 @@ function buildSystemPrompt(
       
       const stepsText = flow.steps.map((step, i) => {
         let line = `${i + 1}. ${step.name.toUpperCase()}\n   Instrução: ${step.instruction}`;
-        if (step.tool_id) {
-          const tool = agentTools.find(t => t.id === step.tool_id);
-          if (tool) line += `\n   Ferramenta: ${tool.name}`;
+        if (step.tool_handler) {
+          const tool = TOOL_CATALOG[step.tool_handler];
+          if (tool) line += `\n   Ferramenta: ${tool.display_name}`;
         }
         if (step.expected_input) line += `\n   Input esperado: ${step.expected_input}`;
         if (step.condition_to_advance) line += `\n   Avance quando: ${step.condition_to_advance}`;
@@ -510,111 +502,62 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Load tools and flows via procedures ──
-    let agentTools: AgentToolRecord[] = [];
+    // ── Load flows via flow_links + tools from hardcoded catalog ──
     let agentFlows: AgentFlowRecord[] = [];
+    let hasActiveErp = false;
 
-    // 1. Get active procedures for this agent
-    const { data: agentProcedures } = await supabaseAdmin
-      .from("ai_agent_procedures")
-      .select("procedure_id")
+    // 1. Get flow links for this agent
+    const { data: flowLinks } = await supabaseAdmin
+      .from("ai_agent_flow_links")
+      .select("flow_id")
       .eq("agent_id", template.id)
       .eq("is_active", true);
 
-    const procedureIds = (agentProcedures || []).map((ap: any) => ap.procedure_id);
+    const flowIds = (flowLinks || []).map((fl: any) => fl.flow_id);
 
-    if (procedureIds.length > 0) {
-      // Only use active procedures
-      const { data: activeProcedures } = await supabaseAdmin
-        .from("ai_procedures")
+    // Check if any tool requires ERP
+    const anyToolRequiresErp = Object.values(TOOL_CATALOG).some(t => t.requires_erp);
+    if (anyToolRequiresErp) {
+      const { data: erpConfig } = await supabaseAdmin
+        .from("erp_configs")
         .select("id")
-        .in("id", procedureIds)
-        .eq("is_active", true);
+        .eq("isp_id", body.isp_id)
+        .eq("is_active", true)
+        .eq("is_connected", true)
+        .limit(1)
+        .single();
+      hasActiveErp = !!erpConfig;
+    }
 
-      const activeProcIds = (activeProcedures || []).map((p: any) => p.id);
+    if (flowIds.length > 0) {
+      const { data: flowsData } = await supabaseAdmin
+        .from("ai_agent_flows")
+        .select("id, name, slug, description, trigger_keywords, trigger_prompt, is_fixed")
+        .in("id", flowIds)
+        .eq("is_active", true)
+        .order("sort_order");
 
-      if (activeProcIds.length > 0) {
-        // 2. Get tool IDs from procedure_tools junction
-        const { data: procToolLinks } = await supabaseAdmin
-          .from("ai_procedure_tools")
-          .select("tool_id")
-          .in("procedure_id", activeProcIds);
+      if (flowsData && flowsData.length > 0) {
+        const activeFlowIds = flowsData.map((f: any) => f.id);
+        const { data: stepsData } = await supabaseAdmin
+          .from("ai_agent_flow_steps")
+          .select("flow_id, name, instruction, expected_input, tool_handler, tool_auto_execute, condition_to_advance")
+          .in("flow_id", activeFlowIds)
+          .eq("is_active", true)
+          .order("step_order");
 
-        const toolIds = [...new Set((procToolLinks || []).map((pt: any) => pt.tool_id))];
-
-        if (toolIds.length > 0) {
-          const { data: toolsData } = await supabaseAdmin
-            .from("ai_agent_tools")
-            .select("id, name, description, parameters_schema, handler_type, handler_config, requires_erp")
-            .in("id", toolIds)
-            .eq("is_active", true)
-            .order("sort_order");
-
-          // Check if ISP has active ERP (for conditional tools)
-          let hasActiveErp = false;
-          if (toolsData && toolsData.some((t: any) => t.requires_erp)) {
-            const { data: erpConfig } = await supabaseAdmin
-              .from("erp_configs")
-              .select("id")
-              .eq("isp_id", body.isp_id)
-              .eq("is_active", true)
-              .eq("is_connected", true)
-              .limit(1)
-              .single();
-            hasActiveErp = !!erpConfig;
-          }
-
-          agentTools = ((toolsData || []) as any[])
-            .filter((t) => !t.requires_erp || hasActiveErp)
-            .map((t) => ({
-              id: t.id,
-              name: t.name,
-              description: t.description,
-              parameters_schema: t.parameters_schema,
-              handler_type: t.handler_type,
-              handler_config: t.handler_config,
-              requires_erp: t.requires_erp,
-            }));
+        const stepsMap: Record<string, FlowStepRecord[]> = {};
+        for (const s of (stepsData || []) as any[]) {
+          // Skip steps with ERP tools if ISP has no ERP
+          if (s.tool_handler && TOOL_CATALOG[s.tool_handler]?.requires_erp && !hasActiveErp) continue;
+          if (!stepsMap[s.flow_id]) stepsMap[s.flow_id] = [];
+          stepsMap[s.flow_id].push(s);
         }
 
-        // 3. Get flow IDs from procedure_flows junction
-        const { data: procFlowLinks } = await supabaseAdmin
-          .from("ai_procedure_flows")
-          .select("flow_id")
-          .in("procedure_id", activeProcIds);
-
-        const flowIds = [...new Set((procFlowLinks || []).map((pf: any) => pf.flow_id))];
-
-        if (flowIds.length > 0) {
-          const { data: flowsData } = await supabaseAdmin
-            .from("ai_agent_flows")
-            .select("id, name, slug, description, trigger_keywords, trigger_prompt, is_fixed")
-            .in("id", flowIds)
-            .eq("is_active", true)
-            .order("sort_order");
-
-          if (flowsData && flowsData.length > 0) {
-            const activeFlowIds = flowsData.map((f: any) => f.id);
-            const { data: stepsData } = await supabaseAdmin
-              .from("ai_agent_flow_steps")
-              .select("flow_id, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance")
-              .in("flow_id", activeFlowIds)
-              .eq("is_active", true)
-              .order("step_order");
-
-            const stepsMap: Record<string, FlowStepRecord[]> = {};
-            for (const s of (stepsData || []) as any[]) {
-              if (s.tool_id && !agentTools.find(t => t.id === s.tool_id)) continue;
-              if (!stepsMap[s.flow_id]) stepsMap[s.flow_id] = [];
-              stepsMap[s.flow_id].push(s);
-            }
-
-            agentFlows = (flowsData as any[]).map((f) => ({
-              ...f,
-              steps: stepsMap[f.id] || [],
-            }));
-          }
-        }
+        agentFlows = (flowsData as any[]).map((f) => ({
+          ...f,
+          steps: stepsMap[f.id] || [],
+        }));
       }
     }
 
@@ -626,11 +569,12 @@ Deno.serve(async (req) => {
       knowledgeBase,
       documentChunks,
       ispName,
-      agentTools,
+      hasActiveErp,
       agentFlows
     );
 
-    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${agentTools.length}, Flows=${agentFlows.length}`);
+    const availableToolCount = Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasActiveErp).length;
+    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${availableToolCount}, Flows=${agentFlows.length}`);
 
     // Build messages with enriched system prompt
     const messages: any[] = [
@@ -645,15 +589,8 @@ Deno.serve(async (req) => {
     };
     const model = modelMap[template.model || "gpt-4o-mini"] || "gpt-4o-mini";
 
-    // Build OpenAI tools array
-    const openaiTools = agentTools.length > 0 ? agentTools.map((t) => ({
-      type: "function" as const,
-      function: {
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters_schema,
-      },
-    })) : undefined;
+    // Build OpenAI tools array from hardcoded catalog
+    const openaiTools = buildOpenAITools(hasActiveErp);
 
     // Tool execution context
     const encryptionKey = Deno.env.get("ENCRYPTION_KEY") || "";
@@ -662,12 +599,6 @@ Deno.serve(async (req) => {
       ispId: body.isp_id,
       encryptionKey,
     };
-
-    // Tool name -> handler mapping for execution
-    const toolHandlerMap: Record<string, { handler_type: string; handler_config: Record<string, unknown> | null }> = {};
-    for (const t of agentTools) {
-      toolHandlerMap[t.name] = { handler_type: t.handler_type, handler_config: t.handler_config };
-    }
 
     // ── Tool call loop (max 3 iterations) ──
     const MAX_TOOL_ITERATIONS = 3;
@@ -719,16 +650,11 @@ Deno.serve(async (req) => {
         for (const toolCall of choice.message.tool_calls) {
           const fnName = toolCall.function.name;
           const fnArgs = JSON.parse(toolCall.function.arguments || "{}");
-          const handler = toolHandlerMap[fnName];
 
           console.log(`🔧 Tool call: ${fnName}(${JSON.stringify(fnArgs)})`);
 
-          let result: any;
-          if (handler) {
-            result = await executeToolHandler(handler.handler_type, toolCtx, fnArgs, handler.handler_config || undefined);
-          } else {
-            result = { success: false, error: `Tool "${fnName}" não encontrada` };
-          }
+          // Tools are now resolved by handler name directly (fnName === handler_type)
+          const result = await executeToolHandler(fnName, toolCtx, fnArgs);
 
           console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`);
 

@@ -10,6 +10,7 @@ export interface FlowStep {
   instruction: string;
   expected_input: string | null;
   tool_id: string | null;
+  tool_handler: string | null;
   tool_auto_execute: boolean;
   condition_to_advance: string | null;
   fallback_instruction: string | null;
@@ -53,6 +54,7 @@ export interface FlowStepInsert {
   instruction: string;
   expected_input?: string;
   tool_id?: string | null;
+  tool_handler?: string | null;
   tool_auto_execute?: boolean;
   condition_to_advance?: string;
   fallback_instruction?: string;
