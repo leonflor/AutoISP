@@ -1,373 +1,95 @@
+// ═══ Fachada Retrocompatível ═══
+// Re-exporta tipos e delega para o driver.
+// Mantém imports existentes funcionando.
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifySignalDb, type SignalQuality } from "./onu-signal-analyzer.ts";
+import { type SignalQuality } from "./onu-signal-analyzer.ts";
 
-export interface ErpClient {
-  erp_id: string;
-  provider: "ixc" | "mk_solutions" | "sgp";
-  provider_name: string;
-  nome: string;
-  cpf_cnpj: string;
-  data_vencimento: string | null;
-  plano: string | null;
-  login: string | null;
-  status_contrato: string;
-  conectado: boolean;
-  /** Single signal value from /radusuarios (IXC) — used for list badges */
-  signal_db: number | null;
-  /** Classified quality derived from signal_db */
-  signal_quality: SignalQuality;
-}
+// Re-exportar tipos da Camada 1
+export type { ErpClient } from "./erp-types.ts";
 
-// Decryption helper
-export async function decrypt(
-  ciphertext: string,
-  iv: string,
-  keyBase64: string
-): Promise<string> {
-  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
-  if (keyBytes.length !== 32) {
-    throw new Error(`ENCRYPTION_KEY inválida: esperado 32 bytes, recebido ${keyBytes.length}`);
-  }
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
-  const ivBytes = Uint8Array.from(atob(iv), (c) => c.charCodeAt(0));
-  const encrypted = Uint8Array.from(atob(ciphertext), (c) => c.charCodeAt(0));
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: ivBytes },
-    key,
-    encrypted
-  );
-  return new TextDecoder().decode(decrypted);
-}
+// Re-exportar decrypt do Driver
+export { decrypt } from "./erp-driver.ts";
 
-// ── IXC: tipo para sessão RADIUS ──
-interface IxcRadusuario {
-  id: string;
-  id_cliente: string;
-  login: string;
-  online: string; // "S", "SS" or "N"
-}
+// Re-exportar searchErpClient delegando ao driver
+import { searchClients } from "./erp-driver.ts";
 
-// ── IXC: registro de fibra (radpop_radio_cliente_fibra) ──
-interface IxcFibraRecord {
-  id_login: string;
-  id_contrato: string;
-  sinal_rx: string;
-  sinal_tx: string;
-  data_sinal: string;
-  mac: string;
-  nome: string;
-}
-
-// ── IXC ──
-export async function fetchIxcClients(apiUrl: string, username: string, password: string): Promise<ErpClient[]> {
-  // Normalizar URL - remover /webservice/v1 se já presente
-  let baseUrl = apiUrl.replace(/\/+$/, '');
-  if (baseUrl.endsWith('/webservice/v1')) {
-    baseUrl = baseUrl.slice(0, -'/webservice/v1'.length);
-  }
-
-  const token = btoa(`${username}:${password}`);
-  const authHeader = `Basic ${token}`;
-
-  const ixcHeaders = {
-    "Content-Type": "application/json",
-    Authorization: authHeader,
-    ixcsoft: "listar",
-  };
-
-  // Fetch clientes + radusuarios + fibra signal em paralelo
-  const [clientesResp, radusuariosResp, fibraResp] = await Promise.all([
-    fetch(`${baseUrl}/webservice/v1/cliente`, {
-      method: "POST",
-      headers: ixcHeaders,
-      body: JSON.stringify({
-        qtype: "cliente.ativo",
-        query: "S",
-        oper: "=",
-        page: "1",
-        rp: "5000",
-      }),
-    }),
-    fetch(`${baseUrl}/webservice/v1/radusuarios`, {
-      method: "POST",
-      headers: ixcHeaders,
-      body: JSON.stringify({
-        qtype: "radusuarios.id",
-        query: "1",
-        oper: ">",
-        page: "1",
-        rp: "5000",
-      }),
-    }).catch(() => null),
-    fetch(`${baseUrl}/webservice/v1/radpop_radio_cliente_fibra`, {
-      method: "POST",
-      headers: ixcHeaders,
-      body: JSON.stringify({
-        qtype: "radpop_radio_cliente_fibra.id",
-        query: "1",
-        oper: ">",
-        page: "1",
-        rp: "5000",
-      }),
-    }).catch(() => null),
-  ]);
-
-  if (!clientesResp.ok) throw new Error(`IXC HTTP ${clientesResp.status}`);
-  const clientesData = await clientesResp.json();
-  const registros = clientesData.registros || [];
-
-  // Build radusuarios lookup by id_cliente
-  const radusuariosMap: Record<string, IxcRadusuario> = {};
-  if (radusuariosResp && radusuariosResp.ok) {
-    try {
-      const radData = await radusuariosResp.json();
-      const radRegistros = radData.registros || [];
-      for (const r of radRegistros) {
-        radusuariosMap[String(r.id_cliente)] = {
-          id: String(r.id),
-          id_cliente: String(r.id_cliente),
-          login: r.login || "",
-          online: r.online || "N",
-        };
-      }
-    } catch { /* non-blocking */ }
-  }
-
-  let contratos: Record<string, any> = {};
-  try {
-    const contratosResp = await fetch(`${baseUrl}/webservice/v1/cliente_contrato`, {
-      method: "POST",
-      headers: ixcHeaders,
-      body: JSON.stringify({
-        qtype: "cliente_contrato.id",
-        query: "1",
-        oper: ">",
-        page: "1",
-        rp: "1000",
-      }),
-    });
-    if (contratosResp.ok) {
-      const cd = await contratosResp.json();
-      for (const c of cd.registros || []) {
-        contratos[String(c.id_cliente)] = c;
-      }
-    }
-  } catch { /* non-blocking */ }
-
-  // Build signal map from radpop_radio_cliente_fibra (already fetched in parallel)
-  const signalMap: Record<string, number | null> = {};
-  if (fibraResp && fibraResp.ok) {
-    try {
-      const fibraData = await fibraResp.json();
-      const fibraRegistros = fibraData.registros || [];
-
-      // Build lookup: id_login -> sinal_rx
-      const loginSignalMap: Record<string, number> = {};
-      for (const f of fibraRegistros) {
-        const rx = parseFloat(f.sinal_rx);
-        if (!isNaN(rx) && f.id_login) {
-          loginSignalMap[String(f.id_login)] = rx;
-        }
-      }
-
-      // Map radusuarios.id -> id_login match, then to client
-      for (const [clientId, rad] of Object.entries(radusuariosMap)) {
-        const signal = loginSignalMap[rad.id];
-        if (signal !== undefined) {
-          signalMap[clientId] = signal;
-        }
-      }
-
-      console.log(`[IXC] radpop_radio_cliente_fibra: ${fibraRegistros.length} records, ${Object.keys(signalMap).length} clients matched`);
-    } catch { /* non-blocking */ }
-  }
-
-  if (Object.keys(signalMap).length > 0) {
-    console.log("[IXC] signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 5)));
-  } else {
-    console.log("[IXC] radpop_radio_cliente_fibra: no signal data matched to clients");
-  }
-
-  return registros.map((r: any) => {
-    const contrato = contratos[String(r.id)];
-    const rad = radusuariosMap[String(r.id)];
-    const statusMap: Record<string, string> = { S: "ativo", N: "cancelado" };
-
-    // Real-time connection status from RADIUS session
-    const isOnlineRadius = rad?.online === "S";
-    // Signal from radpop_radio_cliente_fibra
-    const rawSignal = signalMap[String(r.id)] ?? null;
-    const validSignalDb = rawSignal !== null && !isNaN(rawSignal) ? rawSignal : null;
-
-    return {
-      erp_id: String(r.id),
-      provider: "ixc" as const,
-      provider_name: "IXC Soft",
-      nome: r.razao || r.fantasia || "",
-      cpf_cnpj: r.cnpj_cpf || "",
-      data_vencimento: null,
-      plano: contrato?.contrato || contrato?.id_vd_contrato || null,
-      login: rad?.login || contrato?.login || r.login || null,
-      status_contrato: contrato?.status
-        ? contrato.status === "A" ? "ativo"
-          : contrato.status === "S" ? "suspenso"
-          : contrato.status === "C" ? "cancelado"
-          : contrato.status
-        : statusMap[r.ativo] || "desconhecido",
-      conectado: isOnlineRadius || (contrato?.status === "A" && r.ativo === "S"),
-      signal_db: validSignalDb,
-      signal_quality: classifySignalDb(validSignalDb),
-    };
-  });
-}
-
-// ── SGP ──
-export async function fetchSgpClients(apiUrl: string, token: string, app: string): Promise<ErpClient[]> {
-  let baseUrl = apiUrl.replace(/\/+$/, "");
-  if (baseUrl.endsWith("/api")) baseUrl = baseUrl.slice(0, -4);
-
-  const body = new URLSearchParams();
-  body.append("token", token);
-  body.append("app", app);
-
-  const resp = await fetch(`${baseUrl}/api/ura/clientes`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!resp.ok) throw new Error(`SGP HTTP ${resp.status}`);
-
-  const data = await resp.json();
-  const clientes = Array.isArray(data) ? data : data.clientes || data.data || [];
-
-  return clientes.map((r: any) => ({
-    erp_id: String(r.id || r.codigo || r.cd_cliente || ""),
-    provider: "sgp" as const,
-    provider_name: "SGP",
-    nome: r.nome || r.razao_social || r.nm_cliente || "",
-    cpf_cnpj: r.cpf_cnpj || r.cpf || r.cnpj || "",
-    data_vencimento: r.dia_vencimento ? `Dia ${r.dia_vencimento}` : r.vencimento || null,
-    plano: r.plano || r.nm_plano || r.ds_plano || null,
-    login: r.login || r.usuario || null,
-    status_contrato: r.status || r.situacao || "ativo",
-    conectado: r.online === true || r.online === "S" || r.conectado === true,
-    signal_db: null,
-    signal_quality: "unknown" as SignalQuality,
-  }));
-}
-
-// ── MK-Solutions ──
-export async function fetchMkClients(apiUrl: string, username: string, apiKey: string): Promise<ErpClient[]> {
-  const resp = await fetch(`${apiUrl}/mk/WSMKIntegracaoGeral.rule`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      usuario: username,
-      token: apiKey,
-      funcao: "listarClientes",
-      limit: "500",
-    }),
-  });
-
-  if (!resp.ok) throw new Error(`MK HTTP ${resp.status}`);
-
-  const text = await resp.text();
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error("Resposta MK não é JSON válido");
-  }
-
-  const clientes = Array.isArray(data) ? data : data.clientes || data.lista || [];
-
-  return clientes.map((r: any) => ({
-    erp_id: String(r.CodigoCliente || r.id || ""),
-    provider: "mk_solutions" as const,
-    provider_name: "MK-Solutions",
-    nome: r.NomeRazaoSocial || r.nome || "",
-    cpf_cnpj: r.CpfCnpj || r.cpf_cnpj || "",
-    data_vencimento: r.DiaVencimento ? `Dia ${r.DiaVencimento}` : null,
-    plano: r.NomePlano || r.plano || null,
-    login: r.LoginConexao || r.login || null,
-    status_contrato: (r.Situacao || r.status || "ativo").toLowerCase(),
-    conectado: r.Conectado === "S" || r.online === true,
-    signal_db: null,
-    signal_quality: "unknown" as SignalQuality,
-  }));
-}
-
-/**
- * Search ERP clients by name or CPF/CNPJ for tool call usage.
- * Returns matching clients from all active ERP configs of the ISP.
- */
 export async function searchErpClient(
   supabaseAdmin: SupabaseClient,
   ispId: string,
   encryptionKey: string,
   query: string
-): Promise<{ clients: ErpClient[]; errors: string[] }> {
-  const { data: configs } = await supabaseAdmin
-    .from("erp_configs")
-    .select("*")
-    .eq("isp_id", ispId)
-    .eq("is_active", true)
-    .eq("is_connected", true);
+): Promise<{ clients: import("./erp-types.ts").ErpClient[]; errors: string[] }> {
+  return searchClients(supabaseAdmin, ispId, encryptionKey, query);
+}
 
-  if (!configs || configs.length === 0) {
-    return { clients: [], errors: ["Nenhuma integração ERP ativa"] };
-  }
+// Funções legadas — delegam para os providers via driver
+// Mantidas para retrocompatibilidade com código que ainda importa diretamente
 
-  const allClients: ErpClient[] = [];
-  const errors: string[] = [];
-  const searchLower = query.toLowerCase().trim();
-  const searchClean = searchLower.replace(/[.\-\/]/g, "");
+import { getProvider } from "./erp-providers/index.ts";
+import type { ErpClient } from "./erp-types.ts";
 
-  for (const config of configs) {
-    try {
-      let decryptedKey = "";
-      if (config.api_key_encrypted && config.encryption_iv) {
-        decryptedKey = await decrypt(config.api_key_encrypted, config.encryption_iv, encryptionKey);
-      }
+export async function fetchIxcClients(apiUrl: string, username: string, password: string): Promise<ErpClient[]> {
+  const driver = getProvider("ixc");
+  const { classifySignalDb } = await import("./onu-signal-analyzer.ts");
+  const { PROVIDER_DISPLAY_NAMES } = await import("./erp-types.ts");
+  const raws = await driver.fetchRawClients({ apiUrl, username, password });
+  const supported = driver.supportedFields();
+  return raws.map((r) => ({
+    erp_id: r.erp_id,
+    provider: "ixc" as const,
+    provider_name: PROVIDER_DISPLAY_NAMES.ixc,
+    nome: r.nome,
+    cpf_cnpj: r.cpf_cnpj,
+    data_vencimento: r.data_vencimento,
+    plano: r.plano,
+    login: r.login,
+    status_contrato: r.raw_status as any,
+    conectado: r.raw_online === "S" || r.raw_online === true,
+    signal_db: r.signal_db,
+    signal_quality: classifySignalDb(r.signal_db),
+    field_availability: { signal_db: supported.includes("signal_db"), login: true, plano: true, contrato: true },
+  }));
+}
 
-      // Decrypt password for IXC
-      let decryptedPassword = "";
-      if (config.provider === "ixc" && config.password_encrypted && config.encryption_iv) {
-        decryptedPassword = await decrypt(config.password_encrypted, config.encryption_iv, encryptionKey);
-      }
+export async function fetchSgpClients(apiUrl: string, token: string, app: string): Promise<ErpClient[]> {
+  const driver = getProvider("sgp");
+  const { PROVIDER_DISPLAY_NAMES } = await import("./erp-types.ts");
+  const raws = await driver.fetchRawClients({ apiUrl, token, app });
+  return raws.map((r) => ({
+    erp_id: r.erp_id,
+    provider: "sgp" as const,
+    provider_name: PROVIDER_DISPLAY_NAMES.sgp,
+    nome: r.nome,
+    cpf_cnpj: r.cpf_cnpj,
+    data_vencimento: r.data_vencimento,
+    plano: r.plano,
+    login: r.login,
+    status_contrato: r.raw_status as any,
+    conectado: r.raw_online === "S" || r.raw_online === true,
+    signal_db: null,
+    signal_quality: "unknown" as SignalQuality,
+    field_availability: { signal_db: false, login: true, plano: true },
+  }));
+}
 
-      let clients: ErpClient[] = [];
-      switch (config.provider) {
-        case "ixc":
-          clients = await fetchIxcClients(config.api_url, config.username || "", decryptedPassword);
-          break;
-        case "sgp":
-          clients = await fetchSgpClients(config.api_url, decryptedKey, config.username || "");
-          break;
-        case "mk_solutions":
-          clients = await fetchMkClients(config.api_url, config.username || "", decryptedKey);
-          break;
-      }
-
-      // Filter by query (name or CPF/CNPJ)
-      const filtered = clients.filter((c) => {
-        const nameLower = c.nome.toLowerCase();
-        const docClean = c.cpf_cnpj.replace(/[.\-\/]/g, "").toLowerCase();
-        return nameLower.includes(searchLower) || docClean.includes(searchClean);
-      });
-
-      allClients.push(...filtered);
-    } catch (err) {
-      errors.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro"}`);
-    }
-  }
-
-  return { clients: allClients, errors };
+export async function fetchMkClients(apiUrl: string, username: string, apiKey: string): Promise<ErpClient[]> {
+  const driver = getProvider("mk_solutions");
+  const { PROVIDER_DISPLAY_NAMES } = await import("./erp-types.ts");
+  const raws = await driver.fetchRawClients({ apiUrl, username, apiKey });
+  return raws.map((r) => ({
+    erp_id: r.erp_id,
+    provider: "mk_solutions" as const,
+    provider_name: PROVIDER_DISPLAY_NAMES.mk_solutions,
+    nome: r.nome,
+    cpf_cnpj: r.cpf_cnpj,
+    data_vencimento: r.data_vencimento,
+    plano: r.plano,
+    login: r.login,
+    status_contrato: r.raw_status as any,
+    conectado: r.raw_online === "S" || r.raw_online === true,
+    signal_db: null,
+    signal_quality: "unknown" as SignalQuality,
+    field_availability: { signal_db: false, login: true, plano: true },
+  }));
 }

@@ -1,16 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { decrypt, fetchIxcClients, fetchSgpClients, fetchMkClients, type ErpClient } from "../_shared/erp-fetcher.ts";
+import { fetchAllClients } from "../_shared/erp-driver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-interface FetchResult {
-  clients: ErpClient[];
-  errors: { provider: string; message: string }[];
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -58,21 +53,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch all active ERP configs for this ISP
-    const { data: configs } = await supabaseAdmin
-      .from("erp_configs")
-      .select("*")
-      .eq("isp_id", membership.isp_id)
-      .eq("is_active", true)
-      .eq("is_connected", true);
-
-    if (!configs || configs.length === 0) {
-      return new Response(
-        JSON.stringify({ clients: [], errors: [], message: "Nenhuma integração ERP configurada" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     if (!encryptionKey) {
       return new Response(
         JSON.stringify({ error: "Chave de criptografia não configurada" }),
@@ -80,53 +60,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const result: FetchResult = { clients: [], errors: [] };
-
-    // Process each ERP in parallel
-    const promises = configs.map(async (config) => {
-      try {
-        let decryptedKey = "";
-        if (config.api_key_encrypted && config.encryption_iv) {
-          decryptedKey = await decrypt(config.api_key_encrypted, config.encryption_iv, encryptionKey);
-        }
-
-        // Decrypt password for IXC
-        let decryptedPassword = "";
-        if (config.provider === "ixc" && config.password_encrypted && config.encryption_iv) {
-          decryptedPassword = await decrypt(config.password_encrypted, config.encryption_iv, encryptionKey);
-        }
-
-        let clients: ErpClient[] = [];
-
-        switch (config.provider) {
-          case "ixc":
-            clients = await fetchIxcClients(config.api_url, config.username || "", decryptedPassword);
-            break;
-          case "sgp":
-            clients = await fetchSgpClients(config.api_url, decryptedKey, config.username || "");
-            break;
-          case "mk_solutions":
-            clients = await fetchMkClients(config.api_url, config.username || "", decryptedKey);
-            break;
-        }
-
-        return { clients, error: null, provider: config.provider };
-      } catch (err) {
-        console.error(`[${config.provider}] Fetch error:`, err);
-        return {
-          clients: [] as ErpClient[],
-          error: { provider: config.display_name || config.provider, message: err instanceof Error ? err.message : "Erro desconhecido" },
-          provider: config.provider,
-        };
-      }
-    });
-
-    const results = await Promise.all(promises);
-
-    for (const r of results) {
-      result.clients.push(...r.clients);
-      if (r.error) result.errors.push(r.error);
-    }
+    const result = await fetchAllClients(supabaseAdmin, membership.isp_id, encryptionKey);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
