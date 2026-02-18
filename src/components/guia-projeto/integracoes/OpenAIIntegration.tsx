@@ -148,13 +148,16 @@ const OpenAIIntegration = () => {
                   </div>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-4">
-                  <h4 className="mb-2 text-sm font-medium">Prompt Hierárquico (ai-chat):</h4>
+                  <h4 className="mb-2 text-sm font-medium">Prompt Hierárquico — 8 Camadas (ai-chat):</h4>
                   <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
-                    <li>Template do Admin (escopo, instruções base)</li>
-                    <li>Tom de Voz do ISP (personalização tenant)</li>
-                    <li>Documentos RAG relevantes (pgvector)</li>
-                    <li>Q&A Manual do agente</li>
-                    <li>Cláusulas de Segurança LGPD (obrigatório)</li>
+                    <li><strong>System Prompt Base</strong> — Template do Admin (escopo, instruções)</li>
+                    <li><strong>Tom de Voz</strong> — Personalização do ISP (voice_tone)</li>
+                    <li><strong>Documentos RAG</strong> — Top 5 chunks via pgvector (threshold 0.7)</li>
+                    <li><strong>Q&A Manual</strong> — Pares pergunta/resposta do agent_knowledge_base</li>
+                    <li><strong>Cláusulas de Segurança</strong> — LGPD obrigatórias (ai_security_clauses)</li>
+                    <li><strong>Ferramentas (Tools)</strong> — Carregadas via Procedures vinculados ao agente</li>
+                    <li><strong>Fluxos Conversacionais</strong> — Instruções estruturadas via Procedures</li>
+                    <li><strong>Context Anchoring</strong> — Nome do ISP, data atual, nome do agente</li>
                   </ol>
                 </div>
               </div>
@@ -300,29 +303,31 @@ const OpenAIIntegration = () => {
               <div className="space-y-4">
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                    <strong>✓ Implementado:</strong> Arquitetura dinâmica — tools são registradas no banco (<code>ai_agent_tools</code>) e gerenciadas pelo Admin. O <code>ai-chat</code> carrega tools ativas e as injeta como OpenAI functions em runtime.
+                    <strong>✓ Implementado:</strong> Arquitetura de Procedimentos Reutilizáveis — tools são registradas em <code>ai_agent_tools</code>, agrupadas em <code>ai_procedures</code> via <code>ai_procedure_tools</code>, e vinculadas a agentes via <code>ai_agent_procedures</code>. O <code>ai-chat</code> carrega tools dos procedures ativos do agente.
                   </p>
                 </div>
 
                 <div>
-                  <h4 className="mb-3 text-sm font-medium">Arquitetura:</h4>
+                  <h4 className="mb-3 text-sm font-medium">Arquitetura de Procedures:</h4>
                   <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-                    <li>Tools são cadastradas na tabela <code className="text-xs">ai_agent_tools</code> via Painel Admin</li>
-                    <li>O <code className="text-xs">ai-chat</code> carrega tools ativas do agente e converte para formato OpenAI</li>
+                    <li>Tools e Fluxos são cadastrados globalmente pelo Admin</li>
+                    <li>Agrupados em <strong>Procedimentos</strong> (<code className="text-xs">ai_procedures</code>) — pacotes reutilizáveis</li>
+                    <li>Vinculados a agentes via <code className="text-xs">ai_agent_procedures</code> (checkbox na aba Procedimentos)</li>
+                    <li>O <code className="text-xs">ai-chat</code> carrega tools via: agent → procedures → procedure_tools → tools</li>
                     <li>Handler registry em <code className="text-xs">_shared/tool-handlers.ts</code> mapeia <code>handler_type</code> para funções executáveis</li>
                     <li><strong>Tool Call Loop:</strong> até 3 iterações de function calling antes da resposta final</li>
-                    <li>Após resolver todas as tools, streaming da resposta consolidada via SSE</li>
                   </ol>
                 </div>
 
                 <div>
-                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas:</h4>
+                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas (3 handlers):</h4>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Handler Type</TableHead>
                         <TableHead>Function Name</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Requer ERP</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -331,12 +336,21 @@ const OpenAIIntegration = () => {
                         <TableCell className="font-mono text-xs">erp_search</TableCell>
                         <TableCell className="font-mono text-xs">buscar_contrato_cliente</TableCell>
                         <TableCell className="text-sm">Busca clientes no ERP integrado (IXC/SGP/MK)</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional</Badge></TableCell>
                         <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-mono text-xs">erp_invoice_search</TableCell>
                         <TableCell className="font-mono text-xs">consultar_faturas</TableCell>
-                        <TableCell className="text-sm">Lista faturas do cliente (mock)</TableCell>
+                        <TableCell className="text-sm">Lista faturas do cliente</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-600">Mock</Badge></TableCell>
+                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-xs">onu_diagnostics</TableCell>
+                        <TableCell className="font-mono text-xs">diagnostico_sinal_onu</TableCell>
+                        <TableCell className="text-sm">Diagnóstico de sinal ONU — classifica potência óptica (Excelente/Bom/Alerta/Crítico)</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional (IXC)</Badge></TableCell>
                         <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                     </TableBody>
@@ -347,7 +361,7 @@ const OpenAIIntegration = () => {
                   <h4 className="mb-3 text-sm font-medium">Roadmap de Tools (Futuras):</h4>
                   <div className="rounded-lg bg-muted/50 p-3">
                     <div className="flex flex-wrap gap-2">
-                      {["verificar_conexao", "abrir_chamado", "consultar_plano", "segunda_via_boleto", "agendar_visita"].map((fn) => (
+                      {["abrir_chamado", "consultar_plano", "segunda_via_boleto", "agendar_visita"].map((fn) => (
                         <Badge key={fn} variant="secondary" className="font-mono text-xs opacity-60">{fn}</Badge>
                       ))}
                     </div>
