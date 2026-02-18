@@ -1,86 +1,135 @@
 
-# Atualizar Guia de Projeto com Estado Real da Implementacao de IA
 
-## Contexto
+# Implementar Arquitetura ERP 3 Camadas + Atualizar Guia
 
-O guia de projeto documenta as capacidades dos agentes de IA, mas varias secoes estao desatualizadas em relacao ao que foi realmente implementado. As principais discrepancias sao:
+## Resumo
 
-1. **IAFeatures.tsx** descreve tools e flows vinculados diretamente a agentes, mas a arquitetura atual usa **Procedimentos Reutilizaveis**
-2. **OpenAIIntegration.tsx** lista apenas 2 handlers (erp_search, erp_invoice_search), faltando o `onu_diagnostics`. O prompt hierarquico mostra 5 camadas, mas sao 8 na implementacao real
-3. **AgentesIAClienteFeatures.tsx** descreve funcionalidades aspiracionais (wizard, drag-and-drop, chain of thought) que nao correspondem a implementacao real baseada em catalogo/ativacao
+Refatorar a integracao ERP em 3 camadas com responsabilidades claras, origem obrigatoria em todo registro, e atualizar o guia de projeto para refletir a arquitetura real.
 
-## Alteracoes Planejadas
+## Arquitetura
 
-### 1. IAFeatures.tsx (Features Admin - modulo IA)
+```text
+CAMADA 1 - Tipos Padrao (erp-types.ts)
+  Define O QUE sera exibido. Interfaces com provider obrigatorio.
 
-**O que muda:**
-- Atualizar features F-ADMIN-116 a F-ADMIN-121 para refletir a arquitetura de Procedimentos
-- Substituir "aba Tools no formulario do template" por "aba Procedimentos com pacotes reutilizaveis"
-- Atualizar entidades de `ai_agent_tools` (vinculado a agente) para `ai_procedures`, `ai_procedure_tools`, `ai_procedure_flows`, `ai_agent_procedures`
-- Adicionar feature para gerenciamento de Procedimentos (CRUD de ai_procedures)
-- Atualizar contagem de 16 para o numero correto de features
-- Adicionar handler `onu_diagnostics` nas regras de negocio de F-ADMIN-117
+CAMADA 2 - Driver (erp-driver.ts)
+  Decide DE ONDE buscar, normaliza status/conexao, injeta origem.
 
-### 2. OpenAIIntegration.tsx (Integracoes - OpenAI)
+CAMADA 3 - Providers (erp-providers/*.ts)
+  Conexao efetiva com cada ERP. Retorna dados brutos.
+```
 
-**O que muda:**
-- **Prompt Hierarquico**: Atualizar de 5 para 8 camadas (adicionar Tools, Fluxos Conversacionais, Context Anchoring)
-- **Tools Implementadas**: Adicionar `onu_diagnostics` (3o handler) na tabela de tools
-- **Arquitetura de Procedures**: Adicionar secao explicando que tools e flows sao carregados via `ai_procedures` -> `ai_procedure_tools`/`ai_procedure_flows`
-- **Roadmap de Tools**: Remover `verificar_conexao` do roadmap (parcialmente coberto por onu_diagnostics)
+## Arquivos Criados (6)
 
-### 3. AgentesIAClienteFeatures.tsx (Features Cliente - Agentes IA)
+### 1. `supabase/functions/_shared/erp-types.ts`
+- Tipos: `ErpProvider`, `ContractStatus`, `ErpClient`, `ErpCredentials`, `TestResult`
+- Mapa `PROVIDER_DISPLAY_NAMES`
+- Interface `ErpProviderDriver` (contrato para Camada 3)
+- Tipos brutos: `RawErpClient`, `RawSignalData`
+- Campo `field_availability: Record<string, boolean>` em `ErpClient`
+- `provider` e `provider_name` obrigatorios em toda interface
 
-**O que muda:**
-- Atualizar F-CLI-046 "Criar Novo Agente" para refletir modelo real: ISP ativa agentes de um **catalogo de templates** (nao wizard)
-- Remover F-CLI-047 "Configurar Prompt do Agente" (ISP nao edita prompt do template)
-- Atualizar F-CLI-048 "Configurar Persona" para refletir campos reais: display_name, avatar, voice_tone, escalation_config
-- Remover F-CLI-049 "Regras de Negocio" (nao existe no painel ISP)
-- Remover F-CLI-050 "Ferramentas" (ISP nao configura tools, vem do Procedure vinculado ao template)
-- Remover F-CLI-051 "Fluxos de Conversa" (idem)
-- Atualizar F-CLI-052 "Testar Agente" para refletir o `AgentTestDialog` real (chat simples, nao sandbox isolado)
-- Atualizar F-CLI-058 "Base de Conhecimento" (ja esta correto, apenas ajustar detalhes)
-- Remover features aspiracionais: F-CLI-054 (duplicar), F-CLI-055 (metricas), F-CLI-056 (horario), F-CLI-059 (idiomas), F-CLI-060 (logs conversa)
-- Adicionar feature real: Visualizar uso de tokens (ai_usage stats)
+### 2. `supabase/functions/_shared/erp-providers/ixc.ts`
+- Implementa `ErpProviderDriver`
+- Move logica de `fetchIxcClients` retornando `RawErpClient[]` (sem normalizar status)
+- Move `testIxcConnection` (duplicada em test-erp e save-erp-config)
+- Implementa `fetchRawSignal` via `/botao_rel_22991`
+- `supportedFields()` retorna `["signal_db", "login", "plano", "contrato"]`
 
-### Nenhum arquivo novo sera criado
+### 3. `supabase/functions/_shared/erp-providers/sgp.ts`
+- Implementa `ErpProviderDriver`
+- Move logica de `fetchSgpClients` retornando dados brutos
+- Move `testSgpConnection`
+- `fetchRawSignal` nao implementado (SGP nao suporta)
+- `supportedFields()` retorna `["login", "plano"]`
 
-### Arquivos editados (3):
-1. `src/components/guia-projeto/features/modules/IAFeatures.tsx`
-2. `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
-3. `src/components/guia-projeto/features/modules/cliente/AgentesIAClienteFeatures.tsx`
+### 4. `supabase/functions/_shared/erp-providers/mk.ts`
+- Implementa `ErpProviderDriver`
+- Move logica de `fetchMkClients` retornando dados brutos
+- Move `testMkConnection`
+- `supportedFields()` retorna `["login", "plano"]`
 
----
+### 5. `supabase/functions/_shared/erp-providers/index.ts`
+- Registry: `getProvider(name: ErpProvider): ErpProviderDriver`
+- Mapa de providers registrados
+- Lanca erro para provider desconhecido
 
-## Detalhes Tecnicos
+### 6. `supabase/functions/_shared/erp-driver.ts`
+- `resolveCredentials(config, encryptionKey)` -- decrypt AES-256-GCM
+- `normalizeClient(raw, provider, providerName, supportedFields)` -- normaliza status, conexao, injeta provider obrigatorio, marca `field_availability`
+- `fetchAllClients(supabaseAdmin, ispId, encryptionKey)` -- agrega todos ERPs
+- `searchClients(supabaseAdmin, ispId, encryptionKey, query)` -- busca filtrada
+- `testConnection(provider, credentials)` -- delega para provider
+- `fetchClientSignal(supabaseAdmin, ispId, encryptionKey, clientId)` -- diagnostico ONU
+- Tabela de normalizacao de status por ERP:
+  - IXC: campo ativo "S"/"N", contrato.status "A"/"S"/"C"
+  - SGP: "ativo"/"off"/"suspenso"
+  - MK: "ativo"/"bloqueado" (toLowerCase)
+  - Valor desconhecido -> "desconhecido"
 
-### Prompt Hierarquico Real (8 camadas no ai-chat):
-1. System prompt base (template)
-2. Tom de voz do ISP (voice_tone)
-3. Documentos RAG (pgvector, top 5, threshold 0.7)
-4. Q&A Manual (agent_knowledge_base)
-5. Clausulas de Seguranca LGPD (ai_security_clauses)
-6. Ferramentas Disponiveis (tools via procedures)
-7. Fluxos Conversacionais (flows via procedures)
-8. Context Anchoring (ISP name, data, agente)
+## Arquivos Editados (7)
 
-### Handlers Implementados (3):
-| handler_type | Descricao | Status |
-|---|---|---|
-| erp_search | Busca clientes no ERP | Funcional |
-| erp_invoice_search | Lista faturas do cliente | Mock |
-| onu_diagnostics | Diagnostico de sinal ONU | Funcional (IXC) |
+### 7. `supabase/functions/_shared/erp-fetcher.ts`
+- Transforma em fachada retrocompativel
+- Re-exporta `ErpClient`, `decrypt` de `erp-types.ts`
+- `fetchIxcClients`, `fetchSgpClients`, `fetchMkClients` delegam para driver
+- `searchErpClient` delega para `driver.searchClients()`
 
-### Arquitetura de Procedures:
-- `ai_procedures` -> pacotes reutilizaveis
-- `ai_procedure_tools` -> junction tools
-- `ai_procedure_flows` -> junction flows
-- `ai_agent_procedures` -> vinculo procedure-agente
+### 8. `supabase/functions/fetch-erp-clients/index.ts`
+- Remove switch/case e logica de decrypt inline
+- Chama `fetchAllClients()` do driver (~40 linhas)
 
-### Painel ISP - Modelo Real:
-- ISP ve catalogo de templates disponiveis
-- Ativa agente do catalogo com personalizacao (nome, avatar, tom, escalacao)
-- Gerencia base de conhecimento (docs + Q&A)
-- Testa agente via chat
-- Visualiza uso de tokens
-- Nao edita prompt, tools, flows nem regras
+### 9. `supabase/functions/test-erp/index.ts`
+- Remove 3 funcoes de teste duplicadas (~270 linhas)
+- Importa `getProvider` e `resolveCredentials` do driver
+- Chama `driver.testConnection()` (~80 linhas)
+
+### 10. `supabase/functions/save-erp-config/index.ts`
+- Remove 3 funcoes de teste duplicadas (~200 linhas)
+- Reutiliza `driver.testConnection()`
+- Mantem logica de encrypt e upsert
+
+### 11. `supabase/functions/fetch-onu-signal/index.ts`
+- Remove logica IXC inline
+- Chama `driver.fetchClientSignal()` (~40 linhas)
+
+### 12. `supabase/functions/_shared/tool-handlers.ts`
+- `erpSearchHandler` usa `driver.searchClients()`
+- `onuDiagnosticsHandler` usa `driver.fetchClientSignal()`
+- Remove imports diretos de `decrypt` e logica IXC inline
+
+### 13. `src/components/guia-projeto/integracoes/ERPIntegration.tsx`
+- Atualizar diagrama de arquitetura para mostrar 3 camadas (Tipos, Driver, Providers)
+- Atualizar "Adapter Pattern" para refletir `ErpProviderDriver` real
+- Atualizar tabela de secrets para modelo real (credenciais em `erp_configs` com AES-256-GCM, sem secrets individuais por ERP)
+- Atualizar schema SQL para refletir tabela `erp_configs` real (com `isp_id` em vez de `tenant_id`)
+- Remover tabelas aspiracionais nao implementadas (`erp_sync_logs`, `erp_field_mappings`, `erp_webhooks`, `erp_clientes`, `erp_faturas`, `erp_contratos`)
+- Atualizar Edge Functions para listar as reais (`fetch-erp-clients`, `test-erp`, `save-erp-config`, `fetch-onu-signal`)
+- Atualizar secao de seguranca para refletir modelo real (isolamento por `isp_id` via `isp_users`)
+- Adicionar secao "Origem Obrigatoria" explicando que todo registro tem `provider` + `provider_name`
+- Adicionar secao "Disponibilidade de Campos" explicando `field_availability`
+
+## Ordem de Implementacao
+
+1. Criar `erp-types.ts`
+2. Criar os 3 providers (ixc, sgp, mk) + registry
+3. Criar `erp-driver.ts`
+4. Atualizar `erp-fetcher.ts` como fachada
+5. Simplificar as 4 edge functions
+6. Atualizar `tool-handlers.ts`
+7. Atualizar `ERPIntegration.tsx` (guia)
+8. Deploy e teste das edge functions
+
+## Frontend
+
+Sem alteracoes funcionais. A interface `ErpClient` no hook `useErpClients.ts` ja possui `provider` e `provider_name`. O campo `field_availability` e adicionado de forma opcional.
+
+## Beneficio
+
+Para adicionar um novo ERP (ex: Hubsoft):
+1. Criar `erp-providers/hubsoft.ts` implementando `ErpProviderDriver`
+2. Registrar no `erp-providers/index.ts`
+3. Adicionar mapeamento de status no driver
+4. Adicionar entrada em `PROVIDER_DISPLAY_NAMES`
+
+Zero alteracoes nas edge functions, no frontend ou nos tool handlers.
