@@ -211,7 +211,7 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
       provider_name: "IXC Soft",
       nome: r.razao || r.fantasia || "",
       cpf_cnpj: r.cnpj_cpf || "",
-      data_vencimento: contrato?.dia_vencimento ? `Dia ${contrato.dia_vencimento}` : null,
+      data_vencimento: null,
       plano: contrato?.contrato || contrato?.id_vd_contrato || null,
       login: rad?.login || contrato?.login || r.login || null,
       status_contrato: contrato?.status
