@@ -106,12 +106,12 @@ export default function AiProcessingLogs() {
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <div className="w-64">
-              <Select value={selectedIsp} onValueChange={setSelectedIsp}>
+              <Select value={selectedIsp || "all"} onValueChange={(v) => setSelectedIsp(v === "all" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por ISP" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os ISPs</SelectItem>
+                  <SelectItem value="all">Todos os ISPs</SelectItem>
                   {isps?.map((isp) => (
                     <SelectItem key={isp.id} value={isp.id}>
                       {isp.name}
@@ -121,12 +121,12 @@ export default function AiProcessingLogs() {
               </Select>
             </div>
             <div className="w-64">
-              <Select value={selectedCode} onValueChange={setSelectedCode}>
+              <Select value={selectedCode || "all"} onValueChange={(v) => setSelectedCode(v === "all" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por código" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os códigos</SelectItem>
+                  <SelectItem value="all">Todos os códigos</SelectItem>
                   {ERROR_CODES.map((err) => (
                     <SelectItem key={err.code} value={err.code}>
                       <span className="font-mono text-xs mr-2">{err.code}</span>
