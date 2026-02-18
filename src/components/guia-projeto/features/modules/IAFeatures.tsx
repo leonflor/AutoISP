@@ -68,7 +68,7 @@ const iaFeatures: Feature[] = [
     nome: "Criar Template de Agente",
     modulo: "IA",
     plataforma: "Painel Admin",
-    descricao: "Permite criar um novo template de agente de IA com configurações de nome, tipo, scope, system prompt, modelo, temperatura e tokens máximos. Formulário com 5 abas: Básico, Config IA, Features, Personalização e Procedimentos.",
+    descricao: "Permite criar um novo template de agente de IA com configurações de nome, tipo, scope, system prompt, modelo, temperatura e tokens máximos. Formulário com 5 abas: Básico, Config IA, Features, Personalização e Fluxos.",
     criticidade: "alta",
     regrasNegocio: [
       { codigo: "RN-F109-01", descricao: "Slug é gerado automaticamente a partir do nome", tipo: "Geração" },
@@ -195,85 +195,62 @@ const iaFeatures: Feature[] = [
       { tabela: "audit_logs", campos: "action, entity_type, entity_id, old_data, new_data", operacoes: "INSERT" },
     ],
   },
-  // === Procedimentos Reutilizáveis ===
-  {
-    codigo: "F-ADMIN-116",
-    nome: "Gerenciar Procedimentos Reutilizáveis",
-    modulo: "IA",
-    plataforma: "Painel Admin",
-    descricao: "CRUD de Procedimentos — pacotes reutilizáveis que agrupam Tools e Fluxos Conversacionais. Procedimentos são criados globalmente e vinculados a múltiplos agentes pela aba 'Procedimentos' do template.",
-    criticidade: "alta",
-    regrasNegocio: [
-      { codigo: "RN-F116-01", descricao: "Procedimentos são independentes de agentes — podem ser vinculados a múltiplos templates", tipo: "Comportamento" },
-      { codigo: "RN-F116-02", descricao: "Apenas procedimentos ativos (is_active) aparecem na aba de vinculação", tipo: "Comportamento" },
-      { codigo: "RN-F116-03", descricao: "Cada procedimento exibe contagem de tools e fluxos vinculados", tipo: "UX" },
-    ],
-    permissoes: [
-      { role: "Super Admin", acoes: "Criar, editar, ativar/desativar, excluir procedimentos" },
-    ],
-    entidades: [
-      { tabela: "ai_procedures", campos: "id, name, slug, description, icon, is_active, sort_order", operacoes: "SELECT, INSERT, UPDATE, DELETE" },
-    ],
-  },
+  // === Catálogo de Ferramentas e Fluxos ===
   {
     codigo: "F-ADMIN-117",
-    nome: "Gerenciar Tools Globais",
+    nome: "Catálogo de Ferramentas (Read-Only)",
     modulo: "IA",
     plataforma: "Painel Admin",
-    descricao: "CRUD de Tools (functions OpenAI) que são vinculadas a Procedimentos. Cada tool define handler_type, JSON Schema de parâmetros e handler_config. O ai-chat carrega tools via Procedure → ai_procedure_tools.",
-    criticidade: "alta",
+    descricao: "Página /admin/ai-tools que exibe o catálogo hardcoded de ferramentas (functions OpenAI) disponíveis no sistema: erp_search, erp_invoice_search e onu_diagnostics. Cada tool mostra handler, JSON Schema de parâmetros, descrição da resposta e flag requires_erp. Somente leitura — sem CRUD.",
+    criticidade: "media",
     regrasNegocio: [
-      { codigo: "RN-F117-01", descricao: "parameters_schema deve ser um JSON Schema válido compatível com OpenAI function calling", tipo: "Validação" },
-      { codigo: "RN-F117-02", descricao: "handler_type mapeia para um handler no registry (_shared/tool-handlers.ts)", tipo: "Comportamento" },
-      { codigo: "RN-F117-03", descricao: "Handlers implementados: erp_search, erp_invoice_search (mock), onu_diagnostics", tipo: "Referência" },
-      { codigo: "RN-F117-04", descricao: "Tools com requires_erp=true só funcionam se ISP tiver ERP configurado", tipo: "Validação" },
+      { codigo: "RN-F117-01", descricao: "Catálogo é definido em código (src/constants/tool-catalog.ts), sem tabela no banco", tipo: "Arquitetura" },
+      { codigo: "RN-F117-02", descricao: "Tools com requires_erp=true só funcionam se o ISP tiver ERP configurado", tipo: "Validação" },
+      { codigo: "RN-F117-03", descricao: "Validação em 3 camadas: instrução do fluxo → JSON Schema da tool → handler no backend", tipo: "Segurança" },
     ],
     permissoes: [
-      { role: "Super Admin", acoes: "Criar, editar, excluir tools" },
+      { role: "Super Admin", acoes: "Visualizar catálogo de ferramentas (somente leitura)" },
     ],
-    entidades: [
-      { tabela: "ai_agent_tools", campos: "id, name, description, handler_type, handler_config, parameters_schema, is_active, requires_erp, sort_order", operacoes: "SELECT, INSERT, UPDATE, DELETE" },
-      { tabela: "ai_procedure_tools", campos: "id, procedure_id, tool_id, sort_order", operacoes: "SELECT, INSERT, DELETE" },
-    ],
+    entidades: [],
   },
   {
     codigo: "F-ADMIN-118",
     nome: "Gerenciar Fluxos Conversacionais Globais",
     modulo: "IA",
     plataforma: "Painel Admin",
-    descricao: "CRUD de Fluxos Conversacionais com etapas sequenciais, keywords de ativação e trigger_prompt. Fluxos são vinculados a Procedimentos via ai_procedure_flows.",
+    descricao: "CRUD de Fluxos Conversacionais globais com etapas sequenciais, keywords de ativação e trigger_prompt. Steps referenciam ferramentas via tool_handler (string do catálogo hardcoded). Fluxos são vinculados diretamente a agentes via ai_agent_flow_links.",
     criticidade: "alta",
     regrasNegocio: [
       { codigo: "RN-F118-01", descricao: "Fluxos com is_fixed=true não podem ser excluídos", tipo: "Proteção" },
       { codigo: "RN-F118-02", descricao: "trigger_keywords define palavras-chave para ativação automática", tipo: "Comportamento" },
       { codigo: "RN-F118-03", descricao: "trigger_prompt é injetado no system prompt quando o fluxo é ativado", tipo: "Comportamento" },
+      { codigo: "RN-F118-04", descricao: "Steps usam tool_handler (string) em vez de tool_id (UUID) para referenciar ferramentas", tipo: "Arquitetura" },
     ],
     permissoes: [
       { role: "Super Admin", acoes: "Criar, editar, excluir fluxos e etapas" },
     ],
     entidades: [
       { tabela: "ai_agent_flows", campos: "id, name, slug, description, trigger_keywords, trigger_prompt, is_active, is_fixed, sort_order", operacoes: "SELECT, INSERT, UPDATE, DELETE" },
-      { tabela: "ai_agent_flow_steps", campos: "flow_id, step_order, name, instruction, expected_input, tool_id, tool_auto_execute, condition_to_advance, fallback_instruction", operacoes: "SELECT, INSERT, UPDATE, DELETE" },
-      { tabela: "ai_procedure_flows", campos: "id, procedure_id, flow_id, sort_order", operacoes: "SELECT, INSERT, DELETE" },
+      { tabela: "ai_agent_flow_steps", campos: "flow_id, step_order, name, instruction, expected_input, tool_handler, tool_auto_execute, condition_to_advance, fallback_instruction", operacoes: "SELECT, INSERT, UPDATE, DELETE" },
     ],
   },
   {
     codigo: "F-ADMIN-119",
-    nome: "Vincular Procedimentos a Agentes",
+    nome: "Vincular Fluxos a Agentes",
     modulo: "IA",
     plataforma: "Painel Admin",
-    descricao: "Aba 'Procedimentos' no formulário do template permite selecionar quais procedimentos (pacotes de tools + fluxos) o agente pode utilizar. Usa checkbox list com contagem de tools/fluxos por procedimento.",
+    descricao: "Aba 'Fluxos' no formulário do template permite selecionar quais fluxos conversacionais globais o agente pode utilizar. Usa checkbox list com toggle de ativação por fluxo. Vínculo direto Agent ↔ Flow via ai_agent_flow_links.",
     criticidade: "alta",
     regrasNegocio: [
-      { codigo: "RN-F119-01", descricao: "Vínculo via tabela de junção ai_agent_procedures", tipo: "Comportamento" },
-      { codigo: "RN-F119-02", descricao: "O ai-chat carrega tools e fluxos via procedures vinculados ao agente", tipo: "Comportamento" },
-      { codigo: "RN-F119-03", descricao: "Apenas procedimentos ativos são listados para vinculação", tipo: "Validação" },
+      { codigo: "RN-F119-01", descricao: "Vínculo via tabela de junção ai_agent_flow_links (agent_id, flow_id, is_active, sort_order)", tipo: "Comportamento" },
+      { codigo: "RN-F119-02", descricao: "O ai-chat carrega fluxos e tools via flow_links vinculados ao agente", tipo: "Comportamento" },
+      { codigo: "RN-F119-03", descricao: "Apenas fluxos ativos são listados para vinculação", tipo: "Validação" },
     ],
     permissoes: [
-      { role: "Super Admin", acoes: "Vincular/desvincular procedimentos" },
+      { role: "Super Admin", acoes: "Vincular/desvincular fluxos a agentes" },
     ],
     entidades: [
-      { tabela: "ai_agent_procedures", campos: "id, agent_id, procedure_id, is_active, sort_order", operacoes: "SELECT, INSERT, DELETE" },
+      { tabela: "ai_agent_flow_links", campos: "id, agent_id, flow_id, is_active, sort_order", operacoes: "SELECT, INSERT, DELETE" },
     ],
   },
   {
@@ -341,7 +318,7 @@ const IAFeatures = () => {
     <div className="space-y-4">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          14 features documentadas para o módulo de Inteligência Artificial
+          13 features documentadas para o módulo de Inteligência Artificial
         </p>
       </div>
 
