@@ -47,13 +47,23 @@ export async function decrypt(
 
 // ── IXC: tipo para sessão RADIUS ──
 interface IxcRadusuario {
+  id: string;
   id_cliente: string;
   login: string;
   online: string; // "S", "SS" or "N"
-  sinal_ultimo_atendimento: string; // signal value from last service
 }
 
-// IXC signal record interface removed — signal now comes from radusuarios.sinal_ultimo_atendimento
+// Parse signal from botao_rel_22991 HTML response
+function parseSignalFromHtml(html: string): number | null {
+  // Pattern: "Sinal Rx: -26.384" or "Rx onu: -26.384"
+  const rxMatch = html.match(/Sinal\s+Rx:\s*([+-]?\d+[\.,]?\d*)/i) 
+    || html.match(/Rx\s+onu:\s*([+-]?\d+[\.,]?\d*)/i);
+  if (rxMatch) {
+    const val = parseFloat(rxMatch[1].replace(",", "."));
+    if (!isNaN(val)) return val;
+  }
+  return null;
+}
 
 // ── IXC ──
 export async function fetchIxcClients(apiUrl: string, username: string, password: string): Promise<ErpClient[]> {
@@ -110,10 +120,10 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
       const radRegistros = radData.registros || [];
       for (const r of radRegistros) {
         radusuariosMap[String(r.id_cliente)] = {
+          id: String(r.id),
           id_cliente: String(r.id_cliente),
           login: r.login || "",
           online: r.online || "N",
-          sinal_ultimo_atendimento: r.sinal_ultimo_atendimento || "",
         };
       }
     } catch { /* non-blocking */ }
@@ -140,22 +150,42 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     }
   } catch { /* non-blocking */ }
 
-  // Build signal map from radusuarios sinal_ultimo_atendimento field
+  // Fetch signal via botao_rel_22991 (Potência/Resumo ONU) — returns HTML
+  // Uses radusuarios.id as the identifier, NOT id_cliente
   const signalMap: Record<string, number | null> = {};
-  for (const [clientId, rad] of Object.entries(radusuariosMap)) {
-    const raw = rad.sinal_ultimo_atendimento;
-    if (raw && raw.trim() !== "") {
-      const parsed = parseFloat(raw);
-      if (!isNaN(parsed)) {
-        signalMap[clientId] = parsed;
-      }
-    }
+  const onlineRads = Object.entries(radusuariosMap)
+    .filter(([_, rad]) => rad.online === "S" || rad.online === "SS");
+  
+  const CONCURRENCY = 10;
+  const signalHeaders = {
+    "Content-Type": "application/json",
+    Authorization: authHeader,
+  };
+
+  for (let i = 0; i < onlineRads.length; i += CONCURRENCY) {
+    const batch = onlineRads.slice(i, i + CONCURRENCY);
+    await Promise.allSettled(
+      batch.map(async ([clientId, rad]) => {
+        try {
+          const resp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
+            method: "POST",
+            headers: signalHeaders,
+            body: JSON.stringify({ id: rad.id }),
+          });
+          const html = await resp.text();
+          const signal = parseSignalFromHtml(html);
+          if (signal !== null) {
+            signalMap[clientId] = signal;
+          }
+        } catch { /* non-blocking */ }
+      })
+    );
   }
 
   if (Object.keys(signalMap).length > 0) {
-    console.log("[IXC] radusuarios signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 5)));
+    console.log("[IXC] botao_rel_22991 signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 5)));
   } else {
-    console.log("[IXC] radusuarios: no sinal_ultimo_atendimento data found");
+    console.log("[IXC] botao_rel_22991: no signal data found for online clients");
   }
 
   return registros.map((r: any) => {
