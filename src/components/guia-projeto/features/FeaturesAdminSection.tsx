@@ -20,7 +20,7 @@ const FeaturesAdminSection = () => {
     { id: "relatorios", label: "Relatórios", icon: BarChart3, count: 15 },
     { id: "equipe", label: "Equipe", icon: Users, count: 11 },
     { id: "configuracoes", label: "Configurações", icon: Settings, count: 14 },
-    { id: "ia", label: "IA", icon: Bot, count: 16 },
+    { id: "ia", label: "IA", icon: Bot, count: 13 },
   ];
 
   return (
