@@ -106,6 +106,48 @@ export type Database = {
           },
         ]
       }
+      ai_agent_flow_links: {
+        Row: {
+          agent_id: string
+          created_at: string
+          flow_id: string
+          id: string
+          is_active: boolean
+          sort_order: number
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          flow_id: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          flow_id?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_flow_links_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_flow_links_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_flow_steps: {
         Row: {
           condition_to_advance: string | null
@@ -119,6 +161,7 @@ export type Database = {
           name: string
           step_order: number
           tool_auto_execute: boolean
+          tool_handler: string | null
           tool_id: string | null
           updated_at: string
         }
@@ -134,6 +177,7 @@ export type Database = {
           name: string
           step_order?: number
           tool_auto_execute?: boolean
+          tool_handler?: string | null
           tool_id?: string | null
           updated_at?: string
         }
@@ -149,6 +193,7 @@ export type Database = {
           name?: string
           step_order?: number
           tool_auto_execute?: boolean
+          tool_handler?: string | null
           tool_id?: string | null
           updated_at?: string
         }
@@ -171,7 +216,7 @@ export type Database = {
       }
       ai_agent_flows: {
         Row: {
-          agent_id: string
+          agent_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -185,7 +230,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          agent_id: string
+          agent_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -199,7 +244,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          agent_id?: string
+          agent_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
