@@ -1,6 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { searchErpClient, decrypt } from "./erp-fetcher.ts";
-import { analyzeOnuSignal, formatSignalReport } from "./onu-signal-analyzer.ts";
+import { searchClients, fetchClientSignal } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -28,12 +27,7 @@ const erpSearchHandler: ToolHandler = async (ctx, args) => {
   }
 
   try {
-    const result = await searchErpClient(
-      ctx.supabaseAdmin,
-      ctx.ispId,
-      ctx.encryptionKey,
-      query
-    );
+    const result = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, query);
 
     if (result.clients.length === 0) {
       return {
@@ -102,69 +96,14 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
   }
 
   try {
-    // Get IXC config for this ISP
-    const { data: config } = await ctx.supabaseAdmin
-      .from("erp_configs")
-      .select("*")
-      .eq("isp_id", ctx.ispId)
-      .eq("provider", "ixc")
-      .eq("is_active", true)
-      .eq("is_connected", true)
-      .single();
-
-    if (!config) {
-      return { success: false, error: "Nenhuma integração IXC ativa encontrada" };
-    }
-
-    let decryptedPassword = "";
-    if (config.password_encrypted && config.encryption_iv) {
-      decryptedPassword = await decrypt(config.password_encrypted, config.encryption_iv, ctx.encryptionKey);
-    }
-
-    let baseUrl = (config.api_url || "").replace(/\/+$/, "");
-    if (baseUrl.endsWith("/webservice/v1")) {
-      baseUrl = baseUrl.slice(0, -"/webservice/v1".length);
-    }
-
-    const token = btoa(`${config.username || ""}:${decryptedPassword}`);
-
-    const signalResp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${token}`,
-        ixcsoft: "listar",
-      },
-      body: JSON.stringify({
-        qtype: "botao_rel_22991.id_cliente",
-        query: clientId,
-        oper: "=",
-        page: "1",
-        rp: "1",
-      }),
-    });
-
-    if (!signalResp.ok) {
-      return { success: false, error: `IXC retornou HTTP ${signalResp.status}` };
-    }
-
-    const signalData = await signalResp.json();
-    const record = signalData.registros?.[0] || signalData.data || null;
-
-    const rxValue = record?.rx ? parseFloat(record.rx) : null;
-    const txValue = record?.tx ? parseFloat(record.tx) : null;
-
-    const result = analyzeOnuSignal({
-      tx: txValue !== null && !isNaN(txValue) ? txValue : null,
-      rx: rxValue !== null && !isNaN(rxValue) ? rxValue : null,
-    });
+    const result = await fetchClientSignal(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, clientId);
 
     return {
       success: true,
       data: {
         cliente_id: clientId,
-        diagnostico: result,
-        relatorio: formatSignalReport(result),
+        diagnostico: result.signal,
+        relatorio: result.report,
       },
     };
   } catch (err) {
@@ -183,7 +122,7 @@ const handlers: Record<string, ToolHandler> = {
 };
 
 /**
- * Execute a tool by handler_type. Returns the result as JSON-serializable object.
+ * Execute a tool by handler_type.
  */
 export async function executeToolHandler(
   handlerType: string,
