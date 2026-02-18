@@ -53,16 +53,15 @@ interface IxcRadusuario {
   online: string; // "S", "SS" or "N"
 }
 
-// Parse signal from botao_rel_22991 HTML response
-function parseSignalFromHtml(html: string): number | null {
-  // Pattern: "Sinal Rx: -26.384" or "Rx onu: -26.384"
-  const rxMatch = html.match(/Sinal\s+Rx:\s*([+-]?\d+[\.,]?\d*)/i) 
-    || html.match(/Rx\s+onu:\s*([+-]?\d+[\.,]?\d*)/i);
-  if (rxMatch) {
-    const val = parseFloat(rxMatch[1].replace(",", "."));
-    if (!isNaN(val)) return val;
-  }
-  return null;
+// ── IXC: registro de fibra (radpop_radio_cliente_fibra) ──
+interface IxcFibraRecord {
+  id_login: string;
+  id_contrato: string;
+  sinal_rx: string;
+  sinal_tx: string;
+  data_sinal: string;
+  mac: string;
+  nome: string;
 }
 
 // ── IXC ──
@@ -82,8 +81,8 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     ixcsoft: "listar",
   };
 
-  // Fetch clientes + radusuarios em paralelo
-  const [clientesResp, radusuariosResp] = await Promise.all([
+  // Fetch clientes + radusuarios + fibra signal em paralelo
+  const [clientesResp, radusuariosResp, fibraResp] = await Promise.all([
     fetch(`${baseUrl}/webservice/v1/cliente`, {
       method: "POST",
       headers: ixcHeaders,
@@ -100,6 +99,17 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
       headers: ixcHeaders,
       body: JSON.stringify({
         qtype: "radusuarios.id",
+        query: "1",
+        oper: ">",
+        page: "1",
+        rp: "5000",
+      }),
+    }).catch(() => null),
+    fetch(`${baseUrl}/webservice/v1/radpop_radio_cliente_fibra`, {
+      method: "POST",
+      headers: ixcHeaders,
+      body: JSON.stringify({
+        qtype: "radpop_radio_cliente_fibra.id",
         query: "1",
         oper: ">",
         page: "1",
@@ -150,42 +160,38 @@ export async function fetchIxcClients(apiUrl: string, username: string, password
     }
   } catch { /* non-blocking */ }
 
-  // Fetch signal via botao_rel_22991 (Potência/Resumo ONU) — returns HTML
-  // Uses radusuarios.id as the identifier, NOT id_cliente
+  // Build signal map from radpop_radio_cliente_fibra (already fetched in parallel)
   const signalMap: Record<string, number | null> = {};
-  const onlineRads = Object.entries(radusuariosMap)
-    .filter(([_, rad]) => rad.online === "S" || rad.online === "SS");
-  
-  const CONCURRENCY = 10;
-  const signalHeaders = {
-    "Content-Type": "application/json",
-    Authorization: authHeader,
-  };
+  if (fibraResp && fibraResp.ok) {
+    try {
+      const fibraData = await fibraResp.json();
+      const fibraRegistros = fibraData.registros || [];
 
-  for (let i = 0; i < onlineRads.length; i += CONCURRENCY) {
-    const batch = onlineRads.slice(i, i + CONCURRENCY);
-    await Promise.allSettled(
-      batch.map(async ([clientId, rad]) => {
-        try {
-          const resp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
-            method: "POST",
-            headers: signalHeaders,
-            body: JSON.stringify({ id: rad.id }),
-          });
-          const html = await resp.text();
-          const signal = parseSignalFromHtml(html);
-          if (signal !== null) {
-            signalMap[clientId] = signal;
-          }
-        } catch { /* non-blocking */ }
-      })
-    );
+      // Build lookup: id_login -> sinal_rx
+      const loginSignalMap: Record<string, number> = {};
+      for (const f of fibraRegistros) {
+        const rx = parseFloat(f.sinal_rx);
+        if (!isNaN(rx) && f.id_login) {
+          loginSignalMap[String(f.id_login)] = rx;
+        }
+      }
+
+      // Map radusuarios.id -> id_login match, then to client
+      for (const [clientId, rad] of Object.entries(radusuariosMap)) {
+        const signal = loginSignalMap[rad.id];
+        if (signal !== undefined) {
+          signalMap[clientId] = signal;
+        }
+      }
+
+      console.log(`[IXC] radpop_radio_cliente_fibra: ${fibraRegistros.length} records, ${Object.keys(signalMap).length} clients matched`);
+    } catch { /* non-blocking */ }
   }
 
   if (Object.keys(signalMap).length > 0) {
-    console.log("[IXC] botao_rel_22991 signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 5)));
+    console.log("[IXC] signal samples:", JSON.stringify(Object.entries(signalMap).slice(0, 5)));
   } else {
-    console.log("[IXC] botao_rel_22991: no signal data found for online clients");
+    console.log("[IXC] radpop_radio_cliente_fibra: no signal data matched to clients");
   }
 
   return registros.map((r: any) => {
