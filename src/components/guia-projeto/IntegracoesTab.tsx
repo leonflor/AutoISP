@@ -24,7 +24,7 @@ const IntegracoesTab = () => {
     { id: "comunicacao", label: "Comunicação", icon: MessageSquare, count: 3, status: "done" },
     { id: "autenticacao", label: "Autenticação", icon: Shield, count: 1, status: "done" },
     { id: "storage", label: "Storage", icon: HardDrive, count: 1, status: "done" },
-    { id: "erp", label: "ERP", icon: Activity, count: 1, status: "done" },
+    { id: "erp", label: "ERP", icon: Activity, count: 4, status: "done" },
   ];
 
   return (
@@ -44,7 +44,7 @@ const IntegracoesTab = () => {
             <span className="text-muted-foreground">Pendente</span>
           </div>
           <div className="ml-auto text-sm text-muted-foreground">
-            Total: <span className="font-medium text-foreground">9 integrações</span>
+            Total: <span className="font-medium text-foreground">12 integrações</span>
           </div>
         </div>
       </div>

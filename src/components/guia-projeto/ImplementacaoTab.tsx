@@ -42,13 +42,13 @@ const ImplementacaoTab = () => {
   ];
 
   const fases = [
-    { id: "F1", nome: "Database e Schema", dependencia: "—", rodadas: "12-15", estimativa: "8-12h", icon: Database },
-    { id: "F2", nome: "Integrações Core", dependencia: "F1", rodadas: "10-12", estimativa: "6-10h", icon: Link },
-    { id: "F3", nome: "Autenticação e Segurança", dependencia: "F1, F2", rodadas: "8-10", estimativa: "4-6h", icon: Shield },
-    { id: "F4", nome: "Plataforma Admin", dependencia: "F1-F3", rodadas: "12-15", estimativa: "12-16h", icon: Monitor },
-    { id: "F5", nome: "Plataforma Cliente ISP", dependencia: "F1-F4", rodadas: "12-15", estimativa: "10-14h", icon: Users },
-    { id: "F6", nome: "Landing Page", dependencia: "F1-F5", rodadas: "6-8", estimativa: "4-6h", icon: Globe },
-    { id: "F7", nome: "Deploy e Ajustes", dependencia: "F1-F6", rodadas: "4-6", estimativa: "2-4h", icon: Rocket },
+    { id: "F1", nome: "Database e Schema", dependencia: "—", rodadas: "12-15", estimativa: "8-12h", icon: Database, status: "done" as const },
+    { id: "F2", nome: "Integrações Core", dependencia: "F1", rodadas: "10-12", estimativa: "6-10h", icon: Link, status: "done" as const },
+    { id: "F3", nome: "Autenticação e Segurança", dependencia: "F1, F2", rodadas: "8-10", estimativa: "4-6h", icon: Shield, status: "done" as const },
+    { id: "F4", nome: "Plataforma Admin", dependencia: "F1-F3", rodadas: "12-15", estimativa: "12-16h", icon: Monitor, status: "done" as const },
+    { id: "F5", nome: "Plataforma Cliente ISP", dependencia: "F1-F4", rodadas: "12-15", estimativa: "10-14h", icon: Users, status: "done" as const },
+    { id: "F6", nome: "Landing Page", dependencia: "F1-F5", rodadas: "6-8", estimativa: "4-6h", icon: Globe, status: "done" as const },
+    { id: "F7", nome: "Deploy e Ajustes", dependencia: "F1-F6", rodadas: "4-6", estimativa: "2-4h", icon: Rocket, status: "in_progress" as const },
   ];
 
   const secrets = [
@@ -69,21 +69,26 @@ const ImplementacaoTab = () => {
   ];
 
   const edgeFunctions = [
+    "ai-chat",
+    "ai-usage",
     "asaas-customer",
     "asaas-subscription",
     "asaas-webhook",
-    "ai-chat",
-    "ai-usage",
-    "whatsapp-webhook",
+    "audit-prompt",
     "check-integration",
-    "test-integration",
-    "save-integration",
-    "send-email",
+    "fetch-erp-clients",
+    "fetch-onu-signal",
     "invite-admin",
     "process-document",
     "save-erp-config",
+    "save-integration",
+    "save-whatsapp-config",
+    "send-email",
+    "send-whatsapp",
     "test-erp",
-    "fetch-erp-clients",
+    "test-integration",
+    "test-whatsapp-connection",
+    "whatsapp-webhook",
   ];
 
   return (
@@ -199,6 +204,7 @@ const ImplementacaoTab = () => {
                 <TableHead>Dependência</TableHead>
                 <TableHead>Rodadas</TableHead>
                 <TableHead>Estimativa</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -222,6 +228,14 @@ const ImplementacaoTab = () => {
                         <Clock className="h-3 w-3 text-muted-foreground" />
                         {fase.estimativa}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={fase.status === "done" ? "default" : "secondary"}
+                        className={fase.status === "done" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-500 hover:bg-amber-600 text-white"}
+                      >
+                        {fase.status === "done" ? "Concluída" : "Em progresso"}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 );
@@ -738,7 +752,7 @@ const ImplementacaoTab = () => {
             </div>
             <div>
               <CardTitle>Edge Functions (Supabase)</CardTitle>
-              <CardDescription>Funções serverless a serem criadas</CardDescription>
+              <CardDescription>Funções serverless implementadas ({edgeFunctions.length} funções)</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -751,10 +765,18 @@ const ImplementacaoTab = () => {
             ))}
           </div>
           <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/)</h4>
+            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/) — 9 módulos</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
               <li><code className="rounded bg-muted px-1">_shared/tool-handlers.ts</code> — Registry de handlers para function calling (mapeia handler_type → função executável)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-fetcher.ts</code> — Lógica centralizada de busca em ERPs (IXC, SGP, MK) com descriptografia de credenciais</li>
+              <li><code className="rounded bg-muted px-1">_shared/tool-catalog.ts</code> — Catálogo de tools para function calling (definições OpenAI)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-fetcher.ts</code> — Lógica centralizada de busca em ERPs com descriptografia de credenciais</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-types.ts</code> — Tipos padrão de ERP (ErpClient, ErpProvider, ContractStatus)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Interface base do driver de ERP</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/index.ts</code> — Registry de providers ERP (IXC, SGP, MK)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/ixc.ts</code> — Conector IXC Soft</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/sgp.ts</code> — Conector SGP</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/mk.ts</code> — Conector MK-Solutions</li>
+              <li><code className="rounded bg-muted px-1">_shared/onu-signal-analyzer.ts</code> — Análise de qualidade de sinal ONU (rx/tx)</li>
             </ul>
           </div>
         </CardContent>
