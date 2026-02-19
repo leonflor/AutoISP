@@ -1,35 +1,26 @@
 
+# Corrigir erro "model is not defined" no ai-chat
 
-# Remover feature_tags de todo o sistema
+## Problema
 
-## Resumo
+Na edge function `ai-chat/index.ts`, a variavel `model` e usada em 4 lugares (linhas 622, 711, 793, 834) mas nunca foi declarada como variavel local. O codigo referencia `template.model` na query do Supabase, mas nao extrai esse valor para uma variavel `model`.
 
-Remover todas as referencias ao campo `feature_tags` nos arquivos do frontend. A coluna permanece no banco de dados (nao sera removida), apenas deixa de ser usada pelo codigo.
+Isso causa o erro `ReferenceError: model is not defined` toda vez que o agente tenta responder.
 
-## Arquivos a alterar
+## Correcao
 
-### 1. `src/components/painel/ai/AgentCatalogCard.tsx`
-- Remover a linha que extrai `featureTags` (linha 30)
-- Remover o bloco JSX que renderiza os featureTags como badges (linhas 85-98)
+### Arquivo: `supabase/functions/ai-chat/index.ts`
 
-### 2. `src/hooks/painel/useIspAgents.ts`
-- Remover `feature_tags` da query SELECT do activeAgentsQuery (linha 54)
+Adicionar uma unica linha apos a linha 389 (`const template = ispAgent.ai_agents;`):
 
-### 3. `src/components/admin/ai-agents/constants.ts`
-- Remover a interface `FeatureTag` (linhas 17-21)
-- Remover o array `AGENT_FEATURE_TAGS` (linhas 21-32)
-- Remover os imports de icones usados exclusivamente por AGENT_FEATURE_TAGS (`MessageCircle`, `FileText`, `Ticket`, `Wifi`, `DollarSign`, `Calendar`, `Package`, `TrendingUp`, `Wrench`, `UserPlus`)
+```typescript
+const model = template.model || "gpt-4o-mini";
+```
 
-### 4. `src/components/admin/ai-agents/FeatureTagsSelector.tsx`
-- Deletar o arquivo inteiro (ja nao e importado em lugar nenhum)
+Isso declara a variavel `model` com o valor configurado no template do agente, usando `gpt-4o-mini` como fallback caso o campo esteja nulo.
 
-### 5. `src/components/guia-projeto/features/modules/IAFeatures.tsx`
-- Remover `feature_tags` das strings de campos nas linhas 83 e 101
+Nenhuma outra alteracao necessaria -- todas as 4 referencias a `model` no arquivo passam a funcionar corretamente.
 
-### 6. `src/components/guia-projeto/features/modules/cliente/AgentesIAClienteFeatures.tsx`
-- Remover `"feature_tags"` do array de campos na linha 66
+## Deploy
 
-## Arquivos NAO alterados
-- `src/integrations/supabase/types.ts` -- gerado automaticamente pelo Supabase, nao deve ser editado manualmente
-- Banco de dados -- a coluna `feature_tags` permanece na tabela `ai_agents` sem impacto
-
+A edge function `ai-chat` sera redeployada automaticamente apos a alteracao.
