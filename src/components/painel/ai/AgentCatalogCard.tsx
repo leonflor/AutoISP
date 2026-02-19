@@ -27,7 +27,7 @@ export function AgentCatalogCard({
 }: AgentCatalogCardProps) {
   const IconComponent = agentIcons[agent.type] || Bot;
   const features = (agent.features as string[]) || [];
-  const featureTags = (agent.feature_tags as string[]) || [];
+  
 
   const isBlocked = !agent.isAvailable;
   const isAlreadyActivated = agent.isActivated;
@@ -82,20 +82,6 @@ export function AgentCatalogCard({
           )}
         </div>
 
-        {featureTags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {featureTags.slice(0, 4).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-            {featureTags.length > 4 && (
-              <Badge variant="secondary" className="text-xs">
-                +{featureTags.length - 4}
-              </Badge>
-            )}
-          </div>
-        )}
 
         <Button
           className="w-full mt-auto"

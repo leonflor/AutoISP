@@ -51,7 +51,7 @@ export function useIspAgents() {
           ai_agents!inner (
             id, name, slug, type, description, avatar_url,
             uses_knowledge_base, system_prompt,
-            model, temperature, max_tokens, feature_tags,
+            model, temperature, max_tokens,
             voice_tones, escalation_options, scope,
             is_active
           )
