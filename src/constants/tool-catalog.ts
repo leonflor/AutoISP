@@ -49,4 +49,16 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       "Diagnóstico com potência RX/TX em dBm, qualidade do sinal e recomendações.",
     requires_erp: true,
   },
+  {
+    handler: "erp_active_client_search",
+    display_name: "Busca Cliente Ativo",
+    description:
+      "Busca clientes com contrato ativo no ERP por CPF ou CNPJ. Retorna apenas clientes cujo status seja 'ativo'.",
+    parameters: [
+      { name: "busca", type: "string", description: "CPF ou CNPJ do cliente (mín. 11 caracteres)", required: true },
+    ],
+    response_description:
+      "Cliente ativo com nome, CPF, plano, conexão e provedor ERP.",
+    requires_erp: true,
+  },
 ];
