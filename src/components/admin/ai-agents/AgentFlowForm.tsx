@@ -219,11 +219,14 @@ export function AgentFlowForm({ open, onOpenChange, agentId, flow }: AgentFlowFo
                   control={form.control}
                   name="is_fixed"
                   render={({ field }) => (
-                    <FormItem className="flex items-center gap-2">
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormLabel className="!mt-0">Roteiro Fixo</FormLabel>
+                    <FormItem className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Roteiro Fixo</FormLabel>
+                      </div>
+                      <FormDescription className="text-xs">Ativado: etapas seguidas na ordem exata. Desativado: agente adapta a ordem conforme o contexto.</FormDescription>
                     </FormItem>
                   )}
                 />
