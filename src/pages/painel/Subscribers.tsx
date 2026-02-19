@@ -168,6 +168,7 @@ export default function SubscribersPage() {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
+                <SelectItem value="nao_ativo">Não Ativos</SelectItem>
                 <SelectItem value="suspenso">Suspensos</SelectItem>
                 <SelectItem value="bloqueado">Bloqueados</SelectItem>
                 <SelectItem value="cancelado">Cancelados</SelectItem>
