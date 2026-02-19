@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FeatureTagsSelector } from './FeatureTagsSelector';
+
 import { PersonalizationTab } from './PersonalizationTab';
 import { AgentFlowLinksTab } from './AgentFlowLinksTab';
 import { TemplateAvatarUpload } from './TemplateAvatarUpload';
@@ -55,7 +55,7 @@ const agentSchema = z.object({
   max_tokens: z.coerce.number().min(100).max(4000).default(1000),
   system_prompt: z.string().min(10, 'Prompt é obrigatório'),
   avatar_url: z.string().url().optional().or(z.literal('')),
-  feature_tags: z.array(z.string()).default([]),
+  
   uses_knowledge_base: z.boolean().default(false),
   is_active: z.boolean().default(true),
   allowed_data_access: z.array(z.string()).default([]),
@@ -112,7 +112,7 @@ export function AgentTemplateForm({
       max_tokens: 1000,
       system_prompt: '',
       avatar_url: '',
-      feature_tags: [],
+      
       uses_knowledge_base: false,
       is_active: true,
       allowed_data_access: [],
@@ -136,7 +136,7 @@ export function AgentTemplateForm({
         max_tokens: agent.max_tokens || 1000,
         system_prompt: agent.system_prompt || '',
         avatar_url: agent.avatar_url || '',
-        feature_tags: (agent.feature_tags as string[]) || [],
+        
         uses_knowledge_base: agent.uses_knowledge_base || false,
         is_active: agent.is_active ?? true,
         allowed_data_access: (agent.allowed_data_access as string[]) || [],
@@ -200,7 +200,7 @@ export function AgentTemplateForm({
             <TabsList className="w-full flex gap-1">
               <TabsTrigger value="basic" className="flex-1">Básico</TabsTrigger>
               <TabsTrigger value="ai" className="flex-1">Config IA</TabsTrigger>
-              <TabsTrigger value="features" className="flex-1">Features</TabsTrigger>
+              
               <TabsTrigger value="personalization" className="flex-1" disabled={scope === 'platform'}>
                 Personalização
               </TabsTrigger>
@@ -486,23 +486,6 @@ export function AgentTemplateForm({
                   </FormItem>
                 )}
               />
-            </TabsContent>
-
-            <TabsContent value="features" className="space-y-4 mt-6">
-              <FormField
-                control={form.control}
-                name="feature_tags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FeatureTagsSelector
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {scope === 'tenant' && (
                 <FormField
                   control={form.control}
