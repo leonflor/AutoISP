@@ -1,32 +1,35 @@
 
 
-# Remover aba Features e mover Base de Conhecimento para Basico
+# Remover feature_tags de todo o sistema
 
 ## Resumo
 
-Remover a aba "Features" do formulario de template de agente e mover o toggle "Base de Conhecimento" para o final da aba "Basico".
+Remover todas as referencias ao campo `feature_tags` nos arquivos do frontend. A coluna permanece no banco de dados (nao sera removida), apenas deixa de ser usada pelo codigo.
 
-## Alteracoes
+## Arquivos a alterar
 
-### Arquivo: `src/components/admin/ai-agents/AgentTemplateForm.tsx`
+### 1. `src/components/painel/ai/AgentCatalogCard.tsx`
+- Remover a linha que extrai `featureTags` (linha 30)
+- Remover o bloco JSX que renderiza os featureTags como badges (linhas 85-98)
 
-1. **Remover a aba "Features" do TabsList** (linha 203) -- remover o TabsTrigger `value="features"`
+### 2. `src/hooks/painel/useIspAgents.ts`
+- Remover `feature_tags` da query SELECT do activeAgentsQuery (linha 54)
 
-2. **Mover o toggle "Base de Conhecimento" para dentro da aba "Basico"** -- o bloco `uses_knowledge_base` (linhas 506-527) sera adicionado logo apos o toggle "Ativo" (apos linha 397), mantendo a condicao `scope === 'tenant'`
+### 3. `src/components/admin/ai-agents/constants.ts`
+- Remover a interface `FeatureTag` (linhas 17-21)
+- Remover o array `AGENT_FEATURE_TAGS` (linhas 21-32)
+- Remover os imports de icones usados exclusivamente por AGENT_FEATURE_TAGS (`MessageCircle`, `FileText`, `Ticket`, `Wifi`, `DollarSign`, `Calendar`, `Package`, `TrendingUp`, `Wrench`, `UserPlus`)
 
-3. **Remover o TabsContent `value="features"` inteiro** (linhas 491-528) -- que continha o FeatureTagsSelector e o uses_knowledge_base
+### 4. `src/components/admin/ai-agents/FeatureTagsSelector.tsx`
+- Deletar o arquivo inteiro (ja nao e importado em lugar nenhum)
 
-4. **Remover o import do `FeatureTagsSelector`** (linha 39)
+### 5. `src/components/guia-projeto/features/modules/IAFeatures.tsx`
+- Remover `feature_tags` das strings de campos nas linhas 83 e 101
 
-5. **Remover `feature_tags` do schema e defaultValues** -- remover do objeto `agentSchema` (linha 58), dos `defaultValues` (linha 115), e do `form.reset` ao carregar agente (linha 139)
+### 6. `src/components/guia-projeto/features/modules/cliente/AgentesIAClienteFeatures.tsx`
+- Remover `"feature_tags"` do array de campos na linha 66
 
-### Arquivo: `src/components/admin/ai-agents/FeatureTagsSelector.tsx`
-
-Nenhuma alteracao -- o arquivo deixa de ser importado mas pode ser mantido no repositorio caso seja reaproveitado futuramente (ou removido se preferir).
-
-## Resultado
-
-- A aba "Features" desaparece do formulario
-- O toggle "Base de Conhecimento" aparece na aba "Basico", logo abaixo do toggle "Ativo"
-- O campo `feature_tags` deixa de ser gerenciado pelo formulario (permanece na tabela do banco, apenas nao e mais editavel por aqui)
+## Arquivos NAO alterados
+- `src/integrations/supabase/types.ts` -- gerado automaticamente pelo Supabase, nao deve ser editado manualmente
+- Banco de dados -- a coluna `feature_tags` permanece na tabela `ai_agents` sem impacto
 
