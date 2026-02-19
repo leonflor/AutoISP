@@ -387,6 +387,7 @@ Deno.serve(async (req) => {
     }
 
     const template = ispAgent.ai_agents;
+    const model = template.model || "gpt-4o-mini";
 
     // Validate agent is enabled and active
     if (!ispAgent.is_enabled) {
