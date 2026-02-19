@@ -15,16 +15,16 @@ export interface ToolDefinition {
 export const TOOL_CATALOG: Record<string, ToolDefinition> = {
   erp_search: {
     handler: "erp_search",
-    display_name: "Busca no ERP",
+    display_name: "Busca Clientes no ERP",
     description:
-      "Busca clientes no sistema ERP do provedor por nome, CPF/CNPJ ou ID. Retorna dados de contrato, status de conexão e sinal.",
+      "Busca clientes no sistema ERP do provedor por CPF ou CNPJ. Pode retornar um ou mais clientes com dados de contrato, status de conexão e sinal.",
     parameters_schema: {
       type: "object",
       properties: {
         busca: {
           type: "string",
-          description: "Termo de busca: nome, CPF/CNPJ ou ID do cliente",
-          minLength: 2,
+          description: "CPF ou CNPJ do cliente",
+          minLength: 11,
         },
       },
       required: ["busca"],

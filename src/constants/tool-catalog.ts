@@ -15,11 +15,11 @@ export interface ToolCatalogEntry {
 export const TOOL_CATALOG: ToolCatalogEntry[] = [
   {
     handler: "erp_search",
-    display_name: "Busca no ERP",
+    display_name: "Busca Clientes no ERP",
     description:
-      "Busca clientes no sistema ERP do provedor por nome, CPF/CNPJ ou ID. Retorna dados de contrato, status de conexão e sinal.",
+      "Busca clientes no sistema ERP do provedor por CPF ou CNPJ. Pode retornar um ou mais clientes com dados de contrato, status de conexão e sinal.",
     parameters: [
-      { name: "busca", type: "string", description: "Nome, CPF/CNPJ ou ID do cliente (mín. 2 caracteres)", required: true },
+      { name: "busca", type: "string", description: "CPF ou CNPJ do cliente (mín. 11 caracteres)", required: true },
     ],
     response_description:
       "Lista de clientes com nome, CPF, plano, status, sinal e provedor ERP.",
