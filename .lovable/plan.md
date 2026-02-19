@@ -1,23 +1,32 @@
 
-# Corrigir erro "messages is not defined" no ai-chat
 
-## Problema
+# Adicionar filtro "Nao Ativo" na pagina de Assinantes
 
-Na edge function `ai-chat/index.ts`, a variavel `messages` e usada na linha 624 e em varios outros pontos do loop de tool calls, mas nunca foi declarada. O codigo constroi o `systemPrompt` (linha 575) e tem acesso a `body.messages` (mensagens do usuario), mas nunca combina os dois em um array `messages`.
+## Contexto
 
-## Correcao
+A pagina de Assinantes (`src/pages/painel/Subscribers.tsx`) possui um filtro de status com as opcoes: Todos, Ativos, Suspensos, Bloqueados, Cancelados. O usuario quer um filtro adicional "Nao Ativo" que retorna todos os clientes cujo status NAO e "ativo" (ou seja, suspensos + bloqueados + cancelados + qualquer outro status).
 
-### Arquivo: `supabase/functions/ai-chat/index.ts`
+## Alteracoes
 
-Adicionar uma linha apos a construcao do `systemPrompt` (apos linha 585) e antes do bloco de tools (linha 587):
+### 1. `src/pages/painel/Subscribers.tsx`
+
+- Adicionar a opcao `<SelectItem value="nao_ativo">Nao Ativos</SelectItem>` no Select de status, logo apos "Ativos" (linha 171)
+
+### 2. `src/hooks/painel/useErpClients.ts`
+
+- Na logica de filtragem (linha 80), tratar o caso especial `nao_ativo`: em vez de comparar com `status_contrato`, filtrar por `status_contrato !== "ativo"`
+- Adicionar `naoAtivos` ao objeto `stats` para exibir a contagem
+
+A logica de filtro ficara assim:
 
 ```typescript
-const messages: any[] = [
-  { role: "system", content: systemPrompt },
-  ...body.messages,
-];
+if (status && status !== "all") {
+  if (status === "nao_ativo") {
+    if (c.status_contrato === "ativo") return false;
+  } else {
+    if (c.status_contrato !== status) return false;
+  }
+}
 ```
 
-Isso cria o array `messages` com o system prompt como primeira mensagem, seguido das mensagens do usuario. Todas as referencias subsequentes (`messages.push` nas linhas 652 e 666, e o uso nas chamadas a OpenAI) passam a funcionar corretamente.
-
-Nenhuma outra alteracao necessaria. A edge function `ai-chat` sera redeployada apos a alteracao.
+Nenhuma alteracao na edge function e necessaria, pois a filtragem e feita no lado do cliente.
