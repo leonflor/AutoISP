@@ -122,16 +122,19 @@ export function AgentTestDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasInitializedRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitializedRef.current && agents.length > 0) {
       if (initialAgentId && agents.find((a) => a.id === initialAgentId)) {
         setSelectedAgentId(initialAgentId);
-      } else if (agents.length > 0) {
+      } else {
         setSelectedAgentId(agents[0].id);
       }
+      hasInitializedRef.current = true;
     }
   }, [open, initialAgentId, agents]);
 
@@ -159,6 +162,7 @@ export function AgentTestDialog({
       setInputMessage("");
       setTokensUsed(0);
       setSelectedAgentId("");
+      hasInitializedRef.current = false;
     }
     onOpenChange(newOpen);
   };
@@ -316,6 +320,7 @@ export function AgentTestDialog({
     } finally {
       setIsLoading(false);
       abortRef.current = null;
+      textareaRef.current?.focus();
     }
   }, [inputMessage, selectedAgentId, currentAgent, membership?.ispId, user, messages, toast]);
 
@@ -477,6 +482,7 @@ export function AgentTestDialog({
         <div className="flex-shrink-0 pt-4 border-t">
           <div className="flex gap-2">
             <Textarea
+              ref={textareaRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
