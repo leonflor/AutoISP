@@ -1,32 +1,23 @@
 
+# Corrigir erro "messages is not defined" no ai-chat
 
-# Corrigir perda de foco e troca inesperada de agente no Testar Agente
+## Problema
 
-## Problemas identificados
+Na edge function `ai-chat/index.ts`, a variavel `messages` e usada na linha 624 e em varios outros pontos do loop de tool calls, mas nunca foi declarada. O codigo constroi o `systemPrompt` (linha 575) e tem acesso a `body.messages` (mensagens do usuario), mas nunca combina os dois em um array `messages`.
 
-### 1. Perda de foco no campo de texto
-Apos enviar a mensagem, nada no codigo refoca o campo de texto. O `sendMessage` limpa o input mas nao devolve o foco ao `Textarea`.
+## Correcao
 
-### 2. Troca inesperada de agente
-O `useEffect` da linha 128-136 depende de `[open, initialAgentId, agents]`. Toda vez que o array `agents` muda de referencia (o que acontece quando o React Query refaz o fetch, por exemplo ao trocar de aba do navegador), o efeito roda novamente e redefine `selectedAgentId` para o primeiro agente da lista, limpando a conversa.
+### Arquivo: `supabase/functions/ai-chat/index.ts`
 
-## Correcoes
+Adicionar uma linha apos a construcao do `systemPrompt` (apos linha 585) e antes do bloco de tools (linha 587):
 
-### Arquivo: `src/components/painel/ai/AgentTestDialog.tsx`
+```typescript
+const messages: any[] = [
+  { role: "system", content: systemPrompt },
+  ...body.messages,
+];
+```
 
-**1. Adicionar ref no Textarea e refocus apos envio**
+Isso cria o array `messages` com o system prompt como primeira mensagem, seguido das mensagens do usuario. Todas as referencias subsequentes (`messages.push` nas linhas 652 e 666, e o uso nas chamadas a OpenAI) passam a funcionar corretamente.
 
-- Criar um `useRef` para o Textarea (`textareaRef`)
-- Atribuir a ref ao componente `<Textarea ref={textareaRef} />`
-- No final do `sendMessage` (bloco `finally`), chamar `textareaRef.current?.focus()`
-
-**2. Evitar re-selecao do agente quando `agents` muda de referencia**
-
-- Usar um `useRef` booleano (`hasInitializedRef`) para garantir que a selecao inicial so aconteca uma vez por abertura do dialog
-- No `useEffect`, verificar `hasInitializedRef.current` antes de selecionar; setar para `true` apos a primeira selecao
-- No `handleOpenChange`, resetar `hasInitializedRef.current = false` ao fechar
-
-## Resultado
-
-- O campo de texto mantem o foco apos cada envio de mensagem
-- O agente selecionado nao muda sozinho durante a conversa
+Nenhuma outra alteracao necessaria. A edge function `ai-chat` sera redeployada apos a alteracao.
