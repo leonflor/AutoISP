@@ -1,46 +1,21 @@
 
 
-# Corrigir Modal de Fluxos: Alinhar ao Topo com Scroll
+# Aumentar Largura dos Modais de Fluxo
 
 ## Problema
 
-Ao clicar em "Novo" nos Fluxos Conversacionais, o modal abre centralizado verticalmente e nao se adapta quando o conteudo excede a tela -- parte do formulario fica cortada sem possibilidade de scroll.
+Os modais de criar/editar fluxo usam `max-w-lg` (512px), deixando o conteudo apertado lateralmente.
 
 ## Solucao
 
-Aplicar o padrao de modal responsivo nos dois formularios de fluxo: alinhar ao topo, limitar altura maxima e adicionar ScrollArea no conteudo.
+Alterar `max-w-lg` para `max-w-2xl` (672px) nos dois formularios de fluxo. Isso segue o padrao ja documentado para modais de configuracao complexos.
 
 ## Arquivos editados (2)
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `GlobalFlowForm.tsx` | Alterar `DialogContent` para usar classes de topo + scroll |
-| `AgentFlowForm.tsx` | Mesma alteracao |
+| Arquivo | Linha | Mudanca |
+|---------|-------|---------|
+| `GlobalFlowForm.tsx` | 82 | `max-w-lg` -> `max-w-2xl` |
+| `AgentFlowForm.tsx` | 129 | `max-w-lg` -> `max-w-2xl` |
 
-## Detalhe tecnico
+Apenas uma classe Tailwind alterada em cada arquivo, sem mudanca de logica.
 
-Em ambos os arquivos, o `DialogContent` sera alterado de:
-
-```tsx
-<DialogContent className="max-w-lg">
-```
-
-Para:
-
-```tsx
-<DialogContent className="max-w-lg max-h-[90vh] flex flex-col top-[5vh] translate-y-0">
-```
-
-E o conteudo do formulario sera envolvido em `ScrollArea` para permitir rolagem:
-
-```tsx
-<ScrollArea className="flex-1 overflow-y-auto pr-2">
-  <form ...>
-    ...campos...
-  </form>
-</ScrollArea>
-```
-
-O `DialogHeader` e `DialogFooter` ficam fora do scroll para permanecerem sempre visiveis.
-
-Isso segue o padrao ja estabelecido no projeto para modais complexos (`max-h-[90vh]`, `flex flex-col`, `ScrollArea`).
