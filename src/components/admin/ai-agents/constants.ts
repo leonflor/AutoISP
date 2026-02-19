@@ -1,35 +1,3 @@
-import { 
-  MessageCircle, 
-  FileText, 
-  Ticket, 
-  Wifi, 
-  DollarSign, 
-  Calendar, 
-  Package, 
-  TrendingUp, 
-  Wrench, 
-  UserPlus,
-  type LucideIcon
-} from 'lucide-react';
-
-export interface FeatureTag {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-}
-
-export const AGENT_FEATURE_TAGS: FeatureTag[] = [
-  { id: 'responde_duvidas', label: 'Responde dúvidas', icon: MessageCircle },
-  { id: 'consulta_faturas', label: 'Consulta faturas', icon: FileText },
-  { id: 'abre_chamados', label: 'Abre chamados', icon: Ticket },
-  { id: 'verifica_conexao', label: 'Verifica status conexão', icon: Wifi },
-  { id: 'negocia_debitos', label: 'Negocia débitos', icon: DollarSign },
-  { id: 'registra_promessas', label: 'Registra promessas', icon: Calendar },
-  { id: 'apresenta_planos', label: 'Apresenta planos', icon: Package },
-  { id: 'realiza_upgrades', label: 'Realiza upgrades', icon: TrendingUp },
-  { id: 'diagnostico_tecnico', label: 'Diagnóstico técnico', icon: Wrench },
-  { id: 'escala_humano', label: 'Escala para humano', icon: UserPlus },
-];
 
 export const AI_MODELS = [
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rápido e econômico)' },

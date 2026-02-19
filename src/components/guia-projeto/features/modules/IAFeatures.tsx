@@ -74,13 +74,13 @@ const iaFeatures: Feature[] = [
       { codigo: "RN-F109-01", descricao: "Slug é gerado automaticamente a partir do nome", tipo: "Geração" },
       { codigo: "RN-F109-02", descricao: "System prompt é obrigatório para agentes ativos", tipo: "Validação" },
       { codigo: "RN-F109-03", descricao: "Temperatura padrão: 0.7, Max Tokens padrão: 1000", tipo: "Default" },
-      { codigo: "RN-F109-04", descricao: "Feature tags definem capacidades do agente", tipo: "Comportamento" },
+      
     ],
     permissoes: [
       { role: "Super Admin", acoes: "Criar templates de agentes" },
     ],
     entidades: [
-      { tabela: "ai_agents", campos: "name, slug, type, scope, system_prompt, model, temperature, max_tokens, feature_tags, is_active", operacoes: "INSERT" },
+      { tabela: "ai_agents", campos: "name, slug, type, scope, system_prompt, model, temperature, max_tokens, is_active", operacoes: "INSERT" },
     ],
   },
   {
@@ -98,7 +98,7 @@ const iaFeatures: Feature[] = [
       { role: "Super Admin", acoes: "Editar templates de agentes" },
     ],
     entidades: [
-      { tabela: "ai_agents", campos: "name, slug, type, scope, system_prompt, model, temperature, max_tokens, feature_tags, is_active", operacoes: "UPDATE" },
+      { tabela: "ai_agents", campos: "name, slug, type, scope, system_prompt, model, temperature, max_tokens, is_active", operacoes: "UPDATE" },
       { tabela: "audit_logs", campos: "action, entity_type, entity_id, old_data, new_data", operacoes: "INSERT" },
     ],
   },

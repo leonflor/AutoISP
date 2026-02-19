@@ -63,7 +63,7 @@ const agentesIAClienteFeatures: Feature[] = [
       { perfil: "Operador", visualizar: true, criar: false, editar: false, excluir: false },
     ],
     entidades: [
-      { nome: "ai_agents", campos: ["id", "name", "slug", "type", "scope", "description", "avatar_url", "feature_tags", "is_active"] },
+      { nome: "ai_agents", campos: ["id", "name", "slug", "type", "scope", "description", "avatar_url", "is_active"] },
       { nome: "isp_agents", campos: ["id", "agent_id", "isp_id", "display_name", "is_enabled"] },
       { nome: "ai_limits", campos: ["agent_id", "plan_id", "is_enabled"] },
     ],
