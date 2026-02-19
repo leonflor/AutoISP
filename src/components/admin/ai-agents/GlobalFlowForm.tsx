@@ -104,7 +104,13 @@ export function GlobalFlowForm({ open, onOpenChange, flow }: GlobalFlowFormProps
               )} />
               <div className="flex gap-6">
                 <FormField control={form.control} name="is_fixed" render={({ field }) => (
-                  <FormItem className="flex items-center gap-2"><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="!mt-0">Roteiro Fixo</FormLabel></FormItem>
+                  <FormItem className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormLabel className="!mt-0">Roteiro Fixo</FormLabel>
+                    </div>
+                    <FormDescription className="text-xs">Ativado: etapas seguidas na ordem exata. Desativado: agente adapta a ordem conforme o contexto.</FormDescription>
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="is_active" render={({ field }) => (
                   <FormItem className="flex items-center gap-2"><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="!mt-0">Ativo</FormLabel></FormItem>
