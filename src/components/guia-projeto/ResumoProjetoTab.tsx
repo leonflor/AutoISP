@@ -36,6 +36,8 @@ const ResumoProjetoTab = () => {
     { nome: "OpenAI", icon: Bot, categoria: "IA (GPT-4o)" },
     { nome: "Asaas", icon: CreditCard, categoria: "Pagamentos" },
     { nome: "Resend", icon: Mail, categoria: "Email" },
+    { nome: "WhatsApp", icon: Users, categoria: "Meta Business API" },
+    { nome: "ERP Multi-Provider", icon: Database, categoria: "IXC, SGP, MK" },
     { nome: "Supabase Storage", icon: Database, categoria: "Arquivos" },
     { nome: "Supabase Auth", icon: Users, categoria: "Autenticação" },
     { nome: "Lovable Cloud", icon: Database, categoria: "Backend" },
@@ -338,9 +340,10 @@ const ResumoProjetoTab = () => {
         <CardContent>
           <p className="text-muted-foreground">
             O <strong className="text-foreground">AutoISP</strong> é uma plataforma SaaS de automação inteligente para provedores de internet brasileiros, 
-            combinando agentes de IA (via OpenAI API — GPT-4o/GPT-4o-mini), integração com ERPs e sistemas de monitoramento para oferecer atendimento 24h, 
+            combinando agentes de IA (via OpenAI API — GPT-4o/GPT-4o-mini), integração multi-ERP (IXC, SGP, MK-Solutions, Hubsoft), 
+            diagnóstico ONU em tempo real, auditoria de prompts dinâmicos e sistema de fluxos conversacionais com procedures para oferecer atendimento 24h, 
             automação de cobranças e suporte técnico proativo. Com conformidade LGPD, sistema RBAC granular, arquitetura simplificada de agentes 
-            (Agent → Fluxos Globais → Steps → tool_handler via catálogo hardcoded) e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
+            (Agent → Procedures → Fluxos → Steps → tool_handler via catálogo hardcoded) e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
           </p>
         </CardContent>
       </Card>
