@@ -78,7 +78,7 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Etapas do Fluxo</h4>
         <div className="flex gap-1">
           <Button size="sm" variant="outline" onClick={addStep}><Plus className="h-3.5 w-3.5 mr-1" /> Etapa</Button>
-          {dirty && <Button size="sm" onClick={handleSave} disabled={saveSteps.isPending}><Save className="h-3.5 w-3.5 mr-1" /> Salvar</Button>}
+          <Button size="sm" onClick={handleSave} disabled={!dirty || saveSteps.isPending}><Save className="h-3.5 w-3.5 mr-1" /> Salvar</Button>
         </div>
       </div>
 
