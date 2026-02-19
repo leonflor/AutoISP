@@ -88,7 +88,7 @@ export default function AiFlows() {
                   )}
                 </CardHeader>
                 <CollapsibleContent>
-                  <CardContent className="pt-0 px-4 pb-4">
+                  <CardContent className="pt-0 px-4 pb-4 overflow-hidden">
                     <GlobalFlowStepsEditor flow={flow} />
                   </CardContent>
                 </CollapsibleContent>

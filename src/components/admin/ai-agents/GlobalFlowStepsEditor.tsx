@@ -87,16 +87,16 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
       ) : (
         <div className="space-y-2">
           {steps.map((step, i) => (
-            <div key={i} className="border rounded-md p-3 space-y-2 bg-card">
-              <div className="flex items-center gap-2">
+            <div key={i} className="border rounded-md p-3 space-y-2 bg-card overflow-hidden">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex flex-col gap-0.5">
                   <button type="button" className="text-muted-foreground hover:text-foreground text-xs" onClick={() => moveStep(i, i - 1)} disabled={i === 0}>▲</button>
                   <button type="button" className="text-muted-foreground hover:text-foreground text-xs" onClick={() => moveStep(i, i + 1)} disabled={i === steps.length - 1}>▼</button>
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">{i + 1}</Badge>
-                <Input value={step.name} onChange={e => updateStep(i, 'name', e.target.value)} placeholder="Nome da etapa" className="h-8 text-sm" />
+                <Input value={step.name} onChange={e => updateStep(i, 'name', e.target.value)} placeholder="Nome da etapa" className="h-8 text-sm min-w-0 flex-1" />
                 <Select value={step.tool_handler || 'none'} onValueChange={v => updateStep(i, 'tool_handler', v === 'none' ? '' : v)}>
-                  <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue placeholder="Sem tool" /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] shrink-0 h-8 text-xs"><SelectValue placeholder="Sem tool" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem tool</SelectItem>
                     {TOOL_CATALOG.map(t => (
@@ -111,7 +111,7 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
                 </Button>
               </div>
               <Textarea value={step.instruction} onChange={e => updateStep(i, 'instruction', e.target.value)} placeholder="Instrução para o agente nesta etapa" rows={2} className="text-xs resize-none" />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Input value={step.expected_input} onChange={e => updateStep(i, 'expected_input', e.target.value)} placeholder="Input esperado (ex: CPF)" className="h-7 text-xs" />
                 <Input value={step.condition_to_advance} onChange={e => updateStep(i, 'condition_to_advance', e.target.value)} placeholder="Condição para avançar" className="h-7 text-xs" />
               </div>
