@@ -77,7 +77,13 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
         (c.login && c.login.toLowerCase().includes(s));
       if (!match) return false;
     }
-    if (status && status !== "all" && c.status_contrato !== status) return false;
+    if (status && status !== "all") {
+      if (status === "nao_ativo") {
+        if (c.status_contrato === "ativo") return false;
+      } else {
+        if (c.status_contrato !== status) return false;
+      }
+    }
     if (provider && provider !== "all" && c.provider !== provider) return false;
     return true;
   });
