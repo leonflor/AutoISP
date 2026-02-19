@@ -79,7 +79,7 @@ export function GlobalFlowForm({ open, onOpenChange, flow }: GlobalFlowFormProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col top-[5vh] translate-y-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col top-[5vh] translate-y-0">
         <DialogHeader>
           <DialogTitle>{flow ? 'Editar Fluxo Global' : 'Novo Fluxo Global'}</DialogTitle>
           <DialogDescription>Define um roteiro conversacional reutilizável por múltiplos agentes</DialogDescription>
