@@ -114,11 +114,73 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
   }
 };
 
+// ── Handler: erp_active_client_search ──
+const erpActiveClientSearchHandler: ToolHandler = async (ctx, args) => {
+  const query = String(args.busca || args.cpf || args.cnpj || "");
+  if (!query || query.length < 2) {
+    return { success: false, error: "Informe ao menos 2 caracteres para busca" };
+  }
+
+  try {
+    const result = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, query);
+
+    if (result.clients.length === 0) {
+      return {
+        success: true,
+        data: {
+          encontrados: 0,
+          mensagem: "Nenhum cliente encontrado com esse dado.",
+          erros: result.errors,
+        },
+      };
+    }
+
+    const activeClients = result.clients.filter((c) => c.status_contrato === "ativo");
+
+    if (activeClients.length === 0) {
+      return {
+        success: true,
+        data: {
+          encontrados: 0,
+          mensagem: "Cliente encontrado, porém sem contrato ativo.",
+          total_encontrados: result.clients.length,
+          erros: result.errors,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        encontrados: activeClients.length,
+        clientes: activeClients.slice(0, 10).map((c) => ({
+          nome: c.nome,
+          cpf_cnpj: c.cpf_cnpj,
+          plano: c.plano,
+          status: c.status_contrato,
+          conectado: c.conectado,
+          vencimento: c.data_vencimento,
+          erp: c.provider_name,
+          signal_db: c.signal_db,
+          signal_quality: c.signal_quality,
+        })),
+        erros: result.errors,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Erro ao buscar no ERP: ${err instanceof Error ? err.message : "desconhecido"}`,
+    };
+  }
+};
+
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_search: erpSearchHandler,
   erp_invoice_search: erpInvoiceSearchHandler,
   onu_diagnostics: onuDiagnosticsHandler,
+  erp_active_client_search: erpActiveClientSearchHandler,
 };
 
 /**
