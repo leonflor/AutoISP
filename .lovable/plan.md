@@ -1,96 +1,73 @@
 
 
-# Auditoria de Prompt Dinamico para Super Admins
+# Atualizar o Guia do Projeto com o Estado Atual da Implementacao
 
-## Problema
+## Contexto
 
-O prompt do agente de IA e montado dinamicamente em 8 camadas na Edge Function `ai-chat`, combinando template, tom de voz, RAG, FAQ, clausulas de seguranca, ferramentas, fluxos e contexto. Atualmente nao ha como o super admin visualizar o prompt final que esta sendo enviado ao modelo, dificultando a identificacao de comportamentos indesejados.
+O guia de projeto (`src/components/guia-projeto/`) esta desatualizado em relacao ao que ja foi implementado. Varias edge functions, modulos compartilhados e funcionalidades foram adicionados sem que o guia refletisse essas mudancas.
 
-## Solucao Proposta
+## Alteracoes Necessarias
 
-Criar uma Edge Function dedicada `audit-prompt` que monta o prompt exatamente como o `ai-chat` faz, mas em vez de enviar ao OpenAI, retorna o prompt completo para o super admin visualizar. Complementar com uma interface no painel admin.
+### 1. ImplementacaoTab.tsx — Lista de Edge Functions
 
-## Arquitetura
+**Problema:** Lista 15 funcoes, mas existem 20 implementadas.
 
-A solucao tem 3 partes:
+**Adicionar 5 funcoes ausentes:**
+- `audit-prompt` — Auditoria de prompt dinamico para super admins
+- `fetch-onu-signal` — Diagnostico de sinal ONU em tempo real
+- `save-whatsapp-config` — Salvar configuracao WhatsApp do ISP
+- `send-whatsapp` — Envio de mensagens WhatsApp
+- `test-whatsapp-connection` — Testar conexao WhatsApp
 
-1. **Edge Function `audit-prompt`** - Recebe `isp_agent_id` e retorna o prompt montado com todas as camadas, sem chamar a OpenAI
-2. **Hook `useAuditPrompt`** - Hook React para chamar a edge function
-3. **Dialog `PromptAuditDialog`** - Modal na pagina de detalhes do agente (admin) para visualizar o prompt
+**Atualizar descricao do card:** de "Funcoes serverless a serem criadas" para "Funcoes serverless implementadas" (ja que todas estao no ar).
+
+### 2. ImplementacaoTab.tsx — Modulos Compartilhados (_shared/)
+
+**Problema:** Lista apenas 2 modulos, existem 7.
+
+**Adicionar modulos ausentes:**
+- `_shared/erp-types.ts` — Tipos padrao de ERP (ErpClient, ErpProvider, ContractStatus)
+- `_shared/erp-providers/index.ts` — Registry de providers ERP (IXC, SGP, MK)
+- `_shared/erp-providers/ixc.ts` — Conector IXC Soft
+- `_shared/erp-providers/sgp.ts` — Conector SGP
+- `_shared/erp-providers/mk.ts` — Conector MK-Solutions
+- `_shared/onu-signal-analyzer.ts` — Analise de qualidade de sinal ONU (rx/tx)
+- `_shared/tool-catalog.ts` — Catalogo de tools para function calling
+
+### 3. ImplementacaoTab.tsx — Adicionar Status por Fase
+
+Adicionar badges de status nas fases para indicar progresso:
+- F1 (Database): Concluida
+- F2 (Integracoes Core): Concluida
+- F3 (Auth e Seguranca): Concluida
+- F4 (Plataforma Admin): Concluida
+- F5 (Plataforma Cliente): Concluida
+- F6 (Landing Page): Concluida
+- F7 (Deploy): Em progresso
+
+### 4. ResumoProjetoTab.tsx — Tecnologias Core
+
+**Adicionar tecnologias que ja estao implementadas mas ausentes do resumo:**
+- WhatsApp / Meta Business API (Comunicacao)
+- ERP (IXC, SGP, MK-Solutions) (Integracao)
+
+### 5. ResumoProjetoTab.tsx — Resumo Executivo
+
+Atualizar o paragrafo do resumo executivo para mencionar:
+- Integracao multi-ERP (IXC, SGP, MK-Solutions, Hubsoft)
+- Diagnostico ONU em tempo real
+- Auditoria de prompts dinamicos
+- Sistema de fluxos conversacionais com procedures
+
+### 6. IntegracoesTab.tsx — Contagem de Integracoes
+
+Atualizar o total de "9 integracoes" para refletir o numero real, considerando que agora ha ERP multi-provider.
 
 ## Detalhes Tecnicos
 
-### 1. Edge Function `audit-prompt` (`supabase/functions/audit-prompt/index.ts`)
+Todas as alteracoes sao em componentes React existentes (sem novas dependencias, sem migracoes, sem edge functions). Os arquivos a editar sao:
 
-- Recebe via POST: `{ isp_agent_id: string }`
-- Valida que o usuario autenticado e `super_admin`
-- Busca o `isp_agent` com JOIN no template (`ai_agents`)
-- Busca ISP name, clausulas de seguranca, knowledge base (sem RAG, pois nao ha query do usuario)
-- Busca flows vinculados via `ai_agent_flow_links` (respeitando `is_active`)
-- Busca configuracao ERP do ISP
-- Chama a mesma logica de `buildSystemPrompt` (copiada/adaptada)
-- Retorna JSON com:
-  - `prompt`: o texto completo do system prompt
-  - `metadata`: informacoes sobre cada camada (template usado, qtd de clausulas, qtd de FAQs, fluxos carregados, ferramentas ativas)
-  - `isp_name`, `agent_name`, `template_name`
+- `src/components/guia-projeto/ImplementacaoTab.tsx` — Edge functions, shared modules, status das fases
+- `src/components/guia-projeto/ResumoProjetoTab.tsx` — Tecnologias e resumo executivo
 
-Exemplo de resposta:
-
-```text
-{
-  "prompt": "Voce e um atendente virtual...",
-  "metadata": {
-    "template_id": "...",
-    "template_name": "Atendente Virtual",
-    "voice_tone": "profissional",
-    "security_clauses_count": 2,
-    "knowledge_base_count": 15,
-    "document_chunks": 0,
-    "flows": [{ "name": "Cobranca", "steps_count": 4 }],
-    "tools": ["erp_search", "erp_invoice_search"],
-    "has_erp": true
-  }
-}
-```
-
-### 2. Hook `useAuditPrompt` (`src/hooks/admin/useAuditPrompt.ts`)
-
-- Mutation que chama `supabase.functions.invoke('audit-prompt', { body: { isp_agent_id } })`
-- Retorna o prompt e metadata
-
-### 3. Acesso pela UI
-
-Duas opcoes de acesso:
-
-**Opcao A - Na pagina de Templates (`/admin/ai-agents`):**
-- Na tabela de templates, adicionar um botao/menu "Auditar ISPs" que lista os ISPs que usam aquele template
-- Ao clicar em um ISP, abre o dialog com o prompt montado para aquele agente especifico
-
-**Opcao B - Nova pagina/secao dedicada:**
-- Dropdown para selecionar ISP -> lista agentes ativos daquele ISP -> botao "Ver Prompt"
-
-Recomendo a **Opcao A** pois aproveita o fluxo existente e o hook `useTemplateUsage` que ja lista os ISPs usando cada template.
-
-### 4. Dialog `PromptAuditDialog` (`src/components/admin/ai-agents/PromptAuditDialog.tsx`)
-
-- Modal com layout em duas secoes:
-  - **Painel lateral esquerdo**: metadata resumida (template, ISP, fluxos ativos, ferramentas, contagens)
-  - **Area principal**: prompt completo em texto monoespacado com scroll, com botao de copiar
-- Botao "Copiar Prompt" para facilitar analise externa
-- Indicadores visuais por camada (badges coloridos mostrando quais camadas estao presentes)
-
-### 5. Configuracao
-
-- Adicionar `verify_jwt = false` no `config.toml` para a nova funcao (validacao manual no codigo)
-- Nenhum secret novo necessario (usa os mesmos ja existentes)
-- Nenhuma migracao de banco necessaria
-
-## Fluxo do Super Admin
-
-1. Acessa `/admin/ai-agents`
-2. Clica no template suspeito (ex: "Atendente Virtual")
-3. Na pagina de detalhes, ve a lista de ISPs que usam o template (via `useTemplateUsage`)
-4. Clica em "Auditar Prompt" ao lado de um ISP especifico
-5. O dialog abre mostrando o prompt completo montado + metadata
-6. Identifica instrucoes problematicas e corrige no template ou clausulas de seguranca
-
+Estimativa: edicoes pontuais em 2 arquivos.
