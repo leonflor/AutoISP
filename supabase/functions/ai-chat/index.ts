@@ -584,6 +584,12 @@ Deno.serve(async (req) => {
       flowToolHandlers
     );
 
+    // Combine system prompt + user messages into the messages array
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+      ...body.messages,
+    ];
+
     // Build OpenAI tools filtered by flow handlers
     const filteredTools = Object.values(TOOL_CATALOG).filter(
       t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasActiveErp)
