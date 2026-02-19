@@ -241,6 +241,111 @@ const ComponentsSection = () => {
           </div>
         </CardContent>
       </Card>
+      {/* Modais / Dialogs */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Modais / Dialogs</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Padrão adotado para modais de formulários complexos (ex: Fluxos Conversacionais).
+            O modal é alinhado ao topo da viewport com scroll interno, mantendo header e footer fixos.
+          </p>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Propriedade</TableHead>
+                  <TableHead>Classe / Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell>Posição</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">top-[5vh] translate-y-0</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Altura Máxima</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">max-h-[90vh]</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Layout</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">flex flex-col overflow-hidden</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Scroll</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">ScrollArea (flex-1 overflow-y-auto)</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Largura (complexo)</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">max-w-2xl (672px)</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Header / Footer</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">Fixos, fora do ScrollArea</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Fechamento</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">onInteractOutside + onEscapeKeyDown prevenidos; botão X funcional</code></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Formulários com Switches */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Formulários com Switches</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Padrão para switches que precisam de texto explicativo abaixo do label (ex: "Roteiro Fixo" nos fluxos conversacionais).
+          </p>
+
+          {/* Exemplo visual */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <div className="inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent bg-primary">
+                  <span className="pointer-events-none block h-5 w-5 translate-x-5 rounded-full bg-background shadow-lg" />
+                </div>
+                <span className="text-sm font-medium">Roteiro Fixo</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ativado: etapas seguidas na ordem exata. Desativado: agente adapta a ordem conforme o contexto.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Elemento</TableHead>
+                  <TableHead>Classe</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell>Container (FormItem)</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">flex flex-col gap-1</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Switch + Label</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">flex items-center gap-2</code></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Texto de ajuda</TableCell>
+                  <TableCell><code className="rounded bg-muted px-2 py-1 text-xs">FormDescription text-xs</code></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
