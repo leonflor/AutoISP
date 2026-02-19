@@ -201,7 +201,7 @@ const iaFeatures: Feature[] = [
     nome: "Catálogo de Ferramentas (Read-Only)",
     modulo: "IA",
     plataforma: "Painel Admin",
-    descricao: "Página /admin/ai-tools que exibe o catálogo hardcoded de ferramentas (functions OpenAI) disponíveis no sistema: erp_search, erp_invoice_search e onu_diagnostics. Cada tool mostra handler, JSON Schema de parâmetros, descrição da resposta e flag requires_erp. Somente leitura — sem CRUD.",
+    descricao: "Página /admin/ai-tools que exibe o catálogo hardcoded de ferramentas (functions OpenAI) disponíveis no sistema: erp_search (Busca Clientes no ERP — pesquisa por CPF/CNPJ), erp_invoice_search e onu_diagnostics. Cada tool mostra handler, JSON Schema de parâmetros, descrição da resposta e flag requires_erp. Somente leitura — sem CRUD.",
     criticidade: "media",
     regrasNegocio: [
       { codigo: "RN-F117-01", descricao: "Catálogo é definido em código (src/constants/tool-catalog.ts), sem tabela no banco", tipo: "Arquitetura" },
