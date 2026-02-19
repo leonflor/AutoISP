@@ -175,7 +175,8 @@ function buildSystemPrompt(
   documentChunks: DocumentChunk[],
   ispName: string,
   hasErp: boolean,
-  agentFlows: AgentFlowRecord[]
+  agentFlows: AgentFlowRecord[],
+  flowToolHandlers: Set<string>
 ): string {
   const parts: string[] = [];
 
@@ -216,8 +217,8 @@ function buildSystemPrompt(
     parts.push(`\n## REGRAS OBRIGATÓRIAS DE SEGURANÇA\nVocê DEVE seguir estas regras em todas as interações:\n${clausesText}`);
   }
 
-  // 5.5 Tools section (from hardcoded catalog)
-  const availableTools = Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasErp);
+  // 5.5 Tools section (only tools referenced by linked flows)
+  const availableTools = Object.values(TOOL_CATALOG).filter(t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasErp));
   if (availableTools.length > 0) {
     const toolsList = availableTools
       .map((t) => `- ${t.handler}: ${t.description}`)
@@ -561,6 +562,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Collect tool_handlers from active flow steps
+    const flowToolHandlers = new Set<string>();
+    for (const flow of agentFlows) {
+      for (const step of flow.steps) {
+        if (step.tool_handler) flowToolHandlers.add(step.tool_handler);
+      }
+    }
+
     // Build complete system prompt with all layers (hybrid RAG + tools + flows)
     const systemPrompt = buildSystemPrompt(
       template,
@@ -570,27 +579,22 @@ Deno.serve(async (req) => {
       documentChunks,
       ispName,
       hasActiveErp,
-      agentFlows
+      agentFlows,
+      flowToolHandlers
     );
 
-    const availableToolCount = Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasActiveErp).length;
-    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${availableToolCount}, Flows=${agentFlows.length}`);
+    // Build OpenAI tools filtered by flow handlers
+    const filteredTools = Object.values(TOOL_CATALOG).filter(
+      t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasActiveErp)
+    );
+    const openaiTools = filteredTools.length > 0
+      ? filteredTools.map(t => ({
+          type: "function" as const,
+          function: { name: t.handler, description: t.description, parameters: t.parameters_schema },
+        }))
+      : undefined;
 
-    // Build messages with enriched system prompt
-    const messages: any[] = [
-      { role: "system", content: systemPrompt },
-      ...body.messages
-    ];
-
-    // Map model name to OpenAI model
-    const modelMap: Record<string, string> = {
-      "gpt-4o": "gpt-4o",
-      "gpt-4o-mini": "gpt-4o-mini",
-    };
-    const model = modelMap[template.model || "gpt-4o-mini"] || "gpt-4o-mini";
-
-    // Build OpenAI tools array from hardcoded catalog
-    const openaiTools = buildOpenAITools(hasActiveErp);
+    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${filteredTools.length}/${Object.keys(TOOL_CATALOG).length}, Flows=${agentFlows.length}, FlowHandlers=[${[...flowToolHandlers].join(",")}]`);
 
     // Tool execution context
     const encryptionKey = Deno.env.get("ENCRYPTION_KEY") || "";
