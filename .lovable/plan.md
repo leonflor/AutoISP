@@ -1,36 +1,25 @@
-# Renomear "Busca no ERP" para "Busca Clientes no ERP"
 
-## Resumo
+# Corrigir Overflow no Editor de Etapas dos Fluxos Conversacionais
 
-Atualizar o nome e a descricao da ferramenta `erp_search` para refletir que a chave de pesquisa e o CPF ou CNPJ e que pode retornar um ou mais clientes.
+## Problema
 
-## Mudancas
+Ao expandir um fluxo para editar etapas, o conteudo excede a largura da tela porque a linha de cada etapa usa `flex` sem `flex-wrap`, com um Select de largura fixa (`w-[160px]`) e um Input que nao encolhe.
 
-### 3 arquivos editados
+## Solucao
 
+### Arquivo: `src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx`
 
-| Arquivo                                                       | Mudanca                                                                                                                                                                                                       |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase/functions/_shared/tool-catalog.ts`                  | `display_name`: "Busca Clientes no ERP". `description`: esclarecer que a busca e por CPF ou CNPJ e pode retornar um ou mais clientes. Atualizar descricao do parametro `busca` para "CPF ou CNPJ do cliente". |
-| `src/constants/tool-catalog.ts`                               | Mesmas alteracoes do espelho frontend: `display_name`, `description` e descricao do parametro.                                                                                                                |
-| `src/components/guia-projeto/features/modules/IAFeatures.tsx` | Atualizar referencia de "erp_search" na documentacao do catalogo de ferramentas para o novo nome.                                                                                                             |
+1. **Linha 90 (container da etapa)**: Adicionar `overflow-hidden` ao `div.border` para evitar que o card exceda o pai
+2. **Linha 91 (flex row principal)**: Alterar de `flex items-center gap-2` para `flex flex-wrap items-center gap-2` para permitir quebra de linha em telas menores
+3. **Linha 97 (Input do nome)**: Adicionar `min-w-0 flex-1` para que o input encolha corretamente dentro do flex
+4. **Linha 98-108 (Select da tool)**: Trocar `w-[160px]` por `w-[160px] shrink-0` (ja tem shrink implicitamente, mas garantir) ou usar `min-w-[140px] max-w-[160px]` para flexibilidade
+5. **Linha 114 (grid de inputs)**: Alterar `grid-cols-2` para `grid grid-cols-1 sm:grid-cols-2` para empilhar em telas pequenas
 
+### Arquivo: `src/pages/admin/AiFlows.tsx`
 
-### Detalhes das alteracoes nos catalogos
+6. **Container do CollapsibleContent (linha ~80)**: Adicionar `overflow-hidden` ao CardContent para conter qualquer overflow residual
 
-**Antes:**
+## Impacto
 
-- display_name: "Busca no ERP"
-- description: "Busca clientes no sistema ERP do provedor por nome, CPF/CNPJ ou ID."
-- parametro busca: "Termo de busca: nome, CPF/CNPJ ou ID do cliente"
-
-**Depois:**
-
-- display_name: "Busca Clientes no ERP"
-- description: "Busca clientes no sistema ERP do provedor por CPF ou CNPJ. Pode retornar um ou mais clientes com dados de contrato, status de conexao e sinal."
-- parametro busca: "CPF ou CNPJ do cliente (min. 11 caracteres)"  
- - o cpf ou cnpj deve ser validado antes de realizar a consulta
-
-O handler (`erp_search`) e a chave no registro nao mudam -- apenas metadados de exibicao.
-
-Apos a alteracao no backend, o edge function `ai-chat` sera redeployado para que a OpenAI receba a descricao atualizada.
+- 2 arquivos editados
+- Apenas classes CSS (Tailwind) alteradas, sem mudanca de logica
