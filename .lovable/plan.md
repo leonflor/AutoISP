@@ -1,81 +1,32 @@
 
 
-# Restringir Tools aos Fluxos Vinculados
+# Remover aba Features e mover Base de Conhecimento para Basico
 
-## Problema Atual
+## Resumo
 
-O `ai-chat` injeta **todas** as ferramentas do catalogo no contexto do agente, independentemente de quais fluxos estao vinculados. Isso permite que o agente use ferramentas que nao foram autorizadas para ele.
+Remover a aba "Features" do formulario de template de agente e mover o toggle "Base de Conhecimento" para o final da aba "Basico".
 
-Exemplo: o "Atendente Virtual" tem acesso a `erp_invoice_search` mesmo sem nenhum fluxo que utilize essa ferramenta.
+## Alteracoes
 
-## Regra Nova
+### Arquivo: `src/components/admin/ai-agents/AgentTemplateForm.tsx`
 
-**Tools sao acessiveis ao agente SOMENTE por meio dos fluxos vinculados.** Se nenhum fluxo referencia uma tool, ela nao aparece no prompt nem no function calling.
+1. **Remover a aba "Features" do TabsList** (linha 203) -- remover o TabsTrigger `value="features"`
 
-## Mudanca (1 arquivo)
+2. **Mover o toggle "Base de Conhecimento" para dentro da aba "Basico"** -- o bloco `uses_knowledge_base` (linhas 506-527) sera adicionado logo apos o toggle "Ativo" (apos linha 397), mantendo a condicao `scope === 'tenant'`
 
-### `supabase/functions/ai-chat/index.ts`
+3. **Remover o TabsContent `value="features"` inteiro** (linhas 491-528) -- que continha o FeatureTagsSelector e o uses_knowledge_base
 
-Tres pontos de alteracao dentro do mesmo arquivo:
+4. **Remover o import do `FeatureTagsSelector`** (linha 39)
 
-**A) Coletar tool_handlers dos fluxos (apos carregar steps, ~linha 549-555)**
+5. **Remover `feature_tags` do schema e defaultValues** -- remover do objeto `agentSchema` (linha 58), dos `defaultValues` (linha 115), e do `form.reset` ao carregar agente (linha 139)
 
-Apos montar o `stepsMap`, extrair o conjunto de `tool_handler` strings usados pelos fluxos ativos:
+### Arquivo: `src/components/admin/ai-agents/FeatureTagsSelector.tsx`
 
-```text
-flowToolHandlers = Set de todos os step.tool_handler nao-nulos dos fluxos carregados
-```
+Nenhuma alteracao -- o arquivo deixa de ser importado mas pode ser mantido no repositorio caso seja reaproveitado futuramente (ou removido se preferir).
 
-**B) Substituir a secao "Ferramentas Disponiveis" no prompt (linha 220-226)**
+## Resultado
 
-Em vez de listar todas as tools do catalogo, filtrar apenas as que pertencem ao conjunto `flowToolHandlers`:
+- A aba "Features" desaparece do formulario
+- O toggle "Base de Conhecimento" aparece na aba "Basico", logo abaixo do toggle "Ativo"
+- O campo `feature_tags` deixa de ser gerenciado pelo formulario (permanece na tabela do banco, apenas nao e mais editavel por aqui)
 
-```text
-Antes:  Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasErp)
-Depois: Object.values(TOOL_CATALOG).filter(t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasErp))
-```
-
-O parametro `flowToolHandlers: Set<string>` sera adicionado a funcao `buildSystemPrompt`.
-
-**C) Substituir o `buildOpenAITools` generico (linha 593)**
-
-Em vez de enviar todas as tools ao OpenAI, construir a lista filtrada:
-
-```text
-Antes:  buildOpenAITools(hasActiveErp)
-Depois: Filtrar TOOL_CATALOG por flowToolHandlers + hasActiveErp, e montar o array OpenAI somente com essas
-```
-
-Se `flowToolHandlers` estiver vazio, nenhuma tool e enviada (agente fica so com texto).
-
-**D) Ajustar log (linha 576-577)**
-
-Mostrar a contagem real de tools filtradas em vez do total do catalogo.
-
-## Fluxo resultante
-
-```text
-1. Carrega flow_links do agente
-2. Carrega flows ativos + steps
-3. Extrai tool_handlers dos steps -> Set<string>
-4. Filtra TOOL_CATALOG pelo Set (+ hasErp)
-5. Injeta no prompt apenas as tools filtradas
-6. Envia ao OpenAI apenas as tools filtradas
-7. Agente so pode chamar tools que estao nos seus fluxos
-```
-
-## Impacto
-
-- Agentes sem fluxos vinculados nao terao acesso a nenhuma tool
-- Adicionar/remover uma tool de um agente passa a ser feito exclusivamente pela gestao de fluxos e seus steps
-- Nenhuma alteracao no frontend, banco de dados ou catalogo de tools
-
-## Secao Tecnica
-
-Arquivos alterados: `supabase/functions/ai-chat/index.ts`
-
-Funcoes impactadas:
-- `buildSystemPrompt()` — recebe novo parametro `flowToolHandlers: Set<string>`
-- Bloco principal do handler — coleta tool handlers apos montar stepsMap, e constroi openaiTools filtrado
-
-Nenhuma migration de banco necessaria.
