@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCreateAgentFlow, useUpdateAgentFlow, type AgentFlow } from '@/hooks/admin/useAgentFlows';
 
 const flowSchema = z.object({
@@ -125,7 +126,7 @@ export function AgentFlowForm({ open, onOpenChange, agentId, flow }: AgentFlowFo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col top-[5vh] translate-y-0">
         <DialogHeader>
           <DialogTitle>{flow ? 'Editar Fluxo' : 'Novo Fluxo'}</DialogTitle>
           <DialogDescription>
@@ -133,123 +134,125 @@ export function AgentFlowForm({ open, onOpenChange, agentId, flow }: AgentFlowFo
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome do Fluxo</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Cobrança" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="slug"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Slug</FormLabel>
-                  <FormControl>
-                    <Input placeholder="cobranca" {...field} disabled={!!flow} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Textarea rows={2} className="resize-none" placeholder="Fluxo de cobrança de faturas em aberto" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="trigger_keywords"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Palavras-chave de Ativação</FormLabel>
-                  <FormControl>
-                    <Input placeholder="fatura, boleto, débito, pagamento" {...field} />
-                  </FormControl>
-                  <FormDescription>Separadas por vírgula</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="trigger_prompt"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Instrução de Ativação</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      rows={2}
-                      className="resize-none"
-                      placeholder="Ative quando o usuário mencionar problemas financeiros"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>Instrução textual para o LLM sobre quando ativar</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex gap-6">
+        <ScrollArea className="flex-1 overflow-y-auto pr-2">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="is_fixed"
+                name="name"
                 render={({ field }) => (
-                  <FormItem className="flex items-center gap-2">
+                  <FormItem>
+                    <FormLabel>Nome do Fluxo</FormLabel>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Input placeholder="Cobrança" {...field} />
                     </FormControl>
-                    <FormLabel className="!mt-0">Roteiro Fixo</FormLabel>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
 
               <FormField
                 control={form.control}
-                name="is_active"
+                name="slug"
                 render={({ field }) => (
-                  <FormItem className="flex items-center gap-2">
+                  <FormItem>
+                    <FormLabel>Slug</FormLabel>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Input placeholder="cobranca" {...field} disabled={!!flow} />
                     </FormControl>
-                    <FormLabel className="!mt-0">Ativo</FormLabel>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={createFlow.isPending || updateFlow.isPending}>
-                {flow ? 'Salvar' : 'Criar Fluxo'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descrição</FormLabel>
+                    <FormControl>
+                      <Textarea rows={2} className="resize-none" placeholder="Fluxo de cobrança de faturas em aberto" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="trigger_keywords"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Palavras-chave de Ativação</FormLabel>
+                    <FormControl>
+                      <Input placeholder="fatura, boleto, débito, pagamento" {...field} />
+                    </FormControl>
+                    <FormDescription>Separadas por vírgula</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="trigger_prompt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Instrução de Ativação</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={2}
+                        className="resize-none"
+                        placeholder="Ative quando o usuário mencionar problemas financeiros"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>Instrução textual para o LLM sobre quando ativar</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex gap-6">
+                <FormField
+                  control={form.control}
+                  name="is_fixed"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Roteiro Fixo</FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="is_active"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Ativo</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={createFlow.isPending || updateFlow.isPending}>
+                  {flow ? 'Salvar' : 'Criar Fluxo'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
