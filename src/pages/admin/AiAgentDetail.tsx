@@ -1,13 +1,18 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bot } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Bot, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { AgentTemplateForm } from '@/components/admin/ai-agents/AgentTemplateForm';
+import { PromptAuditDialog } from '@/components/admin/ai-agents/PromptAuditDialog';
 import {
   useAiAgentTemplate,
   useCreateAiAgent,
   useUpdateAiAgent,
 } from '@/hooks/admin/useAiAgentTemplates';
+import { useTemplateIspAgents } from '@/hooks/admin/useTemplateIspAgents';
+import { useAuditPrompt } from '@/hooks/admin/useAuditPrompt';
 import type { AgentFormValues } from '@/components/admin/ai-agents/AgentTemplateForm';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,6 +25,9 @@ export default function AiAgentDetail() {
   const { data: agent, isLoading } = useAiAgentTemplate(isNew ? undefined : id);
   const createMutation = useCreateAiAgent();
   const updateMutation = useUpdateAiAgent();
+  const { data: ispAgents } = useTemplateIspAgents(isNew ? undefined : id);
+  const auditMutation = useAuditPrompt();
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const handleSubmit = async (data: AgentFormValues) => {
     if (isNew) {
@@ -36,6 +44,11 @@ export default function AiAgentDetail() {
 
   const handleCancel = () => {
     navigate('/admin/ai-agents');
+  };
+
+  const handleAudit = async (ispAgentId: string) => {
+    setAuditOpen(true);
+    auditMutation.mutate(ispAgentId);
   };
 
   if (!isNew && isLoading) {
@@ -92,6 +105,59 @@ export default function AiAgentDetail() {
         onSubmit={handleSubmit}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
         onCancel={handleCancel}
+      />
+
+      {/* ISPs using this template - with audit button */}
+      {!isNew && ispAgents && ispAgents.length > 0 && (
+        <div className="rounded-lg border bg-card">
+          <div className="p-4 border-b">
+            <h3 className="font-medium">ISPs usando este template</h3>
+            <p className="text-sm text-muted-foreground">
+              Audite o prompt final montado para cada ISP
+            </p>
+          </div>
+          <div className="divide-y">
+            {ispAgents.map((ia) => (
+              <div key={ia.id} className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <span className="font-medium text-sm">{ia.isp_name}</span>
+                    {ia.display_name && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({ia.display_name})
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant={ia.is_enabled ? 'default' : 'secondary'} className="text-[10px]">
+                    {ia.is_enabled ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                  {ia.voice_tone && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {ia.voice_tone}
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAudit(ia.id)}
+                  disabled={auditMutation.isPending}
+                >
+                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                  Auditar Prompt
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Audit dialog */}
+      <PromptAuditDialog
+        open={auditOpen}
+        onOpenChange={setAuditOpen}
+        data={auditMutation.data || null}
+        isLoading={auditMutation.isPending}
       />
     </div>
   );
