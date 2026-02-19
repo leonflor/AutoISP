@@ -1,90 +1,81 @@
 
 
-# Nova Ferramenta: Busca Cliente Ativo no ERP
+# Restringir Tools aos Fluxos Vinculados
 
-## Objetivo
+## Problema Atual
 
-Criar uma nova tool `erp_active_client_search` que busca clientes por CPF ou CNPJ e retorna **apenas aqueles com contrato ativo**, filtrando automaticamente os demais status (suspenso, cancelado, bloqueado, etc.).
+O `ai-chat` injeta **todas** as ferramentas do catalogo no contexto do agente, independentemente de quais fluxos estao vinculados. Isso permite que o agente use ferramentas que nao foram autorizadas para ele.
 
-## Diferenca da tool existente (`erp_search`)
+Exemplo: o "Atendente Virtual" tem acesso a `erp_invoice_search` mesmo sem nenhum fluxo que utilize essa ferramenta.
 
-| Aspecto | `erp_search` | `erp_active_client_search` |
-|---------|-------------|---------------------------|
-| Filtro de status | Nenhum (retorna todos) | Apenas `status_contrato === "ativo"` |
-| Caso de uso | Busca geral | Validar se cliente esta ativo |
-| Resposta quando inativo | Mostra o cliente com status | Retorna 0 encontrados + mensagem explicativa |
+## Regra Nova
 
-## Arquivos editados (3)
+**Tools sao acessiveis ao agente SOMENTE por meio dos fluxos vinculados.** Se nenhum fluxo referencia uma tool, ela nao aparece no prompt nem no function calling.
 
-Seguindo a regra de 3 arquivos obrigatorios:
+## Mudanca (1 arquivo)
 
-### 1. `supabase/functions/_shared/tool-catalog.ts`
+### `supabase/functions/ai-chat/index.ts`
 
-Adicionar entrada `erp_active_client_search` ao `TOOL_CATALOG`:
+Tres pontos de alteracao dentro do mesmo arquivo:
 
-```
-erp_active_client_search: {
-  handler: "erp_active_client_search",
-  display_name: "Busca Cliente Ativo",
-  description: "Busca clientes com contrato ativo no ERP por CPF ou CNPJ. Retorna apenas clientes cujo status de contrato seja 'ativo'.",
-  parameters_schema: {
-    type: "object",
-    properties: {
-      busca: {
-        type: "string",
-        description: "CPF ou CNPJ do cliente",
-        minLength: 11
-      }
-    },
-    required: ["busca"],
-    additionalProperties: false
-  },
-  response_description: "Cliente ativo com nome, CPF, plano, conexao e provedor ERP. Retorna vazio se nenhum cliente ativo for encontrado.",
-  requires_erp: true
-}
-```
+**A) Coletar tool_handlers dos fluxos (apos carregar steps, ~linha 549-555)**
 
-### 2. `supabase/functions/_shared/tool-handlers.ts`
-
-Adicionar handler `erpActiveClientSearchHandler`:
-
-- Reutiliza `searchClients` existente (mesma busca multi-ERP)
-- Aplica filtro adicional: `.filter(c => c.status_contrato === "ativo")`
-- Se encontrar clientes pela busca mas nenhum ativo, retorna mensagem: "Cliente encontrado, porem sem contrato ativo."
-- Se nao encontrar nenhum cliente, retorna: "Nenhum cliente encontrado com esse dado."
-- Registrar no objeto `handlers`
-
-### 3. `src/constants/tool-catalog.ts`
-
-Adicionar espelho frontend ao array `TOOL_CATALOG`:
-
-```
-{
-  handler: "erp_active_client_search",
-  display_name: "Busca Cliente Ativo",
-  description: "Busca clientes com contrato ativo no ERP por CPF ou CNPJ. Retorna apenas clientes cujo status seja 'ativo'.",
-  parameters: [
-    { name: "busca", type: "string", description: "CPF ou CNPJ do cliente (min. 11 caracteres)", required: true }
-  ],
-  response_description: "Cliente ativo com nome, CPF, plano, conexao e provedor ERP.",
-  requires_erp: true
-}
-```
-
-## Logica do handler (detalhe tecnico)
+Apos montar o `stepsMap`, extrair o conjunto de `tool_handler` strings usados pelos fluxos ativos:
 
 ```text
-1. Receber args.busca (CPF/CNPJ)
-2. Validar minimo 2 caracteres
-3. Chamar searchClients() -- busca em todos os ERPs ativos
-4. Separar resultados:
-   - allFound = resultado total da busca
-   - activeOnly = allFound.filter(c => c.status_contrato === "ativo")
-5. Retornar:
-   - Se activeOnly > 0: lista dos clientes ativos
-   - Se allFound > 0 mas activeOnly === 0: mensagem informando que o cliente existe mas nao esta ativo
-   - Se allFound === 0: mensagem de nenhum cliente encontrado
+flowToolHandlers = Set de todos os step.tool_handler nao-nulos dos fluxos carregados
 ```
 
-Nenhuma funcao nova no `erp-driver.ts` -- reutiliza `searchClients` existente e aplica filtro no handler.
+**B) Substituir a secao "Ferramentas Disponiveis" no prompt (linha 220-226)**
 
+Em vez de listar todas as tools do catalogo, filtrar apenas as que pertencem ao conjunto `flowToolHandlers`:
+
+```text
+Antes:  Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasErp)
+Depois: Object.values(TOOL_CATALOG).filter(t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasErp))
+```
+
+O parametro `flowToolHandlers: Set<string>` sera adicionado a funcao `buildSystemPrompt`.
+
+**C) Substituir o `buildOpenAITools` generico (linha 593)**
+
+Em vez de enviar todas as tools ao OpenAI, construir a lista filtrada:
+
+```text
+Antes:  buildOpenAITools(hasActiveErp)
+Depois: Filtrar TOOL_CATALOG por flowToolHandlers + hasActiveErp, e montar o array OpenAI somente com essas
+```
+
+Se `flowToolHandlers` estiver vazio, nenhuma tool e enviada (agente fica so com texto).
+
+**D) Ajustar log (linha 576-577)**
+
+Mostrar a contagem real de tools filtradas em vez do total do catalogo.
+
+## Fluxo resultante
+
+```text
+1. Carrega flow_links do agente
+2. Carrega flows ativos + steps
+3. Extrai tool_handlers dos steps -> Set<string>
+4. Filtra TOOL_CATALOG pelo Set (+ hasErp)
+5. Injeta no prompt apenas as tools filtradas
+6. Envia ao OpenAI apenas as tools filtradas
+7. Agente so pode chamar tools que estao nos seus fluxos
+```
+
+## Impacto
+
+- Agentes sem fluxos vinculados nao terao acesso a nenhuma tool
+- Adicionar/remover uma tool de um agente passa a ser feito exclusivamente pela gestao de fluxos e seus steps
+- Nenhuma alteracao no frontend, banco de dados ou catalogo de tools
+
+## Secao Tecnica
+
+Arquivos alterados: `supabase/functions/ai-chat/index.ts`
+
+Funcoes impactadas:
+- `buildSystemPrompt()` — recebe novo parametro `flowToolHandlers: Set<string>`
+- Bloco principal do handler — coleta tool handlers apos montar stepsMap, e constroi openaiTools filtrado
+
+Nenhuma migration de banco necessaria.
