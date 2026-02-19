@@ -1,55 +1,90 @@
 
 
-# Atualizar Guia do Projeto com Implementacoes Recentes
+# Nova Ferramenta: Busca Cliente Ativo no ERP
 
-## O que foi implementado
+## Objetivo
 
-Tres melhorias nos modais de Fluxos Conversacionais (GlobalFlowForm e AgentFlowForm):
+Criar uma nova tool `erp_active_client_search` que busca clientes por CPF ou CNPJ e retorna **apenas aqueles com contrato ativo**, filtrando automaticamente os demais status (suspenso, cancelado, bloqueado, etc.).
 
-1. **Modal responsivo** -- alinhado ao topo com scroll interno (`max-h-[90vh]`, `top-[5vh]`, `ScrollArea`)
-2. **Largura aumentada** -- de `max-w-lg` (512px) para `max-w-2xl` (672px)
-3. **Texto de ajuda no Roteiro Fixo** -- `FormDescription` explicando a diferenca entre fixo e flexivel
+## Diferenca da tool existente (`erp_search`)
 
-## Onde atualizar no guia
+| Aspecto | `erp_search` | `erp_active_client_search` |
+|---------|-------------|---------------------------|
+| Filtro de status | Nenhum (retorna todos) | Apenas `status_contrato === "ativo"` |
+| Caso de uso | Busca geral | Validar se cliente esta ativo |
+| Resposta quando inativo | Mostra o cliente com status | Retorna 0 encontrados + mensagem explicativa |
 
-### 1. ComponentsSection.tsx -- Nova secao "Modais / Dialogs"
+## Arquivos editados (3)
 
-Adicionar um novo `Card` ao final do arquivo `src/components/guia-projeto/design/ComponentsSection.tsx` documentando o padrao de modais adotado no projeto:
+Seguindo a regra de 3 arquivos obrigatorios:
 
-- Padrao de posicionamento: `top-[5vh] translate-y-0` (alinhado ao topo)
-- Altura maxima: `max-h-[90vh]` com `flex flex-col`
-- Scroll interno: `ScrollArea` envolvendo o conteudo do formulario
-- Header e Footer fixos (fora do scroll)
-- Largura recomendada: `max-w-2xl` para formularios complexos
-- Tabela de especificacoes com as classes Tailwind
+### 1. `supabase/functions/_shared/tool-catalog.ts`
 
-### 2. ComponentsSection.tsx -- Nova secao "Formularios com Switches"
+Adicionar entrada `erp_active_client_search` ao `TOOL_CATALOG`:
 
-Adicionar um Card documentando o padrao de switches com texto de ajuda:
+```
+erp_active_client_search: {
+  handler: "erp_active_client_search",
+  display_name: "Busca Cliente Ativo",
+  description: "Busca clientes com contrato ativo no ERP por CPF ou CNPJ. Retorna apenas clientes cujo status de contrato seja 'ativo'.",
+  parameters_schema: {
+    type: "object",
+    properties: {
+      busca: {
+        type: "string",
+        description: "CPF ou CNPJ do cliente",
+        minLength: 11
+      }
+    },
+    required: ["busca"],
+    additionalProperties: false
+  },
+  response_description: "Cliente ativo com nome, CPF, plano, conexao e provedor ERP. Retorna vazio se nenhum cliente ativo for encontrado.",
+  requires_erp: true
+}
+```
 
-- Layout: `flex flex-col gap-1` para empilhar switch+label e descricao
-- Switch+Label em `div flex items-center gap-2`
-- `FormDescription` com classe `text-xs` para texto explicativo abaixo
+### 2. `supabase/functions/_shared/tool-handlers.ts`
 
-## Arquivos editados (1)
+Adicionar handler `erpActiveClientSearchHandler`:
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/components/guia-projeto/design/ComponentsSection.tsx` | Adicionar 2 novos Cards: "Modais / Dialogs" e "Formularios com Switches" |
+- Reutiliza `searchClients` existente (mesma busca multi-ERP)
+- Aplica filtro adicional: `.filter(c => c.status_contrato === "ativo")`
+- Se encontrar clientes pela busca mas nenhum ativo, retorna mensagem: "Cliente encontrado, porem sem contrato ativo."
+- Se nao encontrar nenhum cliente, retorna: "Nenhum cliente encontrado com esse dado."
+- Registrar no objeto `handlers`
 
-## Detalhe tecnico
+### 3. `src/constants/tool-catalog.ts`
 
-Dois novos blocos `Card` serao adicionados apos o card "Estilos de Interface" (linha 243), seguindo o mesmo padrao visual ja usado nos outros cards da secao (CardHeader + CardTitle + CardContent com tabela de especificacoes e exemplos visuais).
+Adicionar espelho frontend ao array `TOOL_CATALOG`:
 
-O card de Modais incluira uma tabela com:
+```
+{
+  handler: "erp_active_client_search",
+  display_name: "Busca Cliente Ativo",
+  description: "Busca clientes com contrato ativo no ERP por CPF ou CNPJ. Retorna apenas clientes cujo status seja 'ativo'.",
+  parameters: [
+    { name: "busca", type: "string", description: "CPF ou CNPJ do cliente (min. 11 caracteres)", required: true }
+  ],
+  response_description: "Cliente ativo com nome, CPF, plano, conexao e provedor ERP.",
+  requires_erp: true
+}
+```
 
-| Propriedade | Valor |
-|-------------|-------|
-| Posicao | `top-[5vh] translate-y-0` |
-| Altura Max | `max-h-[90vh]` |
-| Layout | `flex flex-col` |
-| Scroll | `ScrollArea` no conteudo |
-| Largura (complexo) | `max-w-2xl` (672px) |
-| Header/Footer | Fixos, fora do scroll |
+## Logica do handler (detalhe tecnico)
 
-O card de Switches incluira exemplo visual do padrao com descricao e a tabela de classes.
+```text
+1. Receber args.busca (CPF/CNPJ)
+2. Validar minimo 2 caracteres
+3. Chamar searchClients() -- busca em todos os ERPs ativos
+4. Separar resultados:
+   - allFound = resultado total da busca
+   - activeOnly = allFound.filter(c => c.status_contrato === "ativo")
+5. Retornar:
+   - Se activeOnly > 0: lista dos clientes ativos
+   - Se allFound > 0 mas activeOnly === 0: mensagem informando que o cliente existe mas nao esta ativo
+   - Se allFound === 0: mensagem de nenhum cliente encontrado
+```
+
+Nenhuma funcao nova no `erp-driver.ts` -- reutiliza `searchClients` existente e aplica filtro no handler.
+
