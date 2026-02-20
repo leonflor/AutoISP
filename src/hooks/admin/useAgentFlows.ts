@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export interface ConditionalRoute {
+  condition: string;
+  goto_step: number | null;
+  label: string;
+}
+
 export interface FlowStep {
   id: string;
   flow_id: string;
@@ -14,6 +20,7 @@ export interface FlowStep {
   tool_auto_execute: boolean;
   condition_to_advance: string | null;
   fallback_instruction: string | null;
+  conditional_routes: ConditionalRoute[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -58,6 +65,7 @@ export interface FlowStepInsert {
   tool_auto_execute?: boolean;
   condition_to_advance?: string;
   fallback_instruction?: string;
+  conditional_routes?: ConditionalRoute[];
   is_active?: boolean;
 }
 

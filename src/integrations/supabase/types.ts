@@ -151,6 +151,7 @@ export type Database = {
       ai_agent_flow_steps: {
         Row: {
           condition_to_advance: string | null
+          conditional_routes: Json
           created_at: string
           expected_input: string | null
           fallback_instruction: string | null
@@ -167,6 +168,7 @@ export type Database = {
         }
         Insert: {
           condition_to_advance?: string | null
+          conditional_routes?: Json
           created_at?: string
           expected_input?: string | null
           fallback_instruction?: string | null
@@ -183,6 +185,7 @@ export type Database = {
         }
         Update: {
           condition_to_advance?: string | null
+          conditional_routes?: Json
           created_at?: string
           expected_input?: string | null
           fallback_instruction?: string | null
