@@ -1,73 +1,93 @@
 
 
-# Atualizar o Guia do Projeto com o Estado Atual da Implementacao
+# Documentar Arquitetura de Fluxos Conversacionais no Guia do Projeto
 
-## Contexto
+## Objetivo
 
-O guia de projeto (`src/components/guia-projeto/`) esta desatualizado em relacao ao que ja foi implementado. Varias edge functions, modulos compartilhados e funcionalidades foram adicionados sem que o guia refletisse essas mudancas.
+Criar uma nova seção dedicada no guia do projeto que documenta a arquitetura completa dos fluxos conversacionais: campos de cada etapa, diferenca entre roteiro fixo e flexivel, boas praticas de instrucao e o sistema de rotas condicionais (planejado).
 
-## Alteracoes Necessarias
+## Onde adicionar
 
-### 1. ImplementacaoTab.tsx — Lista de Edge Functions
+Novo componente `src/components/guia-projeto/integracoes/FluxosConversacionaisSection.tsx` importado na `IASection.tsx` (aba Integracoes > IA), logo abaixo do bloco OpenAI existente. Esse local faz sentido porque os fluxos sao parte da arquitetura de IA do sistema.
 
-**Problema:** Lista 15 funcoes, mas existem 20 implementadas.
+## Conteudo da documentacao
 
-**Adicionar 5 funcoes ausentes:**
-- `audit-prompt` — Auditoria de prompt dinamico para super admins
-- `fetch-onu-signal` — Diagnostico de sinal ONU em tempo real
-- `save-whatsapp-config` — Salvar configuracao WhatsApp do ISP
-- `send-whatsapp` — Envio de mensagens WhatsApp
-- `test-whatsapp-connection` — Testar conexao WhatsApp
+### Bloco 1 — Visao Geral da Hierarquia
 
-**Atualizar descricao do card:** de "Funcoes serverless a serem criadas" para "Funcoes serverless implementadas" (ja que todas estao no ar).
+Card explicando a cadeia: **Agente > Fluxos (via flow_links) > Etapas > Ferramenta (tool_handler)**
 
-### 2. ImplementacaoTab.tsx — Modulos Compartilhados (_shared/)
+Inclui descricao textual de como o `ai-chat/index.ts` monta o system prompt a partir dessa hierarquia.
 
-**Problema:** Lista apenas 2 modulos, existem 7.
+### Bloco 2 — Campos do Fluxo (ai_agent_flows)
 
-**Adicionar modulos ausentes:**
-- `_shared/erp-types.ts` — Tipos padrao de ERP (ErpClient, ErpProvider, ContractStatus)
-- `_shared/erp-providers/index.ts` — Registry de providers ERP (IXC, SGP, MK)
-- `_shared/erp-providers/ixc.ts` — Conector IXC Soft
-- `_shared/erp-providers/sgp.ts` — Conector SGP
-- `_shared/erp-providers/mk.ts` — Conector MK-Solutions
-- `_shared/onu-signal-analyzer.ts` — Analise de qualidade de sinal ONU (rx/tx)
-- `_shared/tool-catalog.ts` — Catalogo de tools para function calling
+Tabela com cada campo e seu significado:
 
-### 3. ImplementacaoTab.tsx — Adicionar Status por Fase
+| Campo | Tipo | Descricao |
+|---|---|---|
+| `name` | text | Nome exibido no admin e injetado no prompt |
+| `description` | text | Descricao interna (nao vai para o prompt) |
+| `trigger_keywords` | text[] | Palavras-chave que ativam o fluxo automaticamente |
+| `trigger_prompt` | text | Instrucao injetada quando o fluxo e ativado |
+| `is_fixed` | boolean | Roteiro fixo (sequencial) vs flexivel (adaptavel) |
+| `is_active` | boolean | Se o fluxo esta disponivel para vinculacao |
+| `sort_order` | integer | Ordem de exibicao no admin |
 
-Adicionar badges de status nas fases para indicar progresso:
-- F1 (Database): Concluida
-- F2 (Integracoes Core): Concluida
-- F3 (Auth e Seguranca): Concluida
-- F4 (Plataforma Admin): Concluida
-- F5 (Plataforma Cliente): Concluida
-- F6 (Landing Page): Concluida
-- F7 (Deploy): Em progresso
+### Bloco 3 — Campos da Etapa (ai_agent_flow_steps)
 
-### 4. ResumoProjetoTab.tsx — Tecnologias Core
+Tabela detalhada com cada campo, tipo e impacto no comportamento da IA:
 
-**Adicionar tecnologias que ja estao implementadas mas ausentes do resumo:**
-- WhatsApp / Meta Business API (Comunicacao)
-- ERP (IXC, SGP, MK-Solutions) (Integracao)
+| Campo | Descricao | Impacto no Prompt |
+|---|---|---|
+| `name` | Nome da etapa (ex: IDENTIFICACAO) | Titulo em maiusculo no prompt |
+| `instruction` | Comando imperativo para a IA | Linha "Instrucao:" no prompt |
+| `expected_input` | Dado esperado do usuario | Linha "Input esperado:" |
+| `tool_handler` | String do catalogo de tools | Linha "Ferramenta:" (so aparece se a tool existir no catalogo) |
+| `tool_auto_execute` | Executar tool automaticamente | Sem interacao manual |
+| `condition_to_advance` | Condicao para proximo passo | Linha "Avance quando:" |
+| `fallback_instruction` | Orientacao se a etapa falhar | (existe na tabela, ainda nao injetado no prompt) |
 
-### 5. ResumoProjetoTab.tsx — Resumo Executivo
+### Bloco 4 — Fixo vs Flexivel
 
-Atualizar o paragrafo do resumo executivo para mencionar:
-- Integracao multi-ERP (IXC, SGP, MK-Solutions, Hubsoft)
-- Diagnostico ONU em tempo real
-- Auditoria de prompts dinamicos
-- Sistema de fluxos conversacionais com procedures
+Card lado a lado comparando os dois modos:
 
-### 6. IntegracoesTab.tsx — Contagem de Integracoes
+**Roteiro Fixo (`is_fixed: true`)**
+- Prompt injeta: "Siga as etapas na ordem. Nao pule etapas."
+- Ideal para: cobranca, compliance, onboarding
+- A IA nao pode alterar a sequencia
 
-Atualizar o total de "9 integracoes" para refletir o numero real, considerando que agora ha ERP multi-provider.
+**Roteiro Flexivel (`is_fixed: false`)**
+- Prompt injeta: "Use as etapas como guia, adaptando conforme a conversa."
+- Ideal para: suporte tecnico, vendas consultivas
+- A IA pode pular ou reordenar etapas conforme contexto
+
+### Bloco 5 — Boas Praticas de Instrucao
+
+Lista de recomendacoes com exemplos:
+
+1. **Use imperativo com restricoes negativas** — "Solicite o CPF do cliente. NAO prossiga sem validar."
+2. **Uma ferramenta por etapa** — Evita ambiguidade na escolha de tools
+3. **condition_to_advance concreto** — "Pelo menos 1 resultado retornado" em vez de "Cliente encontrado"
+4. **trigger_keywords especificos** — "2via, segunda via, boleto" em vez de "pagamento"
+5. **expected_input tipado** — "CPF (11 digitos) ou CNPJ (14 digitos)" em vez de "documento"
+6. **fallback_instruction explicito** — "Se nao conseguir identificar, pergunte novamente informando o formato esperado"
+
+### Bloco 6 — Rotas Condicionais (Planejado)
+
+Card com badge "Planejado" explicando o sistema de `conditional_routes` (JSONB):
+
+- Estrutura: `[{ condition, goto_step, label }]`
+- Impacto no modo fixo: progresso linear COM saltos explicitos
+- Impacto no modo flexivel: sugestoes fortes de navegacao
+- Exemplo pratico: diagnostico ONU offline -> saltar para suporte tecnico
 
 ## Detalhes Tecnicos
 
-Todas as alteracoes sao em componentes React existentes (sem novas dependencias, sem migracoes, sem edge functions). Os arquivos a editar sao:
+### Arquivos a criar:
+- `src/components/guia-projeto/integracoes/FluxosConversacionaisSection.tsx` — Componente principal com todos os 6 blocos
 
-- `src/components/guia-projeto/ImplementacaoTab.tsx` — Edge functions, shared modules, status das fases
-- `src/components/guia-projeto/ResumoProjetoTab.tsx` — Tecnologias e resumo executivo
+### Arquivos a editar:
+- `src/components/guia-projeto/integracoes/IASection.tsx` — Importar e renderizar o novo componente abaixo do OpenAIIntegration
 
-Estimativa: edicoes pontuais em 2 arquivos.
+### Dependencias:
+- Nenhuma nova. Usa apenas componentes UI existentes (Card, Badge, Table, Accordion)
+
