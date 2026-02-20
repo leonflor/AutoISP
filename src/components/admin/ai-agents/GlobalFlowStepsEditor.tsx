@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/select';
 import { useSaveGlobalFlowSteps } from '@/hooks/admin/useGlobalFlows';
 import { TOOL_CATALOG } from '@/constants/tool-catalog';
-import type { AgentFlow, FlowStepInsert } from '@/hooks/admin/useAgentFlows';
+import { ConditionalRoutesEditor } from './ConditionalRoutesEditor';
+import type { AgentFlow, FlowStepInsert, ConditionalRoute } from '@/hooks/admin/useAgentFlows';
 
 interface StepDraft {
   id?: string;
@@ -19,10 +20,11 @@ interface StepDraft {
   tool_handler: string;
   condition_to_advance: string;
   fallback_instruction: string;
+  conditional_routes: ConditionalRoute[];
 }
 
 function emptyStep(): StepDraft {
-  return { name: '', instruction: '', expected_input: '', tool_handler: '', condition_to_advance: '', fallback_instruction: '' };
+  return { name: '', instruction: '', expected_input: '', tool_handler: '', condition_to_advance: '', fallback_instruction: '', conditional_routes: [] };
 }
 
 interface GlobalFlowStepsEditorProps {
@@ -40,7 +42,9 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
         id: s.id, name: s.name, instruction: s.instruction,
         expected_input: s.expected_input || '',
         tool_handler: (s as any).tool_handler || '',
-        condition_to_advance: s.condition_to_advance || '', fallback_instruction: s.fallback_instruction || '',
+        condition_to_advance: s.condition_to_advance || '',
+        fallback_instruction: s.fallback_instruction || '',
+        conditional_routes: (s as any).conditional_routes || [],
       })));
     } else {
       setSteps([]);
@@ -48,7 +52,7 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
     setDirty(false);
   }, [flow]);
 
-  const updateStep = (index: number, field: keyof StepDraft, value: string) => {
+  const updateStep = (index: number, field: keyof StepDraft, value: any) => {
     setSteps(prev => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
     setDirty(true);
   };
@@ -67,7 +71,9 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
       flow_id: flow.id, step_order: i + 1, name: s.name, instruction: s.instruction,
       expected_input: s.expected_input || undefined,
       tool_handler: s.tool_handler || null,
-      condition_to_advance: s.condition_to_advance || undefined, fallback_instruction: s.fallback_instruction || undefined,
+      condition_to_advance: s.condition_to_advance || undefined,
+      fallback_instruction: s.fallback_instruction || undefined,
+      conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
     }));
     saveSteps.mutate({ flowId: flow.id, steps: payload }, { onSuccess: () => setDirty(false) });
   };
@@ -111,10 +117,17 @@ export function GlobalFlowStepsEditor({ flow }: GlobalFlowStepsEditorProps) {
                 </Button>
               </div>
               <Textarea value={step.instruction} onChange={e => updateStep(i, 'instruction', e.target.value)} placeholder="Instrução para o agente nesta etapa" rows={2} className="text-xs resize-none" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <Input value={step.expected_input} onChange={e => updateStep(i, 'expected_input', e.target.value)} placeholder="Input esperado (ex: CPF)" className="h-7 text-xs" />
                 <Input value={step.condition_to_advance} onChange={e => updateStep(i, 'condition_to_advance', e.target.value)} placeholder="Condição para avançar" className="h-7 text-xs" />
+                <Input value={step.fallback_instruction} onChange={e => updateStep(i, 'fallback_instruction', e.target.value)} placeholder="Fallback (se falhar)" className="h-7 text-xs" />
               </div>
+              <ConditionalRoutesEditor
+                routes={step.conditional_routes}
+                onChange={routes => updateStep(i, 'conditional_routes', routes)}
+                totalSteps={steps.length}
+                currentStepIndex={i}
+              />
             </div>
           ))}
         </div>

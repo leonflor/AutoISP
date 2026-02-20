@@ -146,6 +146,12 @@ async function generateQueryEmbedding(query: string, apiKey: string): Promise<nu
 }
 
 // Interfaces for flows (tools now come from hardcoded catalog)
+interface ConditionalRouteRecord {
+  condition: string;
+  goto_step: number | null;
+  label: string;
+}
+
 interface FlowStepRecord {
   name: string;
   instruction: string;
@@ -153,6 +159,8 @@ interface FlowStepRecord {
   tool_handler: string | null;
   tool_auto_execute: boolean;
   condition_to_advance: string | null;
+  fallback_instruction: string | null;
+  conditional_routes: ConditionalRouteRecord[];
 }
 
 interface AgentFlowRecord {
@@ -242,12 +250,25 @@ function buildSystemPrompt(
         }
         if (step.expected_input) line += `\n   Input esperado: ${step.expected_input}`;
         if (step.condition_to_advance) line += `\n   Avance quando: ${step.condition_to_advance}`;
+        if (step.fallback_instruction) line += `\n   Fallback: ${step.fallback_instruction}`;
+        if (step.conditional_routes && step.conditional_routes.length > 0) {
+          const routesLines = step.conditional_routes.map(r => {
+            const dest = r.goto_step ? `Vá para etapa ${r.goto_step} (${r.label})` : `Siga para a próxima etapa`;
+            return `   - Se ${r.condition} → ${dest}`;
+          }).join("\n");
+          line += `\n   Rotas:\n${routesLines}`;
+        }
         return line;
       }).join("\n\n");
 
+      const hasConditionalRoutes = flow.steps.some(s => s.conditional_routes && s.conditional_routes.length > 0);
       const instructions = flow.is_fixed
-        ? "Siga as etapas na ordem. Não pule etapas."
-        : "Use as etapas como guia, adaptando conforme a conversa.";
+        ? hasConditionalRoutes
+          ? "Siga as etapas na ordem. Não pule etapas, exceto quando uma rota condicional indicar explicitamente um salto."
+          : "Siga as etapas na ordem. Não pule etapas."
+        : hasConditionalRoutes
+          ? "Use as etapas como guia, adaptando conforme a conversa. As rotas condicionais são sugestões fortes de navegação."
+          : "Use as etapas como guia, adaptando conforme a conversa.";
 
       return `### Fluxo: ${flow.name} (${typeLabel})\n${triggerLine}\n${instructions}\n\n${stepsText}`;
     }).join("\n\n");
