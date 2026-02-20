@@ -1,4 +1,5 @@
 import OpenAIIntegration from "./OpenAIIntegration";
+import FluxosConversacionaisSection from "./FluxosConversacionaisSection";
 
 const IASection = () => {
   return (
@@ -11,6 +12,10 @@ const IASection = () => {
       </div>
       
       <OpenAIIntegration />
+
+      <div className="mt-10 border-t border-border pt-10">
+        <FluxosConversacionaisSection />
+      </div>
     </div>
   );
 };
