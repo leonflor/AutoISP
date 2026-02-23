@@ -19,6 +19,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<ErpProvider, string> = {
 
 export type ContractStatus =
   | "ativo"
+  | "nao_ativo"
   | "suspenso"
   | "cancelado"
   | "bloqueado"

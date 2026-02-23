@@ -10,6 +10,7 @@ interface IxcRadusuario {
   id_cliente: string;
   login: string;
   online: string;
+  ativo: string;
 }
 
 interface IxcFibraRecord {
@@ -85,7 +86,7 @@ export const ixcProvider: ErpProviderDriver = {
 
     // Fetch all 4 endpoints in parallel
     const [radRecs, clienteRecs, contratoRecs, fibraRecs] = await Promise.all([
-      ixcFetch(baseUrl, headers, "radusuarios", { qtype: "radusuarios.ativo", query: "S", oper: "=" }),
+      ixcFetch(baseUrl, headers, "radusuarios"),
       ixcFetch(baseUrl, headers, "cliente"),
       ixcFetch(baseUrl, headers, "cliente_contrato"),
       ixcFetch(baseUrl, headers, "radpop_radio_cliente_fibra"),
@@ -156,6 +157,9 @@ export const ixcProvider: ErpProviderDriver = {
       // Resolve contratos
       const contratos = contratosByClienteId.get(clienteId) || [];
 
+      // Status comes from radusuarios.ativo (S/N), not from contract
+      const rawAtivo = r.ativo === "S" ? "ativo:S" : "ativo:N";
+
       if (contratos.length === 0) {
         // RADIUS user without contract
         results.push({
@@ -167,7 +171,7 @@ export const ixcProvider: ErpProviderDriver = {
           data_vencimento: null,
           plano: null,
           login,
-          raw_status: "sem_contrato",
+          raw_status: rawAtivo,
           raw_online: rawOnline,
           signal_db: signalDb,
         });
@@ -183,7 +187,7 @@ export const ixcProvider: ErpProviderDriver = {
             data_vencimento: ct.dia_vencimento ? `Dia ${ct.dia_vencimento}` : null,
             plano: ct.contrato || ct.id_vd_contrato || null,
             login,
-            raw_status: `contrato:${ct.status}`,
+            raw_status: rawAtivo,
             raw_online: rawOnline,
             signal_db: signalDb,
           });

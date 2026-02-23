@@ -96,8 +96,7 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
   const stats = {
     total: allClients.length,
     ativos: allClients.filter((c) => c.status_contrato === "ativo").length,
-    suspensos: allClients.filter((c) => c.status_contrato === "suspenso").length,
-    bloqueados: allClients.filter((c) => c.status_contrato === "bloqueado").length,
+    nao_ativos: allClients.filter((c) => c.status_contrato !== "ativo").length,
     conectados: allClients.filter((c) => c.conectado).length,
   };
 
