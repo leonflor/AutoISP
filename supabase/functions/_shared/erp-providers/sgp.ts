@@ -32,8 +32,11 @@ export const sgpProvider: ErpProviderDriver = {
     const data = await resp.json();
     const clientes = Array.isArray(data) ? data : data.clientes || data.data || [];
 
+    const erpId = (r: any) => String(r.id || r.codigo || r.cd_cliente || "");
     return clientes.map((r: any) => ({
-      erp_id: String(r.id || r.codigo || r.cd_cliente || ""),
+      erp_id: erpId(r),
+      contrato_id: erpId(r),
+      cliente_erp_id: erpId(r),
       nome: r.nome || r.razao_social || r.nm_cliente || "",
       cpf_cnpj: r.cpf_cnpj || r.cpf || r.cnpj || "",
       data_vencimento: r.dia_vencimento ? `Dia ${r.dia_vencimento}` : r.vencimento || null,

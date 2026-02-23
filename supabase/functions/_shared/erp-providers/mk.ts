@@ -32,17 +32,22 @@ export const mkProvider: ErpProviderDriver = {
 
     const clientes = Array.isArray(data) ? data : data.clientes || data.lista || [];
 
-    return clientes.map((r: any) => ({
-      erp_id: String(r.CodigoCliente || r.id || ""),
-      nome: r.NomeRazaoSocial || r.nome || "",
-      cpf_cnpj: r.CpfCnpj || r.cpf_cnpj || "",
-      data_vencimento: r.DiaVencimento ? `Dia ${r.DiaVencimento}` : null,
-      plano: r.NomePlano || r.plano || null,
-      login: r.LoginConexao || r.login || null,
-      raw_status: (r.Situacao || r.status || "ativo"),
-      raw_online: r.Conectado === "S" || r.online === true ? "S" : "N",
-      signal_db: null,
-    }));
+    return clientes.map((r: any) => {
+      const erpId = String(r.CodigoCliente || r.id || "");
+      return {
+        erp_id: erpId,
+        contrato_id: erpId,
+        cliente_erp_id: erpId,
+        nome: r.NomeRazaoSocial || r.nome || "",
+        cpf_cnpj: r.CpfCnpj || r.cpf_cnpj || "",
+        data_vencimento: r.DiaVencimento ? `Dia ${r.DiaVencimento}` : null,
+        plano: r.NomePlano || r.plano || null,
+        login: r.LoginConexao || r.login || null,
+        raw_status: (r.Situacao || r.status || "ativo"),
+        raw_online: r.Conectado === "S" || r.online === true ? "S" : "N",
+        signal_db: null,
+      };
+    });
   },
 
   async testConnection(creds: ErpCredentials): Promise<TestResult> {

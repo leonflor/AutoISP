@@ -62,7 +62,7 @@ export default function SubscribersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Assinantes</h1>
-          <p className="text-muted-foreground">Clientes de todas as integrações ERP</p>
+          <p className="text-muted-foreground">Conexões de todas as integrações ERP</p>
         </div>
         <Button variant="outline" onClick={handleRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -244,7 +244,7 @@ export default function SubscribersPage() {
                             clickable={client.provider === 'ixc' && client.signal_quality !== 'unknown'}
                             onClick={() => {
                               if (client.provider === 'ixc' && client.signal_quality !== 'unknown') {
-                                setDiagClient({ id: client.erp_id, name: client.nome });
+                                setDiagClient({ id: client.cliente_erp_id || client.erp_id, name: client.nome });
                               }
                             }}
                           />

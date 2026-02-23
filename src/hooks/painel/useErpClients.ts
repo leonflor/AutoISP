@@ -6,6 +6,8 @@ export type SignalQuality = 'critical' | 'weak' | 'acceptable' | 'excellent' | '
 
 export interface ErpClient {
   erp_id: string;
+  contrato_id: string | null;
+  cliente_erp_id: string | null;
   provider: "ixc" | "mk_solutions" | "sgp";
   provider_name: string;
   nome: string;

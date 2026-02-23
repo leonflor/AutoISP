@@ -28,8 +28,12 @@ export type ContractStatus =
 // ── ErpClient (saída padronizada para o frontend) ──
 
 export interface ErpClient {
-  /** ID do registro no ERP de origem */
+  /** ID do registro no ERP de origem (conexão fibra no IXC) */
   erp_id: string;
+  /** ID do contrato no ERP (cliente_contrato no IXC) */
+  contrato_id: string | null;
+  /** ID da pessoa no ERP (cliente no IXC) — usado para diagnóstico ONU */
+  cliente_erp_id: string | null;
   /** Chave técnica do ERP — OBRIGATÓRIO, nunca null */
   provider: ErpProvider;
   /** Nome legível do ERP — OBRIGATÓRIO, nunca vazio */
@@ -70,6 +74,10 @@ export interface TestResult {
 
 export interface RawErpClient {
   erp_id: string;
+  /** ID do contrato no ERP (null para providers que não separam) */
+  contrato_id: string | null;
+  /** ID da pessoa no ERP (null para providers que não separam) */
+  cliente_erp_id: string | null;
   nome: string;
   cpf_cnpj: string;
   data_vencimento: string | null;
