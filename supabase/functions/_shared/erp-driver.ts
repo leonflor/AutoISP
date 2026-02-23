@@ -68,11 +68,8 @@ export async function resolveCredentials(
 // ── Normalização de Status ──
 
 const IXC_STATUS_MAP: Record<string, ContractStatus> = {
-  "contrato:A": "ativo",
-  "contrato:S": "suspenso",
-  "contrato:C": "cancelado",
   "ativo:S": "ativo",
-  "ativo:N": "cancelado",
+  "ativo:N": "nao_ativo",
 };
 
 const SGP_STATUS_MAP: Record<string, ContractStatus> = {

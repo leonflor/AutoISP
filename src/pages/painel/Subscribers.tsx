@@ -14,10 +14,20 @@ import { SignalDiagnosticsDialog } from '@/components/painel/subscribers/SignalD
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
+  nao_ativo: 'bg-red-500/10 text-red-600 border-red-500/20',
   suspenso: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
   cancelado: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
   bloqueado: 'bg-red-500/10 text-red-600 border-red-500/20',
   desconhecido: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
+};
+
+const statusLabels: Record<string, string> = {
+  ativo: 'Ativo',
+  nao_ativo: 'Não Ativo',
+  suspenso: 'Suspenso',
+  cancelado: 'Cancelado',
+  bloqueado: 'Bloqueado',
+  desconhecido: 'Desconhecido',
 };
 
 const providerColors: Record<string, string> = {
@@ -79,7 +89,7 @@ export default function SubscribersPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -100,20 +110,11 @@ export default function SubscribersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Suspensos</CardTitle>
-            <UserX className="h-4 w-4 text-yellow-500" />
+            <CardTitle className="text-sm font-medium">Não Ativos</CardTitle>
+            <UserX className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.suspensos}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Bloqueados</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.bloqueados}</div>
+            <div className="text-2xl font-bold text-red-600">{stats.nao_ativos}</div>
           </CardContent>
         </Card>
         <Card>
@@ -169,9 +170,6 @@ export default function SubscribersPage() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="nao_ativo">Não Ativos</SelectItem>
-                <SelectItem value="suspenso">Suspensos</SelectItem>
-                <SelectItem value="bloqueado">Bloqueados</SelectItem>
-                <SelectItem value="cancelado">Cancelados</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -234,7 +232,7 @@ export default function SubscribersPage() {
                         <TableCell className="font-mono text-xs text-muted-foreground">{client.login || '—'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusColors[client.status_contrato] || statusColors.desconhecido}>
-                            {client.status_contrato}
+                            {statusLabels[client.status_contrato] || client.status_contrato}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
