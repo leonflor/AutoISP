@@ -52,12 +52,15 @@ function buildAuth(username: string, password: string) {
   };
 }
 
-async function ixcFetch(baseUrl: string, headers: Record<string, string>, endpoint: string): Promise<any[]> {
+async function ixcFetch(baseUrl: string, headers: Record<string, string>, endpoint: string, filter?: { qtype: string; query: string; oper: string }): Promise<any[]> {
   try {
+    const body = filter
+      ? { qtype: filter.qtype, query: filter.query, oper: filter.oper, page: "1", rp: "5000" }
+      : { qtype: `${endpoint}.id`, query: "1", oper: ">", page: "1", rp: "5000" };
     const resp = await fetch(`${baseUrl}/webservice/v1/${endpoint}`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ qtype: `${endpoint}.id`, query: "1", oper: ">", page: "1", rp: "5000" }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       console.warn(`[IXC] ${endpoint} HTTP ${resp.status}`);
@@ -82,7 +85,7 @@ export const ixcProvider: ErpProviderDriver = {
 
     // Fetch all 4 endpoints in parallel
     const [radRecs, clienteRecs, contratoRecs, fibraRecs] = await Promise.all([
-      ixcFetch(baseUrl, headers, "radusuarios"),
+      ixcFetch(baseUrl, headers, "radusuarios", { qtype: "radusuarios.ativo", query: "S", oper: "=" }),
       ixcFetch(baseUrl, headers, "cliente"),
       ixcFetch(baseUrl, headers, "cliente_contrato"),
       ixcFetch(baseUrl, headers, "radpop_radio_cliente_fibra"),
