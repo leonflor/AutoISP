@@ -8,6 +8,7 @@ import type { ErpProviderDriver, ErpCredentials, RawErpClient, RawSignalData, Te
 interface IxcRadusuario {
   id: string;
   id_cliente: string;
+  id_contrato: string;
   login: string;
   online: string;
   ativo: string;
@@ -105,20 +106,16 @@ export const ixcProvider: ErpProviderDriver = {
       });
     }
 
-    const contratosByClienteId = new Map<string, IxcContrato[]>();
+    const contratosById = new Map<string, IxcContrato>();
     for (const ct of contratoRecs) {
-      const key = String(ct.id_cliente);
-      const entry: IxcContrato = {
+      contratosById.set(String(ct.id), {
         id: String(ct.id),
-        id_cliente: key,
+        id_cliente: String(ct.id_cliente),
         status: ct.status || "",
         contrato: ct.contrato || "",
         id_vd_contrato: ct.id_vd_contrato || "",
         dia_vencimento: ct.dia_vencimento || "",
-      };
-      const existing = contratosByClienteId.get(key);
-      if (existing) existing.push(entry);
-      else contratosByClienteId.set(key, [entry]);
+      });
     }
 
     // fibra indexed by id_login (= radusuarios.id)
@@ -154,45 +151,26 @@ export const ixcProvider: ErpProviderDriver = {
       const sinalRx = fibra ? parseFloat(fibra.sinal_rx) : NaN;
       const signalDb = !isNaN(sinalRx) ? sinalRx : null;
 
-      // Resolve contratos
-      const contratos = contratosByClienteId.get(clienteId) || [];
+      // Resolve contrato via id_contrato (1:1 com radusuarios)
+      const contratoId = String(r.id_contrato || "");
+      const contrato = contratoId ? contratosById.get(contratoId) : null;
 
       // Status comes from radusuarios.ativo (S/N), not from contract
       const rawAtivo = r.ativo === "S" ? "ativo:S" : "ativo:N";
 
-      if (contratos.length === 0) {
-        // RADIUS user without contract
-        results.push({
-          erp_id: radId,
-          contrato_id: null,
-          cliente_erp_id: clienteId,
-          nome,
-          cpf_cnpj: cpfCnpj,
-          data_vencimento: null,
-          plano: null,
-          login,
-          raw_status: rawAtivo,
-          raw_online: rawOnline,
-          signal_db: signalDb,
-        });
-      } else {
-        // One record per contract
-        for (const ct of contratos) {
-          results.push({
-            erp_id: radId,
-            contrato_id: ct.id,
-            cliente_erp_id: clienteId,
-            nome,
-            cpf_cnpj: cpfCnpj,
-            data_vencimento: ct.dia_vencimento ? `Dia ${ct.dia_vencimento}` : null,
-            plano: ct.contrato || ct.id_vd_contrato || null,
-            login,
-            raw_status: rawAtivo,
-            raw_online: rawOnline,
-            signal_db: signalDb,
-          });
-        }
-      }
+      results.push({
+        erp_id: radId,
+        contrato_id: contrato?.id || null,
+        cliente_erp_id: clienteId,
+        nome,
+        cpf_cnpj: cpfCnpj,
+        data_vencimento: contrato?.dia_vencimento ? `Dia ${contrato.dia_vencimento}` : null,
+        plano: contrato ? (contrato.contrato || contrato.id_vd_contrato || null) : null,
+        login,
+        raw_status: rawAtivo,
+        raw_online: rawOnline,
+        signal_db: signalDb,
+      });
     }
 
     console.log(`[IXC] Total records (radius-centric): ${results.length}`);
