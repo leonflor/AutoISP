@@ -1,5 +1,6 @@
 // ═══ CAMADA 3 — Provider IXC Soft ═══
 // Conexão efetiva com o IXC. Retorna dados BRUTOS.
+// Eixo principal: /radpop_radio_cliente_fibra (conexões fibra ativas)
 
 import type { ErpProviderDriver, ErpCredentials, RawErpClient, RawSignalData, TestResult } from "../erp-types.ts";
 
@@ -12,8 +13,26 @@ interface IxcRadusuario {
 }
 
 interface IxcFibraRecord {
+  id: string;
   id_login: string;
   sinal_rx: string;
+  sinal_tx: string;
+}
+
+interface IxcContrato {
+  id: string;
+  id_cliente: string;
+  status: string;
+  contrato: string;
+  id_vd_contrato: string;
+  dia_vencimento: string;
+}
+
+interface IxcCliente {
+  id: string;
+  razao: string;
+  fantasia: string;
+  cnpj_cpf: string;
 }
 
 function normalizeUrl(apiUrl: string): string {
@@ -33,6 +52,25 @@ function buildAuth(username: string, password: string) {
   };
 }
 
+async function ixcFetch(baseUrl: string, headers: Record<string, string>, endpoint: string): Promise<any[]> {
+  try {
+    const resp = await fetch(`${baseUrl}/webservice/v1/${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ qtype: `${endpoint}.id`, query: "1", oper: ">", page: "1", rp: "5000" }),
+    });
+    if (!resp.ok) {
+      console.warn(`[IXC] ${endpoint} HTTP ${resp.status}`);
+      return [];
+    }
+    const data = await resp.json();
+    return data.registros || [];
+  } catch (err) {
+    console.warn(`[IXC] ${endpoint} fetch error:`, err);
+    return [];
+  }
+}
+
 export const ixcProvider: ErpProviderDriver = {
   supportedFields() {
     return ["signal_db", "login", "plano", "contrato"];
@@ -42,108 +80,112 @@ export const ixcProvider: ErpProviderDriver = {
     const baseUrl = normalizeUrl(creds.apiUrl);
     const headers = buildAuth(creds.username || "", creds.password || "");
 
-    // Fetch clientes + radusuarios + fibra signal em paralelo
-    const [clientesResp, radusuariosResp, fibraResp] = await Promise.all([
-      fetch(`${baseUrl}/webservice/v1/cliente`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ qtype: "cliente.ativo", query: "S", oper: "=", page: "1", rp: "5000" }),
-      }),
-      fetch(`${baseUrl}/webservice/v1/radusuarios`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ qtype: "radusuarios.id", query: "1", oper: ">", page: "1", rp: "5000" }),
-      }).catch(() => null),
-      fetch(`${baseUrl}/webservice/v1/radpop_radio_cliente_fibra`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ qtype: "radpop_radio_cliente_fibra.id", query: "1", oper: ">", page: "1", rp: "5000" }),
-      }).catch(() => null),
+    // Fetch all 4 endpoints in parallel
+    const [fibraRecs, radRecs, contratoRecs, clienteRecs] = await Promise.all([
+      ixcFetch(baseUrl, headers, "radpop_radio_cliente_fibra"),
+      ixcFetch(baseUrl, headers, "radusuarios"),
+      ixcFetch(baseUrl, headers, "cliente_contrato"),
+      ixcFetch(baseUrl, headers, "cliente"),
     ]);
 
-    if (!clientesResp.ok) throw new Error(`IXC HTTP ${clientesResp.status}`);
-    const clientesData = await clientesResp.json();
-    const registros = clientesData.registros || [];
+    console.log(`[IXC] fibra: ${fibraRecs.length}, radusuarios: ${radRecs.length}, contratos: ${contratoRecs.length}, clientes: ${clienteRecs.length}`);
 
-    // Build radusuarios lookup
-    const radusuariosMap: Record<string, IxcRadusuario> = {};
-    if (radusuariosResp?.ok) {
-      try {
-        const radData = await radusuariosResp.json();
-        for (const r of radData.registros || []) {
-          radusuariosMap[String(r.id_cliente)] = {
-            id: String(r.id),
-            id_cliente: String(r.id_cliente),
-            login: r.login || "",
-            online: r.online || "N",
-          };
-        }
-      } catch { /* non-blocking */ }
-    }
-
-    // Contratos
-    let contratos: Record<string, any> = {};
-    try {
-      const contratosResp = await fetch(`${baseUrl}/webservice/v1/cliente_contrato`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ qtype: "cliente_contrato.id", query: "1", oper: ">", page: "1", rp: "1000" }),
+    // Build lookup maps
+    const radusuariosById = new Map<string, IxcRadusuario>();
+    for (const r of radRecs) {
+      radusuariosById.set(String(r.id), {
+        id: String(r.id),
+        id_cliente: String(r.id_cliente),
+        login: r.login || "",
+        online: r.online || "N",
       });
-      if (contratosResp.ok) {
-        const cd = await contratosResp.json();
-        for (const c of cd.registros || []) {
-          contratos[String(c.id_cliente)] = c;
-        }
-      }
-    } catch { /* non-blocking */ }
-
-    // Signal map from fibra
-    const signalMap: Record<string, number | null> = {};
-    if (fibraResp?.ok) {
-      try {
-        const fibraData = await fibraResp.json();
-        const fibraRegistros = fibraData.registros || [];
-        const loginSignalMap: Record<string, number> = {};
-        for (const f of fibraRegistros) {
-          const rx = parseFloat(f.sinal_rx);
-          if (!isNaN(rx) && f.id_login) loginSignalMap[String(f.id_login)] = rx;
-        }
-        for (const [clientId, rad] of Object.entries(radusuariosMap)) {
-          const signal = loginSignalMap[rad.id];
-          if (signal !== undefined) signalMap[clientId] = signal;
-        }
-        console.log(`[IXC] radpop_radio_cliente_fibra: ${fibraRegistros.length} records, ${Object.keys(signalMap).length} matched`);
-      } catch { /* non-blocking */ }
     }
 
-    return registros.map((r: any) => {
-      const contrato = contratos[String(r.id)];
-      const rad = radusuariosMap[String(r.id)];
-      const rawSignal = signalMap[String(r.id)] ?? null;
+    const clientesById = new Map<string, IxcCliente>();
+    for (const c of clienteRecs) {
+      clientesById.set(String(c.id), {
+        id: String(c.id),
+        razao: c.razao || "",
+        fantasia: c.fantasia || "",
+        cnpj_cpf: c.cnpj_cpf || "",
+      });
+    }
 
-      // Build raw status string for normalization by driver
-      let rawStatus: string;
-      if (contrato?.status) {
-        rawStatus = `contrato:${contrato.status}`;
-      } else {
-        rawStatus = `ativo:${r.ativo || "?"}`;
-      }
-
-      // Raw online: combine radius + contract info
-      const rawOnline = rad?.online === "S" ? "S" : (contrato?.status === "A" && r.ativo === "S" ? "contract_active" : "N");
-
-      return {
-        erp_id: String(r.id),
-        nome: r.razao || r.fantasia || "",
-        cpf_cnpj: r.cnpj_cpf || "",
-        data_vencimento: null,
-        plano: contrato?.contrato || contrato?.id_vd_contrato || null,
-        login: rad?.login || contrato?.login || r.login || null,
-        raw_status: rawStatus,
-        raw_online: rawOnline,
-        signal_db: rawSignal !== null && !isNaN(rawSignal) ? rawSignal : null,
+    const contratosByClienteId = new Map<string, IxcContrato[]>();
+    for (const ct of contratoRecs) {
+      const key = String(ct.id_cliente);
+      const entry: IxcContrato = {
+        id: String(ct.id),
+        id_cliente: key,
+        status: ct.status || "",
+        contrato: ct.contrato || "",
+        id_vd_contrato: ct.id_vd_contrato || "",
+        dia_vencimento: ct.dia_vencimento || "",
       };
-    });
+      const existing = contratosByClienteId.get(key);
+      if (existing) existing.push(entry);
+      else contratosByClienteId.set(key, [entry]);
+    }
+
+    // Iterate over fibra records (primary axis)
+    const results: RawErpClient[] = [];
+
+    for (const fibra of fibraRecs) {
+      const fibraId = String(fibra.id);
+      const idLogin = String(fibra.id_login || "");
+      const sinalRx = parseFloat(fibra.sinal_rx);
+      const signalDb = !isNaN(sinalRx) ? sinalRx : null;
+
+      // Resolve radusuario
+      const rad = radusuariosById.get(idLogin);
+      if (!rad) continue; // no radius user = orphaned fibra record, skip
+
+      const clienteId = rad.id_cliente;
+      const cliente = clientesById.get(clienteId);
+      const contratos = contratosByClienteId.get(clienteId) || [];
+
+      const nome = cliente ? (cliente.razao || cliente.fantasia || "") : "";
+      const cpfCnpj = cliente?.cnpj_cpf || "";
+      const login = rad.login || null;
+      const rawOnline = rad.online === "S" ? "S" : "N";
+
+      if (contratos.length === 0) {
+        // Fiber connection without contract
+        results.push({
+          erp_id: fibraId,
+          contrato_id: null,
+          cliente_erp_id: clienteId,
+          nome,
+          cpf_cnpj: cpfCnpj,
+          data_vencimento: null,
+          plano: null,
+          login,
+          raw_status: "ativo:S", // has active fiber connection
+          raw_online: rawOnline,
+          signal_db: signalDb,
+        });
+      } else {
+        // One record per contract
+        for (const ct of contratos) {
+          results.push({
+            erp_id: fibraId,
+            contrato_id: ct.id,
+            cliente_erp_id: clienteId,
+            nome,
+            cpf_cnpj: cpfCnpj,
+            data_vencimento: ct.dia_vencimento ? `Dia ${ct.dia_vencimento}` : null,
+            plano: ct.contrato || ct.id_vd_contrato || null,
+            login,
+            raw_status: `contrato:${ct.status}`,
+            raw_online: rawOnline,
+            signal_db: signalDb,
+          });
+        }
+      }
+    }
+
+    console.log(`[IXC] Total records (fiber-centric): ${results.length}`);
+    return results;
   },
 
   async testConnection(creds: ErpCredentials): Promise<TestResult> {

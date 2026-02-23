@@ -127,6 +127,8 @@ function normalizeClient(
 
   return {
     erp_id: raw.erp_id,
+    contrato_id: raw.contrato_id ?? null,
+    cliente_erp_id: raw.cliente_erp_id ?? null,
     provider,
     provider_name: providerName,
     nome: raw.nome,
@@ -274,6 +276,7 @@ export async function fetchClientSignal(
     throw new Error("Provider não suporta diagnóstico de sinal");
   }
 
+  // clientId here should be the cliente_erp_id (person ID), not contract/fiber ID
   const rawSignal = await driver.fetchRawSignal(creds, clientId);
   const result = analyzeOnuSignal({ tx: rawSignal.tx, rx: rawSignal.rx });
 
