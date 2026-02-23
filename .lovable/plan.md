@@ -1,109 +1,98 @@
 
 
-# Rotas Condicionais nos Fluxos Conversacionais
+# Refatorar IXC: radpop_radio_cliente_fibra como Eixo Principal
 
-## Resumo
+## Contexto
 
-Adicionar o campo `conditional_routes` (JSONB) nas etapas dos fluxos, injetar as rotas no prompt do sistema diferenciando fixo/flexivel, ativar o `fallback_instruction` no prompt, e criar um editor visual de rotas nas telas de admin.
+Atualmente o provider IXC itera sobre `/cliente` (pessoas) como eixo principal e faz joins com contratos, RADIUS e fibra. O usuario identificou que `/radpop_radio_cliente_fibra` e o melhor ponto de partida porque representa conexoes ativas reais (equipamentos provisionados), e a partir dele se obtem sinal, conexao e se faz o join com contrato e cliente.
 
----
-
-## 1. Migracao de Banco de Dados
-
-Adicionar coluna `conditional_routes` na tabela `ai_agent_flow_steps`:
+## Nova Logica de Iteracao (IXC)
 
 ```text
-ALTER TABLE ai_agent_flow_steps
-ADD COLUMN conditional_routes jsonb NOT NULL DEFAULT '[]'::jsonb;
+ANTES:  /cliente (pessoa) --> join contrato --> join radius --> join fibra
+DEPOIS: /radpop_radio_cliente_fibra --> join radusuarios --> join cliente_contrato --> join cliente
 ```
 
-Estrutura esperada do JSON:
-```text
-[
-  { "condition": "cliente offline", "goto_step": 4, "label": "Suporte Tecnico" },
-  { "condition": "cliente online", "goto_step": null, "label": "Seguir proximo" }
-]
-```
+## Mapeamento de Colunas: Origem de Cada Campo
 
-- `condition`: texto semantico que a IA interpreta
-- `goto_step`: numero da etapa destino (null = proxima)
-- `label`: descricao curta para exibicao no admin
+| Coluna UI | Campo normalizado | Endpoint IXC de origem | Campo IXC |
+|---|---|---|---|
+| Integracao | `provider` / `provider_name` | Injetado pelo Driver | fixo "ixc" / "IXC Soft" |
+| Nome | `nome` | `/cliente` | `razao` ou `fantasia` |
+| CPF/CNPJ | `cpf_cnpj` | `/cliente` | `cnpj_cpf` |
+| Vencimento | `data_vencimento` | `/cliente_contrato` | `dia_vencimento` |
+| Plano | `plano` | `/cliente_contrato` | `contrato` ou `id_vd_contrato` |
+| Login | `login` | `/radusuarios` | `login` |
+| Status | `status_contrato` | `/cliente_contrato` | `status` (normalizado A/S/C) |
+| Sinal | `signal_db` / `signal_quality` | `/radpop_radio_cliente_fibra` | `sinal_rx` |
+| Conexao | `conectado` | `/radusuarios` | `online` (S/N) |
 
----
+## Fluxo de Dados Detalhado
 
-## 2. Injecao no Prompt (ai-chat/index.ts)
+1. **Buscar `/radpop_radio_cliente_fibra`** (rp: 5000) — eixo principal, cada registro = 1 conexao fibra
+   - Campos usados: `id`, `id_login`, `sinal_rx`, `sinal_tx`
 
-Na secao onde cada etapa e montada (linhas 237-246), adicionar:
+2. **Buscar `/radusuarios`** (rp: 5000) — vincular via `id_login` (fibra) = `id` (radusuarios)
+   - Campos usados: `id`, `id_cliente`, `login`, `online`
 
-- **Rotas condicionais**: se o step tiver `conditional_routes` com itens, injetar linhas tipo:
-  ```text
-  Rotas:
-  - Se cliente offline -> Va para etapa 4 (Suporte Tecnico)
-  - Se cliente online -> Siga para a proxima etapa
-  ```
+3. **Buscar `/cliente_contrato`** (rp: 5000) — vincular via `id_cliente` do radusuarios
+   - Campos usados: `id`, `id_cliente`, `status`, `contrato`, `id_vd_contrato`, `dia_vencimento`
 
-- **Fallback instruction**: se o step tiver `fallback_instruction`, injetar:
-  ```text
-  Fallback: Se nao conseguir determinar, pergunte ao cliente...
-  ```
+4. **Buscar `/cliente`** (rp: 5000) — vincular via `id_cliente` do radusuarios
+   - Campos usados: `id`, `razao`, `fantasia`, `cnpj_cpf`
 
-- **Regra diferenciada fixo/flexivel** (linhas 248-250):
-  - Fixo: "Siga as etapas na ordem. Nao pule etapas, exceto quando uma rota condicional indicar explicitamente um salto."
-  - Flexivel: "Use as etapas como guia. As rotas condicionais sao sugestoes fortes de navegacao."
+5. **Montagem**: Iterar sobre registros de fibra. Para cada um:
+   - Encontrar radusuario pelo `id_login`
+   - Encontrar cliente pelo `id_cliente` do radusuario
+   - Encontrar contrato(s) pelo `id_cliente` do radusuario
+   - Se houver multiplos contratos para o mesmo `id_cliente`, gerar 1 registro por contrato
+   - Se nao houver contrato, gerar 1 registro com plano/status como null
 
----
+## Impacto nos IDs
 
-## 3. Editor Visual - GlobalFlowStepsEditor
+- `erp_id`: passa a ser o ID do registro em `radpop_radio_cliente_fibra` (identificador unico da conexao)
+- Novo campo `contrato_id`: ID do contrato em `cliente_contrato`
+- Novo campo `cliente_erp_id`: ID da pessoa em `/cliente` (necessario para diagnostico ONU via `botao_rel_22991`)
 
-No componente `GlobalFlowStepsEditor.tsx`, para cada etapa:
+## Alteracoes por Arquivo
 
-- Adicionar campo `fallback_instruction` (Input) no grid existente
-- Adicionar array `conditional_routes` no `StepDraft`
-- Botao "+ Rota" dentro de cada step card que adiciona uma entrada `{ condition, goto_step, label }`
-- Cada rota renderiza: Input "Condicao", Select "Ir para etapa" (lista numerada das etapas + opcao "Proxima"), botao remover
-- Incluir `conditional_routes` no payload enviado ao `handleSave`
+### 1. `erp-types.ts`
+- Adicionar `contrato_id: string` e `cliente_erp_id: string` em `RawErpClient` e `ErpClient`
+- Campos opcionais (null) para providers que nao distinguem (SGP, MK)
 
----
+### 2. `erp-providers/ixc.ts` — Mudanca principal
+- Inverter logica: iterar sobre `/radpop_radio_cliente_fibra`
+- Construir maps: `radusuariosById` (id -> record), `clientesById` (id -> record), `contratosByClienteId` (id_cliente -> contrato[])
+- Para cada registro fibra:
+  - Resolver radusuario via `id_login`
+  - Resolver cliente via `id_cliente` do radusuario
+  - Resolver contratos via `id_cliente`
+  - Gerar N registros se houver N contratos, ou 1 se nao houver contrato
 
-## 4. Editor Visual - AgentFlowStepsEditor
+### 3. `erp-providers/sgp.ts` e `mk.ts`
+- Adicionar `contrato_id: erp_id` e `cliente_erp_id: erp_id` (mesmo valor, pois esses ERPs nao separam contrato de cliente)
 
-Mesmas alteracoes do GlobalFlowStepsEditor adaptadas para o contexto de agente (usa `tool_id` em vez de `tool_handler`).
+### 4. `erp-driver.ts`
+- `normalizeClient`: incluir `contrato_id` e `cliente_erp_id` na saida
+- `fetchClientSignal`: usar `cliente_erp_id` em vez de `erp_id` para diagnostico ONU (o endpoint `botao_rel_22991` usa `id_cliente`, nao ID de contrato)
 
----
+### 5. `tool-handlers.ts`
+- Incluir `contrato_id` e `login` na saida do `erp_search` e `erp_active_client_search` para a IA referenciar contratos especificos
 
-## 5. Tipos TypeScript
+### 6. `useErpClients.ts` (frontend)
+- Atualizar interface `ErpClient` com `contrato_id` e `cliente_erp_id`
 
-Atualizar a interface `FlowStep` e `FlowStepInsert` em `useAgentFlows.ts`:
+### 7. `Subscribers.tsx` (frontend)
+- Key do map: `${client.provider}-${client.erp_id}-${idx}` (ja funciona, erp_id agora e unico por conexao fibra)
+- Diagnostico ONU: usar `client.cliente_erp_id` em vez de `client.erp_id`
+- Subtitulo: "Conexoes de todas as integracoes ERP" (reflete que cada linha e uma conexao, nao uma pessoa)
 
-```text
-interface ConditionalRoute {
-  condition: string;
-  goto_step: number | null;
-  label: string;
-}
+### Nenhuma migracao de banco necessaria
+Os dados vem diretamente da API do ERP em tempo real.
 
-// Adicionar em FlowStep:
-conditional_routes: ConditionalRoute[];
+### Nenhuma dependencia nova necessaria
 
-// Adicionar em FlowStepInsert:
-conditional_routes?: ConditionalRoute[];
-```
-
----
-
-## Detalhes Tecnicos
-
-### Arquivos a modificar:
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| Nova migracao SQL | Adicionar coluna `conditional_routes jsonb default '[]'` |
-| `supabase/functions/ai-chat/index.ts` | Injetar rotas e fallback no prompt (linhas 237-250) |
-| `src/hooks/admin/useAgentFlows.ts` | Adicionar tipo `ConditionalRoute`, campo em `FlowStep` e `FlowStepInsert` |
-| `src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx` | Editor de rotas + campo fallback |
-| `src/components/admin/ai-agents/AgentFlowStepsEditor.tsx` | Editor de rotas + campo fallback |
-
-### Nenhuma dependencia nova necessaria.
-
-### O campo `conditional_routes` usa `DEFAULT '[]'` para compatibilidade com etapas existentes (sem rotas = comportamento linear atual).
+### Retrocompatibilidade
+- SGP e MK continuam funcionando identicamente (contrato_id = erp_id)
+- A UI nao muda visualmente — apenas exibe mais linhas quando ha multiplos contratos/conexoes para o mesmo CPF
 
