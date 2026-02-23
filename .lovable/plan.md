@@ -1,56 +1,32 @@
 
+# Corrigir Join de Contratos: usar radusuarios.id_contrato
 
-# Ajustar Status de Assinantes: Ativo / Nao Ativo
+## Problema
 
-## Contexto
+O codigo atual faz o join de contratos via `id_cliente` (linha 158), buscando **todos** os contratos do cliente. Isso causa duplicacao de registros (1120 radusuarios virando 1338 linhas).
 
-O campo `radusuarios.ativo` retorna apenas `S` ou `N`. Portanto, os status "suspenso", "bloqueado" e "cancelado" nao se aplicam ao IXC neste modelo. O filtro e os cards devem refletir apenas dois estados: **Ativo** e **Nao Ativo**.
+O campo correto para o join e `radusuarios.id_contrato`, que se relaciona diretamente com `cliente_contrato.id` -- garantindo **1 registro por usuario RADIUS**.
 
-## Mudancas
+## Mudanca
 
-### 1. `ixc.ts` -- Remover filtro ativo=S e usar campo ativo como status
+### Arquivo: `supabase/functions/_shared/erp-providers/ixc.ts`
 
-- Remover o filtro `{ qtype: "radusuarios.ativo", query: "S", oper: "=" }` para trazer todos os registros (S e N)
-- Usar o campo `ativo` do radusuarios como `raw_status`: `ativo:S` ou `ativo:N`
-- Manter o preenchimento de dados de cliente, contrato e fibra como esta (left join por associacao)
+1. Adicionar `id_contrato` a interface `IxcRadusuario` (linha 11)
+2. Trocar o mapa de contratos: em vez de `contratosByClienteId` (Map por id_cliente), usar `contratosById` (Map por id do contrato)
+3. Na iteracao de `radRecs`, buscar o contrato via `r.id_contrato` em vez de `clienteId`
+4. Remover o loop que cria multiplos registros por contrato -- agora sera sempre 1 registro
 
-### 2. `erp-types.ts` -- Adicionar "nao_ativo" ao ContractStatus
+### Logica resultante (pseudo-codigo):
 
-- Incluir `"nao_ativo"` como valor valido no tipo `ContractStatus`
+```text
+// Mapa de contratos indexado por ID do contrato
+contratosById = Map<contrato.id, contrato>
 
-### 3. `erp-driver.ts` -- Atualizar mapeamento IXC
+// Para cada radusuario:
+contrato = contratosById.get(r.id_contrato) || null
+results.push({ ...dados, contrato_id: contrato?.id, plano: contrato?.contrato, ... })
+```
 
-- Alterar `IXC_STATUS_MAP` para:
-  - `ativo:S` -> `"ativo"`
-  - `ativo:N` -> `"nao_ativo"`
-- Remover mapeamentos de `contrato:A/S/C` que nao sao mais usados pelo IXC
-- Mapeamento de `sem_contrato` -> `"ativo"` (esta em radusuarios, entao e ativo na rede)
+### Nenhum outro arquivo precisa ser alterado
 
-### 4. `Subscribers.tsx` -- Simplificar filtro e cards de status
-
-- Filtro de status: manter apenas "Todos", "Ativo", "Nao Ativo"
-- Cards de estatisticas: remover "Suspensos" e "Bloqueados", manter Total, Ativos, Nao Ativos, Conectados, Sinal Critico (5 cards em vez de 6)
-- Adicionar cor para "nao_ativo" no `statusColors`
-- Exibir label "nao ativo" formatado como "Não Ativo"
-
-### 5. `useErpClients.ts` -- Atualizar stats
-
-- Remover `suspensos` e `bloqueados` das stats
-- Adicionar `nao_ativos` (count de `status_contrato !== "ativo"`)
-- Manter filtro "nao_ativo" funcionando (status_contrato === "nao_ativo")
-
-### 6. `useErpClients.ts` (frontend type) -- Incluir "nao_ativo" no SignalQuality/status
-
-- O tipo `SignalQuality` nao muda
-- Mas a lista de status possiveis muda para contemplar "nao_ativo"
-
-## Resumo de arquivos alterados
-
-| Arquivo | O que muda |
-|---|---|
-| `erp-providers/ixc.ts` | Remove filtro ativo=S, usa campo ativo como raw_status |
-| `erp-types.ts` | Adiciona "nao_ativo" ao ContractStatus |
-| `erp-driver.ts` | Atualiza IXC_STATUS_MAP |
-| `Subscribers.tsx` | Simplifica filtro e cards |
-| `useErpClients.ts` | Atualiza stats (remove suspensos/bloqueados, adiciona nao_ativos) |
-
+A Edge Function `fetch-erp-clients` sera reimplantada apos a mudanca.
