@@ -155,8 +155,8 @@ const OpenAIIntegration = () => {
                     <li><strong>Documentos RAG</strong> — Top 5 chunks via pgvector (threshold 0.7)</li>
                     <li><strong>Q&A Manual</strong> — Pares pergunta/resposta do agent_knowledge_base</li>
                     <li><strong>Cláusulas de Segurança</strong> — LGPD obrigatórias (ai_security_clauses)</li>
-                    <li><strong>Ferramentas (Tools)</strong> — Carregadas via Procedures vinculados ao agente</li>
-                    <li><strong>Fluxos Conversacionais</strong> — Instruções estruturadas via Procedures</li>
+                    <li><strong>Ferramentas (Tools)</strong> — Filtradas do catálogo hardcoded conforme fluxos vinculados (ai_agent_flow_links)</li>
+                    <li><strong>Fluxos Conversacionais</strong> — Carregados via ai_agent_flow_links com steps e rotas condicionais</li>
                     <li><strong>Context Anchoring</strong> — Nome do ISP, data atual, nome do agente</li>
                   </ol>
                 </div>

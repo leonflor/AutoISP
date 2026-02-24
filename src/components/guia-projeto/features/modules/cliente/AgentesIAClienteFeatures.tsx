@@ -115,7 +115,7 @@ const agentesIAClienteFeatures: Feature[] = [
     nome: "Testar Agente via Chat",
     modulo: "Agentes de IA",
     plataforma: "Painel Cliente",
-    descricao: "Dialog de teste com chat simples para simular conversas com o agente. Utiliza a Edge Function ai-chat com o contexto real do ISP (RAG, Q&A, tools via procedures).",
+    descricao: "Dialog de teste com chat simples para simular conversas com o agente. Utiliza a Edge Function ai-chat com o contexto real do ISP (RAG, Q&A, tools via catálogo hardcoded e fluxos vinculados).",
     criticidade: "alta",
     regrasNegocio: [
       { codigo: "RN-CLI-200", descricao: "Chat de teste usa a mesma Edge Function ai-chat do atendimento real" },
