@@ -1,96 +1,84 @@
 
 
-# Documentar Alteracoes no Guia do Projeto
+# Conformidade de Tools: Discrepancias Encontradas
 
-## Diagnostico
+## Diagnostico Completo
 
-A refatoracao das 3 camadas introduziu mudancas profundas que deixaram o guia desatualizado em dois arquivos principais:
+Analisei 4 camadas onde tools sao referenciadas: backend (catalog + handlers), frontend (catalog + UI), banco de dados (tabelas), e fluxos (per-agent e global). Encontrei **3 discrepancias estruturais** e **2 inconsistencias de dados**.
 
-### `ERPIntegration.tsx` — 7 secoes desatualizadas
+---
 
-1. **Diagrama da Arquitetura (linhas 144-167)**: Menciona `ContractStatus`, `fetchRawClients`, `normalizeClient()`, `RawErpClient` — tipos e funcoes que foram removidos
-2. **Fluxo de Requisicao (linhas 174-197)**: Referencia `provider.fetchRawClients()` e `normalizeClient()` — substituidos por funcoes granulares compostas no Driver
-3. **Tabela de Arquivos (linhas 244-247)**: Lista `erp-fetcher.ts` como arquivo ativo — foi deletado
-4. **Normalizacao de Status (linhas 357-418)**: Documenta `ContractStatus` com mapeamentos antigos (`contrato.status = "A"/"S"`) — substituido por `InternetStatus` usando `status_internet` do `cliente_contrato`
-5. **Tool Handlers IA (linhas 564-573)**: Indica `erp_invoice_search → mock (integracao futura)` — agora e real via `fetchInvoices()` conectado ao `/fn_areceber` do IXC
-6. **Como Adicionar Novo ERP (linhas 707-745)**: Codigo de exemplo usa `fetchRawClients`, `ContractStatus`, `HUBSOFT_STATUS_MAP` — tudo removido
-7. **Troubleshooting (linhas 787-789)**: Menciona status `"desconhecido"` — agora e `"outros"`
+## Discrepancia 1: Dois sistemas paralelos para referenciar tools nos fluxos
 
-### `ImplementacaoTab.tsx` — 1 secao desatualizada
+**Problema critico.** Existem dois editores de etapas de fluxo que usam mecanismos diferentes para vincular tools:
 
-1. **Modulos Compartilhados (linhas 768-779)**: Lista `erp-fetcher.ts` como modulo ativo, descreve `erp-types.ts` com `ContractStatus`, descreve `erp-driver.ts` incorretamente como "Interface base do driver"
+| Editor | Usado em | Fonte de tools | Campo salvo no DB |
+|---|---|---|---|
+| `AgentFlowStepsEditor` | Fluxos per-agent (aba Fluxos do agente) | Tabela `ai_agent_tools` (UUID via `tool_id`) | `tool_id` (UUID) |
+| `GlobalFlowStepsEditor` | Fluxos globais | Hardcoded `TOOL_CATALOG` (string via `tool_handler`) | `tool_handler` (string) |
 
-## Plano de Alteracoes
+**O backend (`ai-chat`) so le `tool_handler` (string).** O campo `tool_id` e completamente ignorado na hora de montar o prompt e executar tools. Isso significa que qualquer tool selecionada via `AgentFlowStepsEditor` usando `tool_id` **nao funciona** a menos que `tool_handler` tambem esteja preenchido.
 
-### Arquivo 1: `src/components/guia-projeto/integracoes/ERPIntegration.tsx`
+**Evidencia no banco:** Os steps existentes tem `tool_id` preenchido E `tool_handler` preenchido (provavelmente salvos manualmente), mas o editor `AgentFlowStepsEditor` so salva `tool_id`, nao `tool_handler`.
 
-**1. Diagrama da Arquitetura (linhas 143-167)**
+**Correcao:** Unificar `AgentFlowStepsEditor` para usar `TOOL_CATALOG` com `tool_handler` (string), igual ao `GlobalFlowStepsEditor`. Remover dependencia de `useAgentTools` e da tabela `ai_agent_tools`.
 
-Substituir o diagrama ASCII para refletir a arquitetura atual:
-- Camada 1: `ErpClient`, `ErpInvoice`, `InternetStatus`, `ErpProvider`
-- Camada 2: `composeIxcClients()`, `composeSimpleClients()`, `fetchInvoices()`, `normalizeInternetStatus()`
-- Camada 3: Funcoes granulares por endpoint (`fetchClientes`, `fetchContratos`, `fetchRadusuarios`, `fetchFibra`, `fetchFaturas`, `fetchRawSignal`)
+---
 
-**2. Fluxo de Requisicao (linhas 174-197)**
+## Discrepancia 2: Tabela `ai_agent_tools` e redundante
 
-Atualizar para mostrar dois fluxos: listagem de assinantes (composicao IXC com 4 chamadas paralelas) e consulta de faturas (fluxo sequencial CPF → id_cliente → `/fn_areceber`).
+A tabela `ai_agent_tools` no banco contem 2 registros:
+- `erp_search` (handler_type: "erp_search")
+- `erp_invoice_search` (handler_type: "erp_invoice_search")
 
-**3. Tabela de Arquivos (linhas 204-249)**
+Esses registros sao copias manuais do que ja existe no hardcoded `TOOL_CATALOG`. O backend **nunca consulta** essa tabela — ele usa exclusivamente o catalogo hardcoded. A tabela so e usada pelo frontend `AgentFlowsTab` → `useAgentTools(agentId)` para popular o dropdown de tools no `AgentFlowStepsEditor`.
 
-- Remover linha do `erp-fetcher.ts`
-- Atualizar descricao do `erp-types.ts`: "Interfaces, InternetStatus, RawFatura, ErpInvoice, ErpProviderDriver"
-- Atualizar descricao do `erp-driver.ts`: "Orquestracao, composicao granular, normalizacao status_internet, fetchInvoices"
-- Atualizar descricao dos providers: "Funcoes granulares por endpoint (IXC: 6, SGP: 3, MK: 3)"
+Alem disso, `onu_diagnostics` existe no catalogo hardcoded mas **nao existe** na tabela `ai_agent_tools`, criando uma inconsistencia: fluxos globais podem usar `onu_diagnostics`, fluxos per-agent nao.
 
-**4. Normalizacao de Status (linhas 357-418)**
+**Correcao:** Eliminar uso da tabela `ai_agent_tools` no frontend. O `AgentFlowStepsEditor` deve usar `TOOL_CATALOG` diretamente.
 
-Substituir inteiramente:
-- Titulo: "Normalizacao de status_internet"
-- Explicar que o campo vem de `cliente_contrato.status_internet` (bruto do IXC)
-- Novo tipo: `InternetStatus = "ativo" | "bloqueado" | "financeiro_em_atraso" | "outros"`
-- Tabela de mapeamento IXC: `normal→ativo`, `bloqueado→bloqueado`, `bloqueio_manual→bloqueado`, `bloqueio_automatico→bloqueado`, `reduzido→financeiro_em_atraso`, `pendente_reativa→bloqueado`, `desativado→bloqueado`, `default→outros`
-- Nota: SGP/MK retornam `"ativo"` como padrao (sem contratos granulares)
-- Nota: Filtro de contratos ativos (`status='A'`) ocorre na Camada 3
+---
 
-**5. Tool Handlers IA (linhas 563-574)**
+## Discrepancia 3: Documentacao do guia desatualizada
 
-Atualizar lista:
-- `erp_search` → `searchClients()` — busca por CPF/CNPJ, retorna `status_internet`
-- `erp_invoice_search` → `fetchInvoices()` — faturas reais via IXC `/fn_areceber` (SGP/MK retornam `[]`)
-- `onu_diagnostics` → `fetchClientSignal()` — diagnostico ONU
-- Remover mencao a "mock"
+Em `OpenAIIntegration.tsx` (linha 306), ha uma descricao que menciona uma arquitetura antiga:
 
-**6. Como Adicionar Novo ERP (linhas 716-743)**
+> "tools sao registradas em `ai_agent_tools`, agrupadas em `ai_procedures` via `ai_procedure_tools`, e vinculadas a agentes via `ai_agent_procedures`"
 
-Atualizar codigo de exemplo:
-- Usar `fetchClientes()`, `fetchContratos()`, `fetchFaturas()` em vez de `fetchRawClients()`
-- Remover referencia a `ContractStatus` e `HUBSOFT_STATUS_MAP`
-- Explicar que a normalizacao de `status_internet` ocorre no Driver com mapa por provider
+Essa arquitetura de "Procedures" **nao existe mais**. As tabelas `ai_procedures`, `ai_procedure_tools`, `ai_agent_procedures` foram substituidas pelo sistema de fluxos (`ai_agent_flows` + `ai_agent_flow_steps`) com catalogo hardcoded.
 
-**7. Troubleshooting (linha 787-789)**
+---
 
-- Mudar `Status "desconhecido"` para `Status "outros"` 
-- Mudar descricao para "Valor do campo status_internet nao mapeado no IXC_INTERNET_STATUS_MAP"
+## Plano de Correcao
 
-### Arquivo 2: `src/components/guia-projeto/ImplementacaoTab.tsx`
+### Arquivo 1: `src/components/admin/ai-agents/AgentFlowStepsEditor.tsx`
 
-**1. Modulos Compartilhados (linhas 768-779)**
+Substituir o sistema de `tool_id` (UUID da tabela) por `tool_handler` (string do catalogo):
+- Remover import de `AgentTool` do `useAgentTools`
+- Importar `TOOL_CATALOG` de `@/constants/tool-catalog`
+- Mudar o campo `StepDraft.tool_id` para `StepDraft.tool_handler`
+- Mudar o dropdown para listar `TOOL_CATALOG` em vez de `tools` prop
+- No `handleSave`, enviar `tool_handler` em vez de `tool_id`
+- Remover prop `tools` da interface
 
-Atualizar lista de 10 modulos para 9 (removido `erp-fetcher.ts`) e corrigir descricoes:
-- `tool-handlers.ts`: manter descricao atual
-- `tool-catalog.ts`: manter descricao atual
-- Remover `erp-fetcher.ts` completamente
-- `erp-types.ts`: "Tipos padrao de ERP (ErpClient, ErpInvoice, InternetStatus, RawFatura, ErpProviderDriver)"
-- `erp-driver.ts`: "Orquestrador: composicao granular, normalizacao status_internet, fetchInvoices, decrypt AES-256-GCM"
-- `erp-providers/ixc.ts`: "Conector IXC Soft — 6 funcoes granulares (clientes, contratos, radusuarios, fibra, faturas, sinal)"
-- `erp-providers/sgp.ts`: "Conector SGP — clientes + stubs para contratos/faturas"
-- `erp-providers/mk.ts`: "Conector MK-Solutions — clientes + stubs para contratos/faturas"
-- Atualizar contador de "9 modulos" para "8 modulos" (header da secao)
+### Arquivo 2: `src/components/admin/ai-agents/AgentFlowsTab.tsx`
+
+- Remover import e uso de `useAgentTools`
+- Remover prop `tools` do `AgentFlowStepsEditor`
+
+### Arquivo 3: `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
+
+- Atualizar a descricao na linha ~306 para refletir a arquitetura atual: tools vem do catalogo hardcoded (`tool-catalog.ts`), sao vinculadas a etapas de fluxos (`ai_agent_flow_steps.tool_handler`), e fluxos sao conectados a agentes via `ai_agent_flow_links`
+
+### Nao alterar (por ora):
+- Tabela `ai_agent_tools` no banco — manter para nao quebrar queries existentes; pode ser removida em limpeza futura
+- Hook `useAgentTools.ts` — manter arquivo mas sem uso ativo (dead code)
 
 ## Resumo de Impacto
 
-| Arquivo | Secoes Alteradas |
+| Arquivo | Mudanca |
 |---|---|
-| `ERPIntegration.tsx` | 7 secoes: diagrama, fluxo, tabela arquivos, status, tools IA, novo ERP, troubleshooting |
-| `ImplementacaoTab.tsx` | 1 secao: modulos compartilhados |
+| `AgentFlowStepsEditor.tsx` | Trocar `tool_id`/`AgentTool` por `tool_handler`/`TOOL_CATALOG` |
+| `AgentFlowsTab.tsx` | Remover `useAgentTools`, remover prop `tools` |
+| `OpenAIIntegration.tsx` | Corrigir descricao da arquitetura de tools |
 
