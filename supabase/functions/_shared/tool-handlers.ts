@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchClientSignal, fetchInvoices } from "./erp-driver.ts";
+import { fetchClientSignal, fetchInvoices, searchClients } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -93,10 +93,62 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
   }
 };
 
+// ── Handler: erp_client_lookup ──
+const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
+  const cpfCnpj = String(args.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+  if (!cpfCnpj || cpfCnpj.length < 11) {
+    return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
+  }
+
+  try {
+    const result = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
+
+    // Filter exact match by cleaned CPF/CNPJ
+    const matched = result.clients.filter((c) => {
+      const cleanDoc = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+      return cleanDoc === cpfCnpj;
+    });
+
+    if (matched.length === 0) {
+      return {
+        success: true,
+        data: {
+          encontrados: 0,
+          mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.",
+          erros: result.errors,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        encontrados: matched.length,
+        clientes: matched.map((c) => ({
+          cliente_erp_id: c.id,
+          nome: c.nome,
+          cpf_cnpj: c.cpf_cnpj,
+          status_internet: c.status_internet,
+          plano: c.plano,
+          conectado: c.conectado,
+          provider_name: c.provider_name,
+        })),
+        erros: result.errors,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Erro ao buscar cliente: ${err instanceof Error ? err.message : "desconhecido"}`,
+    };
+  }
+};
+
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_invoice_search: erpInvoiceSearchHandler,
   onu_diagnostics: onuDiagnosticsHandler,
+  erp_client_lookup: erpClientLookupHandler,
 };
 
 /**

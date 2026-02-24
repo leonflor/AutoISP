@@ -54,6 +54,28 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       "Diagnóstico com potência RX/TX em dBm, qualidade do sinal e recomendações.",
     requires_erp: true,
   },
+
+  erp_client_lookup: {
+    handler: "erp_client_lookup",
+    display_name: "Busca Cliente por CPF/CNPJ",
+    description:
+      "Busca dados cadastrais de um cliente no ERP por CPF ou CNPJ. Retorna o ID do cliente no ERP (necessário para outras ferramentas como diagnóstico de sinal), nome, status do contrato e plano.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        cpf_cnpj: {
+          type: "string",
+          description: "CPF ou CNPJ do cliente (somente números ou formatado)",
+          minLength: 11,
+        },
+      },
+      required: ["cpf_cnpj"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Dados do cliente incluindo cliente_erp_id (usar em onu_diagnostics), nome, CPF/CNPJ, status e plano.",
+    requires_erp: true,
+  },
 };
 
 /**
