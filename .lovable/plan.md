@@ -1,235 +1,96 @@
 
 
-# Refatoracao Completa: 3 Camadas + Tools Atomicas + Faturas Reais IXC
+# Documentar Alteracoes no Guia do Projeto
 
-## Entendimento
+## Diagnostico
 
-1. **Sem retrocompatibilidade** — `erp-fetcher.ts` sera deletado, `fetchRawClients` sera removido
-2. **Tools sao atomicas** — cada tool e um passo no fluxo do agente, nao um fluxo completo
-3. **Filtros na Camada 3** — contratos so retornam `status='A'`, faturas so retornam `status='A'` (a receber)
-4. **status_internet** — campo do `cliente_contrato` que indica o estado da conexao. Normalizado na Camada 2 para: `ativo`, `bloqueado`, `financeiro_em_atraso`, `outros`
-5. **Status de contrato/fatura nao existem na Camada 1** — os filtros ja ocorrem na Camada 3
+A refatoracao das 3 camadas introduziu mudancas profundas que deixaram o guia desatualizado em dois arquivos principais:
 
-## Arquitetura Final
+### `ERPIntegration.tsx` — 7 secoes desatualizadas
 
-```text
-┌─────────────────────────────────────────────────────┐
-│  CAMADA 1 — TOOL HANDLERS (tool-handlers.ts)        │
-│  erp_search        → busca cliente por CPF/CNPJ     │
-│  erp_invoice_search → busca faturas em aberto       │
-│  onu_diagnostics   → diagnostico ONU                │
-│  Recebe dados ja normalizados. Define formato final.│
-├─────────────────────────────────────────────────────┤
-│  CAMADA 2 — DRIVER (erp-driver.ts)                  │
-│  searchClients()   → orquestra busca de clientes    │
-│  fetchInvoices()   → orquestra busca de faturas     │
-│  fetchClientSignal() → orquestra diagnostico ONU    │
-│  Normaliza status_internet. Injeta provider.        │
-├─────────────────────────────────────────────────────┤
-│  CAMADA 3 — CONECTORES (erp-providers/*.ts)         │
-│  IXC: fetchClientes, fetchContratos, fetchFaturas,  │
-│       fetchRadusuarios, fetchFibra, fetchSignal     │
-│  SGP/MK: fetchClientes (stub vazio para faturas)    │
-│  Dados brutos. Filtros ERP-specificos aqui.         │
-└─────────────────────────────────────────────────────┘
-```
+1. **Diagrama da Arquitetura (linhas 144-167)**: Menciona `ContractStatus`, `fetchRawClients`, `normalizeClient()`, `RawErpClient` — tipos e funcoes que foram removidos
+2. **Fluxo de Requisicao (linhas 174-197)**: Referencia `provider.fetchRawClients()` e `normalizeClient()` — substituidos por funcoes granulares compostas no Driver
+3. **Tabela de Arquivos (linhas 244-247)**: Lista `erp-fetcher.ts` como arquivo ativo — foi deletado
+4. **Normalizacao de Status (linhas 357-418)**: Documenta `ContractStatus` com mapeamentos antigos (`contrato.status = "A"/"S"`) — substituido por `InternetStatus` usando `status_internet` do `cliente_contrato`
+5. **Tool Handlers IA (linhas 564-573)**: Indica `erp_invoice_search → mock (integracao futura)` — agora e real via `fetchInvoices()` conectado ao `/fn_areceber` do IXC
+6. **Como Adicionar Novo ERP (linhas 707-745)**: Codigo de exemplo usa `fetchRawClients`, `ContractStatus`, `HUBSOFT_STATUS_MAP` — tudo removido
+7. **Troubleshooting (linhas 787-789)**: Menciona status `"desconhecido"` — agora e `"outros"`
 
-## Mudancas por Arquivo
+### `ImplementacaoTab.tsx` — 1 secao desatualizada
 
-### 1. DELETAR `erp-fetcher.ts`
+1. **Modulos Compartilhados (linhas 768-779)**: Lista `erp-fetcher.ts` como modulo ativo, descreve `erp-types.ts` com `ContractStatus`, descreve `erp-driver.ts` incorretamente como "Interface base do driver"
 
-Nao e importado por nenhum arquivo. Contem funcoes legadas que nao serao mais usadas.
+## Plano de Alteracoes
 
-### 2. `erp-types.ts` — Novos tipos, remover ContractStatus
+### Arquivo 1: `src/components/guia-projeto/integracoes/ERPIntegration.tsx`
 
-**Remover:**
-- `ContractStatus` (nao e mais usado na Camada 1; filtro ocorre na Camada 3)
+**1. Diagrama da Arquitetura (linhas 143-167)**
 
-**Adicionar:**
+Substituir o diagrama ASCII para refletir a arquitetura atual:
+- Camada 1: `ErpClient`, `ErpInvoice`, `InternetStatus`, `ErpProvider`
+- Camada 2: `composeIxcClients()`, `composeSimpleClients()`, `fetchInvoices()`, `normalizeInternetStatus()`
+- Camada 3: Funcoes granulares por endpoint (`fetchClientes`, `fetchContratos`, `fetchRadusuarios`, `fetchFibra`, `fetchFaturas`, `fetchRawSignal`)
 
-```text
-// Status da internet normalizado (Camada 2)
-type InternetStatus = "ativo" | "bloqueado" | "financeiro_em_atraso" | "outros"
+**2. Fluxo de Requisicao (linhas 174-197)**
 
-// Tipo bruto de fatura (Camada 3)
-RawFatura {
-  id: string
-  id_cliente: string
-  data_vencimento: string
-  valor: number
-  valor_pago: number | null
-  linha_digitavel: string | null
-  gateway_link: string | null
-}
+Atualizar para mostrar dois fluxos: listagem de assinantes (composicao IXC com 4 chamadas paralelas) e consulta de faturas (fluxo sequencial CPF → id_cliente → `/fn_areceber`).
 
-// Fatura normalizada (Camada 2 → Camada 1)
-ErpInvoice {
-  provider: ErpProvider
-  provider_name: string
-  id: string
-  id_cliente: string
-  data_vencimento: string
-  valor: number
-  valor_pago: number | null
-  dias_atraso: number
-  linha_digitavel: string | null
-  gateway_link: string | null
-}
+**3. Tabela de Arquivos (linhas 204-249)**
 
-// Filtro de faturas
-FaturaFilter {
-  cpf_cnpj: string
-}
-```
+- Remover linha do `erp-fetcher.ts`
+- Atualizar descricao do `erp-types.ts`: "Interfaces, InternetStatus, RawFatura, ErpInvoice, ErpProviderDriver"
+- Atualizar descricao do `erp-driver.ts`: "Orquestracao, composicao granular, normalizacao status_internet, fetchInvoices"
+- Atualizar descricao dos providers: "Funcoes granulares por endpoint (IXC: 6, SGP: 3, MK: 3)"
 
-**Modificar `ErpProviderDriver`:**
+**4. Normalizacao de Status (linhas 357-418)**
 
-```text
-ErpProviderDriver {
-  supportedFields(): string[]
-  testConnection(creds): Promise<TestResult>
+Substituir inteiramente:
+- Titulo: "Normalizacao de status_internet"
+- Explicar que o campo vem de `cliente_contrato.status_internet` (bruto do IXC)
+- Novo tipo: `InternetStatus = "ativo" | "bloqueado" | "financeiro_em_atraso" | "outros"`
+- Tabela de mapeamento IXC: `normal→ativo`, `bloqueado→bloqueado`, `bloqueio_manual→bloqueado`, `bloqueio_automatico→bloqueado`, `reduzido→financeiro_em_atraso`, `pendente_reativa→bloqueado`, `desativado→bloqueado`, `default→outros`
+- Nota: SGP/MK retornam `"ativo"` como padrao (sem contratos granulares)
+- Nota: Filtro de contratos ativos (`status='A'`) ocorre na Camada 3
 
-  // Granulares (opcionais por provider)
-  fetchClientes?(creds, filtro?: { cpf_cnpj: string }): Promise<RawCliente[]>
-  fetchContratos?(creds, filtro?: { id_cliente: string }): Promise<RawContrato[]>
-  fetchRadusuarios?(creds): Promise<RawRadusuario[]>
-  fetchFibra?(creds): Promise<RawFibraRecord[]>
-  fetchFaturas?(creds, filtro: FaturaFilter): Promise<RawFatura[]>
-  fetchRawSignal?(creds, clientId: string): Promise<RawSignalData>
-}
-```
+**5. Tool Handlers IA (linhas 563-574)**
 
-**Remover `fetchRawClients`** da interface (sem retrocompatibilidade).
+Atualizar lista:
+- `erp_search` → `searchClients()` — busca por CPF/CNPJ, retorna `status_internet`
+- `erp_invoice_search` → `fetchInvoices()` — faturas reais via IXC `/fn_areceber` (SGP/MK retornam `[]`)
+- `onu_diagnostics` → `fetchClientSignal()` — diagnostico ONU
+- Remover mencao a "mock"
 
-**Modificar `ErpClient`:**
-- Substituir `status_contrato: ContractStatus` por `status_internet: InternetStatus`
-- O campo `status_contrato` deixa de existir; o filtro de contratos ativos ocorre na Camada 3
+**6. Como Adicionar Novo ERP (linhas 716-743)**
 
-### 3. `erp-providers/ixc.ts` — Granularizar + fetchFaturas real
+Atualizar codigo de exemplo:
+- Usar `fetchClientes()`, `fetchContratos()`, `fetchFaturas()` em vez de `fetchRawClients()`
+- Remover referencia a `ContractStatus` e `HUBSOFT_STATUS_MAP`
+- Explicar que a normalizacao de `status_internet` ocorre no Driver com mapa por provider
 
-**Extrair funcoes granulares** a partir do bloco monolitico atual:
+**7. Troubleshooting (linha 787-789)**
 
-| Funcao | Endpoint | Filtro na Camada 3 |
-|---|---|---|
-| `fetchRadusuarios(creds)` | `/radusuarios` | nenhum |
-| `fetchClientes(creds, filtro?)` | `/cliente` | `cnpj_cpf` quando filtro presente |
-| `fetchContratos(creds, filtro?)` | `/cliente_contrato` | `status='A'` (so ativos) |
-| `fetchFibra(creds)` | `/radpop_radio_cliente_fibra` | nenhum |
-| `fetchFaturas(creds, filtro)` | `/fn_areceber` | `status='A'` (a receber) |
-| `fetchRawSignal(creds, clientId)` | `/botao_rel_22991` | por id_cliente |
+- Mudar `Status "desconhecido"` para `Status "outros"` 
+- Mudar descricao para "Valor do campo status_internet nao mapeado no IXC_INTERNET_STATUS_MAP"
 
-**Fluxo fetchFaturas IXC:**
+### Arquivo 2: `src/components/guia-projeto/ImplementacaoTab.tsx`
 
-```text
-1. Recebe { cpf_cnpj }
-2. fetchClientes(creds, { cpf_cnpj }) → obtem id_cliente
-3. POST /fn_areceber com qtype=id_cliente, query=id, filtro status='A'
-4. Retorna RawFatura[]
-```
+**1. Modulos Compartilhados (linhas 768-779)**
 
-**O metodo `fetchRawClients` sera removido.** A composicao (radusuarios + clientes + contratos + fibra) passa para o Driver.
-
-**Contrato agora inclui `status_internet`** — campo bruto retornado como esta do IXC.
-
-### 4. `erp-providers/sgp.ts` e `mk.ts` — Adaptar interface
-
-- Remover `fetchRawClients`
-- Adicionar `fetchClientes(creds)` contendo a logica atual
-- Adicionar `fetchFaturas()` retornando `[]` (stub)
-- Adicionar `fetchContratos()` retornando `[]` (stub)
-
-### 5. `erp-driver.ts` — Refatorar composicao + fetchInvoices
-
-**Refatorar `fetchAllClients`:**
-
-Em vez de chamar `driver.fetchRawClients()`, o Driver agora compoe as chamadas granulares:
-
-```text
-// Para IXC:
-const [rads, clientes, contratos, fibra] = await Promise.all([
-  provider.fetchRadusuarios(creds),
-  provider.fetchClientes(creds),
-  provider.fetchContratos(creds),      // ja filtra status='A'
-  provider.fetchFibra(creds),
-])
-// Monta maps, itera rads, join 1:1 com contrato via id_contrato
-// Normaliza status_internet
-
-// Para SGP/MK:
-const clientes = await provider.fetchClientes(creds)
-// Monta resultado direto
-```
-
-**Normalizacao de status_internet (Camada 2):**
-
-```text
-IXC_INTERNET_STATUS_MAP:
-  "normal"           → "ativo"
-  "bloqueado"        → "bloqueado"
-  "reduzido"         → "financeiro_em_atraso"
-  "pendente_reativa" → "bloqueado"
-  default            → "outros"
-```
-
-**Nova funcao `fetchInvoices`:**
-
-```text
-fetchInvoices(supabase, ispId, encryptionKey, cpfCnpj)
-  → resolve ERPs ativos
-  → para cada ERP: provider.fetchFaturas(creds, { cpf_cnpj })
-  → calcula dias_atraso para cada fatura
-  → injeta provider/provider_name
-  → retorna ErpInvoice[]
-```
-
-**Remover:**
-- `normalizeStatus()` (ContractStatus nao existe mais)
-- `IXC_STATUS_MAP`, `SGP_STATUS_MAP`, `MK_STATUS_MAP`
-
-### 6. `tool-handlers.ts` — Conectar faturas reais + remover tool redundante
-
-**`erp_invoice_search`** — substituir mock por chamada real:
-
-```text
-erpInvoiceSearchHandler:
-  1. Recebe cliente_id (CPF/CNPJ)
-  2. Chama driver.fetchInvoices(supabase, ispId, key, cliente_id)
-  3. Calcula total_aberto (soma de faturas)
-  4. Retorna faturas reais
-```
-
-**Remover `erp_active_client_search`** — era redundante (filtrava `status_contrato === 'ativo'` que nao existe mais; o `erp_search` ja retorna so contratos ativos pela Camada 3).
-
-**Atualizar `erp_search`** — o campo `status` muda de `status_contrato` para `status_internet`.
-
-### 7. `tool-catalog.ts` (backend) — Remover tool redundante
-
-Remover `erp_active_client_search` do catalogo. O `erp_search` ja retorna apenas clientes com contrato ativo (filtro na Camada 3).
-
-Atualizar `response_description` do `erp_search` para mencionar `status_internet`.
-
-### 8. `src/constants/tool-catalog.ts` (frontend) — Sincronizar
-
-Remover `erp_active_client_search` do catalogo de exibicao no admin.
-
-### 9. `fetch-erp-clients/index.ts` — Atualizar import
-
-Ajustar para usar as novas funcoes do Driver (que agora compoe internamente).
+Atualizar lista de 10 modulos para 9 (removido `erp-fetcher.ts`) e corrigir descricoes:
+- `tool-handlers.ts`: manter descricao atual
+- `tool-catalog.ts`: manter descricao atual
+- Remover `erp-fetcher.ts` completamente
+- `erp-types.ts`: "Tipos padrao de ERP (ErpClient, ErpInvoice, InternetStatus, RawFatura, ErpProviderDriver)"
+- `erp-driver.ts`: "Orquestrador: composicao granular, normalizacao status_internet, fetchInvoices, decrypt AES-256-GCM"
+- `erp-providers/ixc.ts`: "Conector IXC Soft — 6 funcoes granulares (clientes, contratos, radusuarios, fibra, faturas, sinal)"
+- `erp-providers/sgp.ts`: "Conector SGP — clientes + stubs para contratos/faturas"
+- `erp-providers/mk.ts`: "Conector MK-Solutions — clientes + stubs para contratos/faturas"
+- Atualizar contador de "9 modulos" para "8 modulos" (header da secao)
 
 ## Resumo de Impacto
 
-| Arquivo | Acao |
+| Arquivo | Secoes Alteradas |
 |---|---|
-| `erp-fetcher.ts` | **DELETAR** |
-| `erp-types.ts` | Remover ContractStatus, adicionar InternetStatus, RawFatura, ErpInvoice, expandir interface |
-| `erp-providers/ixc.ts` | Granularizar em 6 funcoes, remover fetchRawClients, adicionar fetchFaturas real |
-| `erp-providers/sgp.ts` | Adaptar interface, stubs para faturas/contratos |
-| `erp-providers/mk.ts` | Adaptar interface, stubs para faturas/contratos |
-| `erp-providers/index.ts` | Sem mudanca |
-| `erp-driver.ts` | Refatorar composicao, adicionar fetchInvoices, normalizar status_internet |
-| `tool-handlers.ts` | Conectar faturas reais, remover erp_active_client_search |
-| `tool-catalog.ts` (backend) | Remover erp_active_client_search, atualizar descricoes |
-| `src/constants/tool-catalog.ts` (frontend) | Remover erp_active_client_search |
-| `fetch-erp-clients/index.ts` | Ajustar imports |
-| Edge functions | Reimplantar: fetch-erp-clients, ai-chat |
+| `ERPIntegration.tsx` | 7 secoes: diagrama, fluxo, tabela arquivos, status, tools IA, novo ERP, troubleshooting |
+| `ImplementacaoTab.tsx` | 1 secao: modulos compartilhados |
 
