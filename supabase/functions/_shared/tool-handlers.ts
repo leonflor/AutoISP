@@ -67,7 +67,7 @@ const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
   }
 };
 
-// ── Handler: onu_diagnostics ──
+// ── Handler: erp_onu_diagnostics ──
 const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
   const clientId = String(args.client_id || args.cliente_id || args.id || "");
   if (!clientId) {
@@ -191,7 +191,7 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_invoice_search: erpInvoiceSearchHandler,
-  onu_diagnostics: onuDiagnosticsHandler,
+  erp_onu_diagnostics: onuDiagnosticsHandler,
   erp_client_lookup: erpClientLookupHandler,
   erp_contract_lookup: erpContractLookupHandler,
 };

@@ -611,7 +611,7 @@ CREATE POLICY "ISP admins" ON erp_configs FOR ALL
               </p>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                 <li>• <code>erp_invoice_search</code> → <code>fetchInvoices()</code> — faturas reais via IXC <code>/fn_areceber</code> (SGP/MK retornam <code>[]</code>)</li>
-                <li>• <code>onu_diagnostics</code> → <code>fetchClientSignal()</code> — diagnóstico ONU com análise de qualidade</li>
+                <li>• <code>erp_onu_diagnostics</code> → <code>fetchClientSignal()</code> — diagnóstico ONU com análise de qualidade</li>
               </ul>
               <p className="mt-2 text-xs text-muted-foreground">
                 <strong>Nota:</strong> <code>searchClients()</code> é usada internamente pela edge function <code>fetch-erp-clients</code> (página Assinantes), não é uma tool de IA.
