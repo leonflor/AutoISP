@@ -34,8 +34,8 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     requires_erp: true,
   },
 
-  onu_diagnostics: {
-    handler: "onu_diagnostics",
+  erp_onu_diagnostics: {
+    handler: "erp_onu_diagnostics",
     display_name: "Diagnóstico de Sinal ONU",
     description:
       "Executa diagnóstico de sinal óptico (ONU/ONT) do cliente. Retorna níveis de potência RX/TX e análise de qualidade.",
@@ -73,7 +73,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Dados do cliente incluindo cliente_erp_id (usar em onu_diagnostics), nome, CPF/CNPJ, status e plano.",
+      "Dados do cliente incluindo cliente_erp_id (usar em erp_onu_diagnostics), nome, CPF/CNPJ, status e plano.",
     requires_erp: true,
   },
 

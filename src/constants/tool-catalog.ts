@@ -26,7 +26,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     requires_erp: true,
   },
   {
-    handler: "onu_diagnostics",
+    handler: "erp_onu_diagnostics",
     display_name: "Diagnóstico de Sinal ONU",
     description:
       "Executa diagnóstico de sinal óptico (ONU/ONT) do cliente. Retorna níveis de potência RX/TX e análise de qualidade.",
