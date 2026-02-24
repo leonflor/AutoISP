@@ -312,7 +312,7 @@ const OpenAIIntegration = () => {
                   <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
                     <li>Tools são definidas no catálogo hardcoded (<code className="text-xs">tool-catalog.ts</code>) com JSON Schema para function calling</li>
                     <li>Fluxos conversacionais (<code className="text-xs">ai_agent_flows</code>) contêm etapas (<code className="text-xs">ai_agent_flow_steps</code>)</li>
-                    <li>Cada etapa pode referenciar uma tool via <code className="text-xs">tool_handler</code> (string, ex: "erp_search")</li>
+                    <li>Cada etapa pode referenciar uma tool via <code className="text-xs">tool_handler</code> (string, ex: "erp_invoice_search")</li>
                     <li>Fluxos são vinculados a agentes via <code className="text-xs">ai_agent_flow_links</code></li>
                     <li>O <code className="text-xs">ai-chat</code> filtra tools do catálogo conforme fluxos ativos do agente</li>
                     <li>Handler registry em <code className="text-xs">_shared/tool-handlers.ts</code> mapeia <code>handler</code> para funções executáveis</li>
@@ -321,7 +321,7 @@ const OpenAIIntegration = () => {
                 </div>
 
                 <div>
-                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas (3 handlers):</h4>
+                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas (2 handlers):</h4>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -333,13 +333,6 @@ const OpenAIIntegration = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">erp_search</TableCell>
-                        <TableCell className="font-mono text-xs">buscar_contrato_cliente</TableCell>
-                        <TableCell className="text-sm">Busca clientes no ERP integrado (IXC/SGP/MK)</TableCell>
-                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional</Badge></TableCell>
-                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
-                      </TableRow>
                       <TableRow>
                         <TableCell className="font-mono text-xs">erp_invoice_search</TableCell>
                         <TableCell className="font-mono text-xs">consultar_faturas</TableCell>

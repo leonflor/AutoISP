@@ -132,7 +132,7 @@ const FluxosConversacionaisSection = () => {
                 { campo: "name", desc: "Nome da etapa (ex: IDENTIFICAÇÃO)", impacto: "Título em maiúsculo no bloco Markdown" },
                 { campo: "instruction", desc: "Comando imperativo para a IA seguir", impacto: 'Linha "Instrução:" no prompt' },
                 { campo: "expected_input", desc: "Dado esperado do usuário nesta etapa", impacto: 'Linha "Input esperado:"' },
-                { campo: "tool_handler", desc: "String do catálogo de tools (ex: erp_search)", impacto: 'Linha "Ferramenta:" — só aparece se a tool existir no catálogo' },
+                { campo: "tool_handler", desc: "String do catálogo de tools (ex: erp_invoice_search)", impacto: 'Linha "Ferramenta:" — só aparece se a tool existir no catálogo' },
                 { campo: "tool_auto_execute", desc: "Executar a ferramenta automaticamente sem confirmação", impacto: "Sem interação manual do usuário" },
                 { campo: "condition_to_advance", desc: "Condição para avançar ao próximo passo", impacto: 'Linha "Avance quando:"' },
                 { campo: "fallback_instruction", desc: "Orientação se a etapa falhar ou não conseguir avançar", impacto: "Existe na tabela, ainda não injetado no prompt" },
