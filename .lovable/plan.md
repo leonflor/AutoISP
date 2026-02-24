@@ -1,84 +1,62 @@
 
 
-# Conformidade de Tools: Discrepancias Encontradas
+# Remover Dead Code: Tabela ai_agent_tools + Hook + Tabelas Procedures Legadas
 
-## Diagnostico Completo
+## Diagnostico
 
-Analisei 4 camadas onde tools sao referenciadas: backend (catalog + handlers), frontend (catalog + UI), banco de dados (tabelas), e fluxos (per-agent e global). Encontrei **3 discrepancias estruturais** e **2 inconsistencias de dados**.
+Confirmei que:
+- `useAgentTools.ts` nao e importado por nenhum outro arquivo (0 referencias externas)
+- A tabela `ai_agent_tools` nao e referenciada por nenhuma edge function
+- As tabelas legadas do sistema "Procedures" (`ai_procedures`, `ai_procedure_tools`, `ai_procedure_flows`, `ai_agent_procedures`) tambem nao sao referenciadas por nenhum codigo — sao dead code completo desde a migracao para o sistema de fluxos
 
----
+## Plano
 
-## Discrepancia 1: Dois sistemas paralelos para referenciar tools nos fluxos
+### 1. Deletar arquivo `src/hooks/admin/useAgentTools.ts`
 
-**Problema critico.** Existem dois editores de etapas de fluxo que usam mecanismos diferentes para vincular tools:
+Hook completamente sem uso apos a unificacao do `AgentFlowStepsEditor` para `TOOL_CATALOG`.
 
-| Editor | Usado em | Fonte de tools | Campo salvo no DB |
-|---|---|---|---|
-| `AgentFlowStepsEditor` | Fluxos per-agent (aba Fluxos do agente) | Tabela `ai_agent_tools` (UUID via `tool_id`) | `tool_id` (UUID) |
-| `GlobalFlowStepsEditor` | Fluxos globais | Hardcoded `TOOL_CATALOG` (string via `tool_handler`) | `tool_handler` (string) |
+### 2. Migracao SQL — Dropar 5 tabelas obsoletas
 
-**O backend (`ai-chat`) so le `tool_handler` (string).** O campo `tool_id` e completamente ignorado na hora de montar o prompt e executar tools. Isso significa que qualquer tool selecionada via `AgentFlowStepsEditor` usando `tool_id` **nao funciona** a menos que `tool_handler` tambem esteja preenchido.
+Ordem de DROP respeitando foreign keys (tabelas-filhas primeiro):
 
-**Evidencia no banco:** Os steps existentes tem `tool_id` preenchido E `tool_handler` preenchido (provavelmente salvos manualmente), mas o editor `AgentFlowStepsEditor` so salva `tool_id`, nao `tool_handler`.
+```sql
+-- 1. Tabelas de junção das Procedures (dependem de ai_procedures)
+DROP TABLE IF EXISTS ai_procedure_tools;
+DROP TABLE IF EXISTS ai_procedure_flows;
+DROP TABLE IF EXISTS ai_agent_procedures;
 
-**Correcao:** Unificar `AgentFlowStepsEditor` para usar `TOOL_CATALOG` com `tool_handler` (string), igual ao `GlobalFlowStepsEditor`. Remover dependencia de `useAgentTools` e da tabela `ai_agent_tools`.
+-- 2. Tabela principal Procedures
+DROP TABLE IF EXISTS ai_procedures;
 
----
+-- 3. Tabela ai_agent_tools (dead code — backend usa TOOL_CATALOG hardcoded)
+DROP TABLE IF EXISTS ai_agent_tools;
+```
 
-## Discrepancia 2: Tabela `ai_agent_tools` e redundante
+Essas 5 tabelas nao possuem dados relevantes e nao sao referenciadas por nenhum codigo no frontend nem no backend.
 
-A tabela `ai_agent_tools` no banco contem 2 registros:
-- `erp_search` (handler_type: "erp_search")
-- `erp_invoice_search` (handler_type: "erp_invoice_search")
+### 3. Coluna `tool_id` em `ai_agent_flow_steps`
 
-Esses registros sao copias manuais do que ja existe no hardcoded `TOOL_CATALOG`. O backend **nunca consulta** essa tabela — ele usa exclusivamente o catalogo hardcoded. A tabela so e usada pelo frontend `AgentFlowsTab` → `useAgentTools(agentId)` para popular o dropdown de tools no `AgentFlowStepsEditor`.
+A coluna `tool_id` (UUID, FK para `ai_agent_tools`) ficara orfã apos dropar `ai_agent_tools`. Sera removida na mesma migracao:
 
-Alem disso, `onu_diagnostics` existe no catalogo hardcoded mas **nao existe** na tabela `ai_agent_tools`, criando uma inconsistencia: fluxos globais podem usar `onu_diagnostics`, fluxos per-agent nao.
+```sql
+ALTER TABLE ai_agent_flow_steps DROP COLUMN IF EXISTS tool_id;
+```
 
-**Correcao:** Eliminar uso da tabela `ai_agent_tools` no frontend. O `AgentFlowStepsEditor` deve usar `TOOL_CATALOG` diretamente.
+O backend e o frontend ja usam exclusivamente `tool_handler` (string).
 
----
+### 4. Coluna `agent_id` em `ai_agent_flows`
 
-## Discrepancia 3: Documentacao do guia desatualizada
-
-Em `OpenAIIntegration.tsx` (linha 306), ha uma descricao que menciona uma arquitetura antiga:
-
-> "tools sao registradas em `ai_agent_tools`, agrupadas em `ai_procedures` via `ai_procedure_tools`, e vinculadas a agentes via `ai_agent_procedures`"
-
-Essa arquitetura de "Procedures" **nao existe mais**. As tabelas `ai_procedures`, `ai_procedure_tools`, `ai_agent_procedures` foram substituidas pelo sistema de fluxos (`ai_agent_flows` + `ai_agent_flow_steps`) com catalogo hardcoded.
-
----
-
-## Plano de Correcao
-
-### Arquivo 1: `src/components/admin/ai-agents/AgentFlowStepsEditor.tsx`
-
-Substituir o sistema de `tool_id` (UUID da tabela) por `tool_handler` (string do catalogo):
-- Remover import de `AgentTool` do `useAgentTools`
-- Importar `TOOL_CATALOG` de `@/constants/tool-catalog`
-- Mudar o campo `StepDraft.tool_id` para `StepDraft.tool_handler`
-- Mudar o dropdown para listar `TOOL_CATALOG` em vez de `tools` prop
-- No `handleSave`, enviar `tool_handler` em vez de `tool_id`
-- Remover prop `tools` da interface
-
-### Arquivo 2: `src/components/admin/ai-agents/AgentFlowsTab.tsx`
-
-- Remover import e uso de `useAgentTools`
-- Remover prop `tools` do `AgentFlowStepsEditor`
-
-### Arquivo 3: `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
-
-- Atualizar a descricao na linha ~306 para refletir a arquitetura atual: tools vem do catalogo hardcoded (`tool-catalog.ts`), sao vinculadas a etapas de fluxos (`ai_agent_flow_steps.tool_handler`), e fluxos sao conectados a agentes via `ai_agent_flow_links`
-
-### Nao alterar (por ora):
-- Tabela `ai_agent_tools` no banco — manter para nao quebrar queries existentes; pode ser removida em limpeza futura
-- Hook `useAgentTools.ts` — manter arquivo mas sem uso ativo (dead code)
+A coluna `agent_id` na tabela `ai_agent_flows` era do sistema antigo (fluxos per-agent). Agora a vinculacao e feita via `ai_agent_flow_links`. Porem, o `AgentFlowsTab` ainda usa `agent_id` para listar fluxos per-agent. **Nao sera removida** nesta etapa.
 
 ## Resumo de Impacto
 
-| Arquivo | Mudanca |
+| Item | Acao |
 |---|---|
-| `AgentFlowStepsEditor.tsx` | Trocar `tool_id`/`AgentTool` por `tool_handler`/`TOOL_CATALOG` |
-| `AgentFlowsTab.tsx` | Remover `useAgentTools`, remover prop `tools` |
-| `OpenAIIntegration.tsx` | Corrigir descricao da arquitetura de tools |
+| `src/hooks/admin/useAgentTools.ts` | **DELETAR** arquivo |
+| `ai_procedure_tools` (tabela) | **DROP** |
+| `ai_procedure_flows` (tabela) | **DROP** |
+| `ai_agent_procedures` (tabela) | **DROP** |
+| `ai_procedures` (tabela) | **DROP** |
+| `ai_agent_tools` (tabela) | **DROP** |
+| `ai_agent_flow_steps.tool_id` (coluna) | **DROP COLUMN** |
 
