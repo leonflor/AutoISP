@@ -340,10 +340,10 @@ const ResumoProjetoTab = () => {
         <CardContent>
           <p className="text-muted-foreground">
             O <strong className="text-foreground">AutoISP</strong> é uma plataforma SaaS de automação inteligente para provedores de internet brasileiros, 
-            combinando agentes de IA (via OpenAI API — GPT-4o/GPT-4o-mini), integração multi-ERP (IXC, SGP, MK-Solutions, Hubsoft), 
-            diagnóstico ONU em tempo real, auditoria de prompts dinâmicos e sistema de fluxos conversacionais com procedures para oferecer atendimento 24h, 
+            combinando agentes de IA (via OpenAI API — GPT-4o/GPT-4o-mini), integração multi-ERP (IXC, SGP, MK-Solutions — Hubsoft planejado), 
+            diagnóstico ONU em tempo real, auditoria de prompts dinâmicos e sistema de fluxos conversacionais para oferecer atendimento 24h, 
             automação de cobranças e suporte técnico proativo. Com conformidade LGPD, sistema RBAC granular, arquitetura simplificada de agentes 
-            (Agent → Procedures → Fluxos → Steps → tool_handler via catálogo hardcoded) e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
+            (Agent → Flow Links → Flows → Steps → tool_handler via catálogo hardcoded) e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
           </p>
         </CardContent>
       </Card>
