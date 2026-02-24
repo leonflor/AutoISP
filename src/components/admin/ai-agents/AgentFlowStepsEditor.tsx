@@ -8,7 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useSaveFlowSteps, type AgentFlow, type FlowStepInsert, type ConditionalRoute } from '@/hooks/admin/useAgentFlows';
-import type { AgentTool } from '@/hooks/admin/useAgentTools';
+import { TOOL_CATALOG } from '@/constants/tool-catalog';
 import { ConditionalRoutesEditor } from './ConditionalRoutesEditor';
 
 interface StepDraft {
@@ -16,7 +16,7 @@ interface StepDraft {
   name: string;
   instruction: string;
   expected_input: string;
-  tool_id: string;
+  tool_handler: string;
   condition_to_advance: string;
   fallback_instruction: string;
   conditional_routes: ConditionalRoute[];
@@ -24,18 +24,17 @@ interface StepDraft {
 
 interface AgentFlowStepsEditorProps {
   flow: AgentFlow;
-  tools: AgentTool[];
   agentId: string;
 }
 
 function emptyStep(): StepDraft {
   return {
-    name: '', instruction: '', expected_input: '', tool_id: '',
+    name: '', instruction: '', expected_input: '', tool_handler: '',
     condition_to_advance: '', fallback_instruction: '', conditional_routes: [],
   };
 }
 
-export function AgentFlowStepsEditor({ flow, tools, agentId }: AgentFlowStepsEditorProps) {
+export function AgentFlowStepsEditor({ flow, agentId }: AgentFlowStepsEditorProps) {
   const saveSteps = useSaveFlowSteps();
   const [steps, setSteps] = useState<StepDraft[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -45,7 +44,7 @@ export function AgentFlowStepsEditor({ flow, tools, agentId }: AgentFlowStepsEdi
       setSteps(flow.steps.map(s => ({
         id: s.id, name: s.name, instruction: s.instruction,
         expected_input: s.expected_input || '',
-        tool_id: s.tool_id || '',
+        tool_handler: s.tool_handler || '',
         condition_to_advance: s.condition_to_advance || '',
         fallback_instruction: s.fallback_instruction || '',
         conditional_routes: s.conditional_routes || [],
@@ -74,7 +73,7 @@ export function AgentFlowStepsEditor({ flow, tools, agentId }: AgentFlowStepsEdi
     const payload: FlowStepInsert[] = steps.filter(s => s.name && s.instruction).map((s, i) => ({
       flow_id: flow.id, step_order: i + 1, name: s.name, instruction: s.instruction,
       expected_input: s.expected_input || undefined,
-      tool_id: s.tool_id || null,
+      tool_handler: s.tool_handler || null,
       condition_to_advance: s.condition_to_advance || undefined,
       fallback_instruction: s.fallback_instruction || undefined,
       conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
@@ -105,13 +104,13 @@ export function AgentFlowStepsEditor({ flow, tools, agentId }: AgentFlowStepsEdi
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">{i + 1}</Badge>
                 <Input value={step.name} onChange={e => updateStep(i, 'name', e.target.value)} placeholder="Nome da etapa" className="h-8 text-sm" />
-                <Select value={step.tool_id || 'none'} onValueChange={v => updateStep(i, 'tool_id', v === 'none' ? '' : v)}>
-                  <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue placeholder="Sem tool" /></SelectTrigger>
+                <Select value={step.tool_handler || 'none'} onValueChange={v => updateStep(i, 'tool_handler', v === 'none' ? '' : v)}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Sem tool" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem tool</SelectItem>
-                    {tools.map(t => (
-                      <SelectItem key={t.id} value={t.id}>
-                        <span className="flex items-center gap-1"><Wrench className="h-3 w-3" />{t.name}</span>
+                    {TOOL_CATALOG.map(t => (
+                      <SelectItem key={t.handler} value={t.handler}>
+                        <span className="flex items-center gap-1"><Wrench className="h-3 w-3" />{t.display_name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>

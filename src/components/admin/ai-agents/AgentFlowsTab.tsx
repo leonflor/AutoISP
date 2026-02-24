@@ -6,7 +6,6 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAgentFlows, useDeleteAgentFlow, useUpdateAgentFlow, type AgentFlow } from '@/hooks/admin/useAgentFlows';
-import { useAgentTools } from '@/hooks/admin/useAgentTools';
 import { AgentFlowForm } from './AgentFlowForm';
 import { AgentFlowStepsEditor } from './AgentFlowStepsEditor';
 
@@ -16,7 +15,6 @@ interface AgentFlowsTabProps {
 
 export function AgentFlowsTab({ agentId }: AgentFlowsTabProps) {
   const { data: flows = [], isLoading } = useAgentFlows(agentId);
-  const { data: tools = [] } = useAgentTools(agentId);
   const deleteFlow = useDeleteAgentFlow();
   const updateFlow = useUpdateAgentFlow();
   const [editingFlow, setEditingFlow] = useState<AgentFlow | null>(null);
@@ -123,7 +121,6 @@ export function AgentFlowsTab({ agentId }: AgentFlowsTabProps) {
                   <CardContent className="pt-0 px-4 pb-4">
                     <AgentFlowStepsEditor
                       flow={flow}
-                      tools={tools}
                       agentId={agentId}
                     />
                   </CardContent>
