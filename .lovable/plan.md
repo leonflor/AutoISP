@@ -1,39 +1,37 @@
 
 
-# Fix: `conditional_routes` null constraint violation ao salvar fluxos
+# Remover campos `status_internet`, `plano` e `conectado` do retorno de `erp_client_lookup`
 
-## Problema
+## Objetivo
 
-Ao salvar etapas de fluxos conversacionais, quando `conditional_routes` está vazio, o código envia `undefined` para o banco. A coluna `conditional_routes` na tabela `ai_agent_flow_steps` é `NOT NULL DEFAULT '[]'::jsonb`, então `undefined` vira `null` no Supabase e viola a constraint.
+Simplificar o retorno da tool `erp_client_lookup` removendo três campos que pertencem ao contexto de contrato/conexão e não à identificação do cliente. Esses dados são obtidos via `erp_contract_lookup` e `erp_onu_diagnostics`.
 
-## Causa
+## Alteração
 
-Nas linhas de payload dos dois editores:
-```typescript
-conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
-```
+### `supabase/functions/_shared/tool-handlers.ts` (linhas 127-134)
 
-Quando não há rotas, envia `undefined` ao invés de `[]`.
+Remover `status_internet`, `plano` e `conectado` do mapeamento de retorno:
 
-## Correção
-
-Trocar `undefined` por `[]` em ambos os arquivos:
-
-### 1. `src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx` (linha 76)
 ```typescript
 // De:
-conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
+clientes: matched.map((c) => ({
+  cliente_erp_id: c.id,
+  nome: c.nome,
+  cpf_cnpj: c.cpf_cnpj,
+  status_internet: c.status_internet,
+  plano: c.plano,
+  conectado: c.conectado,
+  provider_name: c.provider_name,
+})),
+
 // Para:
-conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : [],
+clientes: matched.map((c) => ({
+  cliente_erp_id: c.id,
+  nome: c.nome,
+  cpf_cnpj: c.cpf_cnpj,
+  provider_name: c.provider_name,
+})),
 ```
 
-### 2. `src/components/admin/ai-agents/AgentFlowStepsEditor.tsx` (linha 79)
-```typescript
-// De:
-conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
-// Para:
-conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : [],
-```
-
-Duas linhas alteradas, zero impacto em lógica.
+Um arquivo, uma alteração. Requer redeploy da edge function `ai-chat`.
 
