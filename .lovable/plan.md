@@ -1,35 +1,39 @@
 
 
-# Renomear `onu_diagnostics` → `erp_onu_diagnostics`
+# Fix: `conditional_routes` null constraint violation ao salvar fluxos
 
-## Objetivo
+## Problema
 
-Padronizar a nomenclatura da tool de diagnóstico de sinal ONU para seguir o mesmo padrão `erp_` das demais tools (`erp_invoice_search`, `erp_client_lookup`, `erp_contract_lookup`).
+Ao salvar etapas de fluxos conversacionais, quando `conditional_routes` está vazio, o código envia `undefined` para o banco. A coluna `conditional_routes` na tabela `ai_agent_flow_steps` é `NOT NULL DEFAULT '[]'::jsonb`, então `undefined` vira `null` no Supabase e viola a constraint.
 
-## Alterações
+## Causa
 
-### 1. `supabase/functions/_shared/tool-catalog.ts`
-- Renomear chave `onu_diagnostics` → `erp_onu_diagnostics`
-- Atualizar `handler: "erp_onu_diagnostics"`
-- Atualizar referência na `response_description` do `erp_client_lookup` (linha 76: trocar "onu_diagnostics" por "erp_onu_diagnostics")
+Nas linhas de payload dos dois editores:
+```typescript
+conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
+```
 
-### 2. `supabase/functions/_shared/tool-handlers.ts`
-- Renomear registro no `handlers` map: `onu_diagnostics` → `erp_onu_diagnostics` (linha 194)
-- Atualizar comentário do handler (linha 70)
+Quando não há rotas, envia `undefined` ao invés de `[]`.
 
-### 3. `src/constants/tool-catalog.ts`
-- Atualizar `handler: "erp_onu_diagnostics"` (linha 29)
+## Correção
 
-### 4. `src/components/guia-projeto/features/modules/IAFeatures.tsx`
-- Atualizar referência textual de `onu_diagnostics` → `erp_onu_diagnostics` (linha 204)
+Trocar `undefined` por `[]` em ambos os arquivos:
 
-### 5. `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
-- Atualizar referência de `onu_diagnostics` → `erp_onu_diagnostics` (linha 344)
+### 1. `src/components/admin/ai-agents/GlobalFlowStepsEditor.tsx` (linha 76)
+```typescript
+// De:
+conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
+// Para:
+conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : [],
+```
 
-### 6. `src/components/guia-projeto/integracoes/ERPIntegration.tsx`
-- Atualizar referência de `onu_diagnostics` → `erp_onu_diagnostics` (linha 614)
+### 2. `src/components/admin/ai-agents/AgentFlowStepsEditor.tsx` (linha 79)
+```typescript
+// De:
+conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
+// Para:
+conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : [],
+```
 
-## Impacto
-
-Apenas renomeação de strings — nenhuma lógica alterada. A função `buildOpenAITools()` usa o campo `handler` dinamicamente, então o OpenAI function calling receberá automaticamente o novo nome. O handler backend continua apontando para a mesma função `onuDiagnosticsHandler`.
+Duas linhas alteradas, zero impacto em lógica.
 
