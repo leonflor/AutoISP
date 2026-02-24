@@ -15,16 +15,9 @@ export const PROVIDER_DISPLAY_NAMES: Record<ErpProvider, string> = {
   hubsoft: "Hubsoft",
 };
 
-// ── Contract Status (normalizado) ──
+// ── Status da Internet (normalizado na Camada 2) ──
 
-export type ContractStatus =
-  | "ativo"
-  | "nao_ativo"
-  | "suspenso"
-  | "cancelado"
-  | "bloqueado"
-  | "inadimplente"
-  | "desconhecido";
+export type InternetStatus = "ativo" | "bloqueado" | "financeiro_em_atraso" | "outros";
 
 // ── ErpClient (saída padronizada para o frontend) ──
 
@@ -44,7 +37,8 @@ export interface ErpClient {
   data_vencimento: string | null;
   plano: string | null;
   login: string | null;
-  status_contrato: ContractStatus;
+  /** Status da internet normalizado (ativo, bloqueado, financeiro_em_atraso, outros) */
+  status_internet: InternetStatus;
   conectado: boolean;
   signal_db: number | null;
   signal_quality: SignalQuality;
@@ -71,25 +65,46 @@ export interface TestResult {
   details?: Record<string, unknown>;
 }
 
-// ── Tipos Brutos (retornados pelos Providers, sem normalização) ──
+// ── Tipos Brutos — Camada 3 (retornados pelos Providers, sem normalização) ──
 
-export interface RawErpClient {
-  erp_id: string;
-  /** ID do contrato no ERP (null para providers que não separam) */
-  contrato_id: string | null;
-  /** ID da pessoa no ERP (null para providers que não separam) */
-  cliente_erp_id: string | null;
+export interface RawRadusuario {
+  id: string;
+  id_cliente: string;
+  id_contrato: string;
+  login: string;
+  online: string;
+}
+
+export interface RawCliente {
+  id: string;
   nome: string;
   cpf_cnpj: string;
-  data_vencimento: string | null;
+}
+
+export interface RawContrato {
+  id: string;
+  id_cliente: string;
   plano: string | null;
-  login: string | null;
-  /** Status bruto do ERP — valor proprietário, sem normalizar */
-  raw_status: string;
-  /** Conexão bruta — valor proprietário */
-  raw_online: string | boolean | null;
-  /** Sinal bruto (apenas IXC) */
-  signal_db: number | null;
+  dia_vencimento: string | null;
+  /** Status bruto da internet — valor proprietário do ERP */
+  status_internet: string;
+}
+
+export interface RawFibraRecord {
+  id: string;
+  id_login: string;
+  sinal_rx: number | null;
+  sinal_tx: number | null;
+}
+
+export interface RawFatura {
+  id: string;
+  id_cliente: string;
+  data_vencimento: string;
+  valor: number;
+  valor_pago: number | null;
+  linha_digitavel: string | null;
+  gateway_link: string | null;
 }
 
 export interface RawSignalData {
@@ -98,18 +113,53 @@ export interface RawSignalData {
   raw_record?: Record<string, unknown>;
 }
 
+// ── Fatura Normalizada (Camada 2 → Camada 1) ──
+
+export interface ErpInvoice {
+  provider: ErpProvider;
+  provider_name: string;
+  id: string;
+  id_cliente: string;
+  data_vencimento: string;
+  valor: number;
+  valor_pago: number | null;
+  dias_atraso: number;
+  linha_digitavel: string | null;
+  gateway_link: string | null;
+}
+
+// ── Filtro de Faturas ──
+
+export interface FaturaFilter {
+  cpf_cnpj: string;
+}
+
 // ── Contrato do Provider (Camada 3) ──
 
 export interface ErpProviderDriver {
   /** Campos que este provider suporta */
   supportedFields(): string[];
 
-  /** Busca clientes brutos do ERP */
-  fetchRawClients(creds: ErpCredentials): Promise<RawErpClient[]>;
-
   /** Testa conectividade com o ERP */
   testConnection(creds: ErpCredentials): Promise<TestResult>;
 
-  /** Busca sinal bruto de um cliente (opcional — nem todo ERP suporta) */
+  // ── Métodos granulares (opcionais por provider) ──
+
+  /** Busca clientes brutos */
+  fetchClientes?(creds: ErpCredentials, filtro?: { cpf_cnpj: string }): Promise<RawCliente[]>;
+
+  /** Busca contratos ativos */
+  fetchContratos?(creds: ErpCredentials, filtro?: { id_cliente: string }): Promise<RawContrato[]>;
+
+  /** Busca usuários RADIUS */
+  fetchRadusuarios?(creds: ErpCredentials): Promise<RawRadusuario[]>;
+
+  /** Busca registros de fibra (sinal em massa) */
+  fetchFibra?(creds: ErpCredentials): Promise<RawFibraRecord[]>;
+
+  /** Busca faturas em aberto */
+  fetchFaturas?(creds: ErpCredentials, filtro: FaturaFilter): Promise<RawFatura[]>;
+
+  /** Busca sinal bruto de um cliente (diagnóstico ONU sob demanda) */
   fetchRawSignal?(creds: ErpCredentials, clientId: string): Promise<RawSignalData>;
 }

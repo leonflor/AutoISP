@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { searchClients, fetchClientSignal } from "./erp-driver.ts";
+import { searchClients, fetchClientSignal, fetchInvoices } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -49,11 +49,12 @@ const erpSearchHandler: ToolHandler = async (ctx, args) => {
           cpf_cnpj: c.cpf_cnpj,
           plano: c.plano,
           login: c.login,
-          status: c.status_contrato,
+          status_internet: c.status_internet,
           conectado: c.conectado,
           vencimento: c.data_vencimento,
           erp: c.provider_name,
           contrato_id: c.contrato_id,
+          cliente_erp_id: c.cliente_erp_id,
           signal_db: c.signal_db,
           signal_quality: c.signal_quality,
         })),
@@ -69,25 +70,51 @@ const erpSearchHandler: ToolHandler = async (ctx, args) => {
 };
 
 // ── Handler: erp_invoice_search ──
-const erpInvoiceSearchHandler: ToolHandler = async (_ctx, args) => {
-  const clienteId = String(args.cliente_id || "");
-  if (!clienteId) {
-    return { success: false, error: "Informe o CPF/CNPJ ou ID do cliente" };
+const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
+  const cpfCnpj = String(args.cliente_id || "");
+  if (!cpfCnpj) {
+    return { success: false, error: "Informe o CPF/CNPJ do cliente" };
   }
 
-  // Mock — pronto para integração futura com ERPs reais
-  return {
-    success: true,
-    data: {
-      cliente_id: clienteId,
-      faturas: [
-        { numero: "FAT-2026-001", valor: 129.90, vencimento: "2026-01-15", status: "vencida", dias_atraso: 23 },
-        { numero: "FAT-2026-002", valor: 129.90, vencimento: "2026-02-15", status: "aberta", dias_atraso: 0 },
-      ],
-      total_aberto: 259.80,
-      mensagem: "Dados simulados para teste. Integrar com API do ERP para dados reais.",
-    },
-  };
+  try {
+    const result = await fetchInvoices(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
+
+    if (result.invoices.length === 0) {
+      return {
+        success: true,
+        data: {
+          encontrados: 0,
+          mensagem: "Nenhuma fatura em aberto encontrada para este cliente.",
+          erros: result.errors,
+        },
+      };
+    }
+
+    const totalAberto = result.invoices.reduce((sum, f) => sum + f.valor, 0);
+
+    return {
+      success: true,
+      data: {
+        encontrados: result.invoices.length,
+        total_aberto: totalAberto,
+        faturas: result.invoices.map((f) => ({
+          id: f.id,
+          valor: f.valor,
+          vencimento: f.data_vencimento,
+          dias_atraso: f.dias_atraso,
+          linha_digitavel: f.linha_digitavel,
+          gateway_link: f.gateway_link,
+          erp: f.provider_name,
+        })),
+        erros: result.errors,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Erro ao buscar faturas: ${err instanceof Error ? err.message : "desconhecido"}`,
+    };
+  }
 };
 
 // ── Handler: onu_diagnostics ──
@@ -116,75 +143,11 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
   }
 };
 
-// ── Handler: erp_active_client_search ──
-const erpActiveClientSearchHandler: ToolHandler = async (ctx, args) => {
-  const query = String(args.busca || args.cpf || args.cnpj || "");
-  if (!query || query.length < 2) {
-    return { success: false, error: "Informe ao menos 2 caracteres para busca" };
-  }
-
-  try {
-    const result = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, query);
-
-    if (result.clients.length === 0) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: "Nenhum cliente encontrado com esse dado.",
-          erros: result.errors,
-        },
-      };
-    }
-
-    const activeClients = result.clients.filter((c) => c.status_contrato === "ativo");
-
-    if (activeClients.length === 0) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: "Cliente encontrado, porém sem contrato ativo.",
-          total_encontrados: result.clients.length,
-          erros: result.errors,
-        },
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        encontrados: activeClients.length,
-        clientes: activeClients.slice(0, 10).map((c) => ({
-          nome: c.nome,
-          cpf_cnpj: c.cpf_cnpj,
-          plano: c.plano,
-          login: c.login,
-          status: c.status_contrato,
-          conectado: c.conectado,
-          vencimento: c.data_vencimento,
-          erp: c.provider_name,
-          contrato_id: c.contrato_id,
-          signal_db: c.signal_db,
-          signal_quality: c.signal_quality,
-        })),
-        erros: result.errors,
-      },
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `Erro ao buscar no ERP: ${err instanceof Error ? err.message : "desconhecido"}`,
-    };
-  }
-};
-
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_search: erpSearchHandler,
   erp_invoice_search: erpInvoiceSearchHandler,
   onu_diagnostics: onuDiagnosticsHandler,
-  erp_active_client_search: erpActiveClientSearchHandler,
 };
 
 /**

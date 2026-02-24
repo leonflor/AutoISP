@@ -1,7 +1,15 @@
 // ═══ CAMADA 3 — Provider SGP ═══
 // Conexão efetiva com o SGP. Retorna dados BRUTOS.
 
-import type { ErpProviderDriver, ErpCredentials, RawErpClient, TestResult } from "../erp-types.ts";
+import type {
+  ErpProviderDriver,
+  ErpCredentials,
+  RawCliente,
+  RawContrato,
+  RawFatura,
+  TestResult,
+  FaturaFilter,
+} from "../erp-types.ts";
 
 function normalizeUrl(apiUrl: string): string {
   let base = apiUrl.replace(/\/+$/, "");
@@ -14,7 +22,7 @@ export const sgpProvider: ErpProviderDriver = {
     return ["login", "plano"];
   },
 
-  async fetchRawClients(creds: ErpCredentials): Promise<RawErpClient[]> {
+  async fetchClientes(creds: ErpCredentials): Promise<RawCliente[]> {
     const baseUrl = normalizeUrl(creds.apiUrl);
 
     const body = new URLSearchParams();
@@ -32,20 +40,23 @@ export const sgpProvider: ErpProviderDriver = {
     const data = await resp.json();
     const clientes = Array.isArray(data) ? data : data.clientes || data.data || [];
 
-    const erpId = (r: any) => String(r.id || r.codigo || r.cd_cliente || "");
     return clientes.map((r: any) => ({
-      erp_id: erpId(r),
-      contrato_id: erpId(r),
-      cliente_erp_id: erpId(r),
+      id: String(r.id || r.codigo || r.cd_cliente || ""),
       nome: r.nome || r.razao_social || r.nm_cliente || "",
       cpf_cnpj: r.cpf_cnpj || r.cpf || r.cnpj || "",
-      data_vencimento: r.dia_vencimento ? `Dia ${r.dia_vencimento}` : r.vencimento || null,
-      plano: r.plano || r.nm_plano || r.ds_plano || null,
-      login: r.login || r.usuario || null,
-      raw_status: r.status || r.situacao || "ativo",
-      raw_online: r.online === true || r.online === "S" || r.conectado === true ? "S" : "N",
-      signal_db: null,
     }));
+  },
+
+  async fetchContratos(): Promise<RawContrato[]> {
+    // SGP não suporta busca granular de contratos por ora
+    console.log("[SGP] fetchContratos: stub — sem integração real");
+    return [];
+  },
+
+  async fetchFaturas(_creds: ErpCredentials, _filtro: FaturaFilter): Promise<RawFatura[]> {
+    // SGP não suporta busca de faturas por ora
+    console.log("[SGP] fetchFaturas: stub — sem integração real");
+    return [];
   },
 
   async testConnection(creds: ErpCredentials): Promise<TestResult> {

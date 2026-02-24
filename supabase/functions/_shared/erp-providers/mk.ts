@@ -1,14 +1,22 @@
 // ═══ CAMADA 3 — Provider MK-Solutions ═══
 // Conexão efetiva com o MK. Retorna dados BRUTOS.
 
-import type { ErpProviderDriver, ErpCredentials, RawErpClient, TestResult } from "../erp-types.ts";
+import type {
+  ErpProviderDriver,
+  ErpCredentials,
+  RawCliente,
+  RawContrato,
+  RawFatura,
+  TestResult,
+  FaturaFilter,
+} from "../erp-types.ts";
 
 export const mkProvider: ErpProviderDriver = {
   supportedFields() {
     return ["login", "plano"];
   },
 
-  async fetchRawClients(creds: ErpCredentials): Promise<RawErpClient[]> {
+  async fetchClientes(creds: ErpCredentials): Promise<RawCliente[]> {
     const resp = await fetch(`${creds.apiUrl}/mk/WSMKIntegracaoGeral.rule`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -32,22 +40,23 @@ export const mkProvider: ErpProviderDriver = {
 
     const clientes = Array.isArray(data) ? data : data.clientes || data.lista || [];
 
-    return clientes.map((r: any) => {
-      const erpId = String(r.CodigoCliente || r.id || "");
-      return {
-        erp_id: erpId,
-        contrato_id: erpId,
-        cliente_erp_id: erpId,
-        nome: r.NomeRazaoSocial || r.nome || "",
-        cpf_cnpj: r.CpfCnpj || r.cpf_cnpj || "",
-        data_vencimento: r.DiaVencimento ? `Dia ${r.DiaVencimento}` : null,
-        plano: r.NomePlano || r.plano || null,
-        login: r.LoginConexao || r.login || null,
-        raw_status: (r.Situacao || r.status || "ativo"),
-        raw_online: r.Conectado === "S" || r.online === true ? "S" : "N",
-        signal_db: null,
-      };
-    });
+    return clientes.map((r: any) => ({
+      id: String(r.CodigoCliente || r.id || ""),
+      nome: r.NomeRazaoSocial || r.nome || "",
+      cpf_cnpj: r.CpfCnpj || r.cpf_cnpj || "",
+    }));
+  },
+
+  async fetchContratos(): Promise<RawContrato[]> {
+    // MK não suporta busca granular de contratos por ora
+    console.log("[MK] fetchContratos: stub — sem integração real");
+    return [];
+  },
+
+  async fetchFaturas(_creds: ErpCredentials, _filtro: FaturaFilter): Promise<RawFatura[]> {
+    // MK não suporta busca de faturas por ora
+    console.log("[MK] fetchFaturas: stub — sem integração real");
+    return [];
   },
 
   async testConnection(creds: ErpCredentials): Promise<TestResult> {

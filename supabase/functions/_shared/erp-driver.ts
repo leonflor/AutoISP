@@ -1,5 +1,5 @@
 // ═══ CAMADA 2 — Driver / Orquestrador ERP ═══
-// Decide DE ONDE buscar, normaliza status/conexão, injeta origem obrigatória.
+// Resolve credenciais, compõe chamadas granulares, normaliza status_internet.
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifySignalDb } from "./onu-signal-analyzer.ts";
@@ -9,9 +9,9 @@ import type {
   ErpProvider,
   ErpClient,
   ErpCredentials,
-  TestResult,
-  RawErpClient,
-  ContractStatus,
+  ErpInvoice,
+  InternetStatus,
+  FaturaFilter,
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 
@@ -65,98 +65,26 @@ export async function resolveCredentials(
   return creds;
 }
 
-// ── Normalização de Status ──
+// ── Normalização de status_internet (Camada 2) ──
 
-const IXC_STATUS_MAP: Record<string, ContractStatus> = {
-  "ativo:S": "ativo",
-  "ativo:N": "nao_ativo",
-};
-
-const SGP_STATUS_MAP: Record<string, ContractStatus> = {
-  ativo: "ativo",
-  off: "cancelado",
-  suspenso: "suspenso",
+const IXC_INTERNET_STATUS_MAP: Record<string, InternetStatus> = {
+  normal: "ativo",
   bloqueado: "bloqueado",
-  inativo: "cancelado",
-  desconectado: "cancelado",
+  bloqueio_manual: "bloqueado",
+  bloqueio_automatico: "bloqueado",
+  reduzido: "financeiro_em_atraso",
+  pendente_reativa: "bloqueado",
+  desativado: "bloqueado",
 };
 
-const MK_STATUS_MAP: Record<string, ContractStatus> = {
-  ativo: "ativo",
-  bloqueado: "bloqueado",
-  suspenso: "suspenso",
-  cancelado: "cancelado",
-  inativo: "cancelado",
-};
-
-function normalizeStatus(rawStatus: string, provider: ErpProvider): ContractStatus {
-  switch (provider) {
-    case "ixc":
-      return IXC_STATUS_MAP[rawStatus] || "desconhecido";
-    case "sgp":
-      return SGP_STATUS_MAP[rawStatus.toLowerCase()] || "desconhecido";
-    case "mk_solutions":
-      return MK_STATUS_MAP[rawStatus.toLowerCase()] || "desconhecido";
-    default:
-      return "desconhecido";
-  }
+function normalizeInternetStatus(rawStatus: string, _provider: ErpProvider): InternetStatus {
+  const key = rawStatus.toLowerCase().trim();
+  return IXC_INTERNET_STATUS_MAP[key] || "outros";
 }
 
-function normalizeOnline(rawOnline: string | boolean | null): boolean {
-  if (rawOnline === true || rawOnline === "S" || rawOnline === "contract_active") return true;
-  return false;
-}
+// ── Resolver configs ativos do ISP ──
 
-// ── Normalizar Cliente ──
-
-function normalizeClient(
-  raw: RawErpClient,
-  provider: ErpProvider,
-  providerName: string,
-  supported: string[]
-): ErpClient {
-  const fieldAvailability: Record<string, boolean> = {
-    signal_db: supported.includes("signal_db"),
-    login: supported.includes("login"),
-    plano: supported.includes("plano"),
-    contrato: supported.includes("contrato"),
-  };
-
-  return {
-    erp_id: raw.erp_id,
-    contrato_id: raw.contrato_id ?? null,
-    cliente_erp_id: raw.cliente_erp_id ?? null,
-    provider,
-    provider_name: providerName,
-    nome: raw.nome,
-    cpf_cnpj: raw.cpf_cnpj,
-    data_vencimento: raw.data_vencimento,
-    plano: raw.plano,
-    login: raw.login,
-    status_contrato: normalizeStatus(raw.raw_status, provider),
-    conectado: normalizeOnline(raw.raw_online),
-    signal_db: raw.signal_db,
-    signal_quality: classifySignalDb(raw.signal_db),
-    field_availability: fieldAvailability,
-  };
-}
-
-// ── Métodos Públicos ──
-
-interface FetchResult {
-  clients: ErpClient[];
-  errors: { provider: string; message: string }[];
-}
-
-/**
- * Busca clientes de TODOS os ERPs ativos do ISP.
- * Injeta provider obrigatório em cada registro.
- */
-export async function fetchAllClients(
-  supabaseAdmin: SupabaseClient,
-  ispId: string,
-  encryptionKey: string
-): Promise<FetchResult> {
+async function resolveActiveConfigs(supabaseAdmin: SupabaseClient, ispId: string) {
   const { data: configs } = await supabaseAdmin
     .from("erp_configs")
     .select("*")
@@ -164,9 +92,121 @@ export async function fetchAllClients(
     .eq("is_active", true)
     .eq("is_connected", true);
 
-  if (!configs || configs.length === 0) {
-    return { clients: [], errors: [] };
+  return configs || [];
+}
+
+// ── Composição: IXC (radusuarios + clientes + contratos + fibra) ──
+
+interface FetchResult {
+  clients: ErpClient[];
+  errors: { provider: string; message: string }[];
+}
+
+async function composeIxcClients(
+  creds: ErpCredentials,
+  providerName: string,
+  driver: import("./erp-types.ts").ErpProviderDriver
+): Promise<ErpClient[]> {
+  const [rads, clientes, contratos, fibra] = await Promise.all([
+    driver.fetchRadusuarios!(creds),
+    driver.fetchClientes!(creds),
+    driver.fetchContratos!(creds),
+    driver.fetchFibra!(creds),
+  ]);
+
+  console.log(`[IXC] radusuarios: ${rads.length}, clientes: ${clientes.length}, contratos: ${contratos.length}, fibra: ${fibra.length}`);
+
+  // Maps
+  const clientesById = new Map(clientes.map((c) => [c.id, c]));
+  const contratosById = new Map(contratos.map((ct) => [ct.id, ct]));
+  const fibraByIdLogin = new Map(fibra.map((f) => [f.id_login, f]));
+
+  const results: ErpClient[] = [];
+
+  for (const rad of rads) {
+    const cliente = clientesById.get(rad.id_cliente);
+    const contrato = rad.id_contrato ? contratosById.get(rad.id_contrato) : null;
+    const fibraRec = fibraByIdLogin.get(rad.id);
+
+    // Apenas radusuarios com contrato ativo (contratos já vem filtrados status='A')
+    if (!contrato) continue;
+
+    results.push({
+      erp_id: rad.id,
+      contrato_id: contrato.id,
+      cliente_erp_id: rad.id_cliente,
+      provider: "ixc",
+      provider_name: providerName,
+      nome: cliente?.nome || "",
+      cpf_cnpj: cliente?.cpf_cnpj || "",
+      data_vencimento: contrato.dia_vencimento ? `Dia ${contrato.dia_vencimento}` : null,
+      plano: contrato.plano,
+      login: rad.login || null,
+      status_internet: normalizeInternetStatus(contrato.status_internet, "ixc"),
+      conectado: rad.online === "S",
+      signal_db: fibraRec?.sinal_rx ?? null,
+      signal_quality: classifySignalDb(fibraRec?.sinal_rx ?? null),
+      field_availability: {
+        signal_db: true,
+        login: true,
+        plano: true,
+        contrato: true,
+      },
+    });
   }
+
+  console.log(`[IXC] Total records (radius-centric, contrato ativo): ${results.length}`);
+  return results;
+}
+
+// ── Composição: SGP / MK (simples) ──
+
+async function composeSimpleClients(
+  creds: ErpCredentials,
+  provider: ErpProvider,
+  providerName: string,
+  driver: import("./erp-types.ts").ErpProviderDriver
+): Promise<ErpClient[]> {
+  if (!driver.fetchClientes) return [];
+  const clientes = await driver.fetchClientes(creds);
+  const supported = driver.supportedFields();
+
+  return clientes.map((c) => ({
+    erp_id: c.id,
+    contrato_id: c.id,
+    cliente_erp_id: c.id,
+    provider,
+    provider_name: providerName,
+    nome: c.nome,
+    cpf_cnpj: c.cpf_cnpj,
+    data_vencimento: null,
+    plano: null,
+    login: null,
+    status_internet: "ativo" as InternetStatus,
+    conectado: false,
+    signal_db: null,
+    signal_quality: classifySignalDb(null),
+    field_availability: {
+      signal_db: supported.includes("signal_db"),
+      login: supported.includes("login"),
+      plano: supported.includes("plano"),
+      contrato: false,
+    },
+  }));
+}
+
+// ── Métodos Públicos ──
+
+/**
+ * Busca clientes de TODOS os ERPs ativos do ISP.
+ */
+export async function fetchAllClients(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string
+): Promise<FetchResult> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  if (configs.length === 0) return { clients: [], errors: [] };
 
   const result: FetchResult = { clients: [], errors: [] };
 
@@ -176,14 +216,12 @@ export async function fetchAllClients(
       const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
       const driver = getProvider(providerKey);
       const creds = await resolveCredentials(config, encryptionKey);
-      const rawClients = await driver.fetchRawClients(creds);
-      const supported = driver.supportedFields();
 
-      return {
-        clients: rawClients.map((r) => normalizeClient(r, providerKey, providerName, supported)),
-        error: null,
-        provider: providerName,
-      };
+      const clients = providerKey === "ixc"
+        ? await composeIxcClients(creds, providerName, driver)
+        : await composeSimpleClients(creds, providerKey, providerName, driver);
+
+      return { clients, error: null, provider: providerName };
     } catch (err) {
       console.error(`[${config.provider}] Fetch error:`, err);
       return {
@@ -233,12 +271,80 @@ export async function searchClients(
 }
 
 /**
+ * Busca faturas em aberto de um cliente por CPF/CNPJ.
+ */
+export async function fetchInvoices(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  cpfCnpj: string
+): Promise<{ invoices: ErpInvoice[]; errors: string[] }> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  if (configs.length === 0) return { invoices: [], errors: [] };
+
+  const allInvoices: ErpInvoice[] = [];
+  const allErrors: string[] = [];
+  const today = new Date();
+
+  const promises = configs.map(async (config) => {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      const creds = await resolveCredentials(config, encryptionKey);
+
+      if (!driver.fetchFaturas) {
+        console.log(`[${providerKey}] fetchFaturas não implementado`);
+        return { invoices: [] as ErpInvoice[], error: null };
+      }
+
+      const rawFaturas = await driver.fetchFaturas(creds, { cpf_cnpj: cpfCnpj });
+
+      const invoices: ErpInvoice[] = rawFaturas.map((f) => {
+        const vencimento = new Date(f.data_vencimento);
+        const diffMs = today.getTime() - vencimento.getTime();
+        const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+        return {
+          provider: providerKey,
+          provider_name: providerName,
+          id: f.id,
+          id_cliente: f.id_cliente,
+          data_vencimento: f.data_vencimento,
+          valor: f.valor,
+          valor_pago: f.valor_pago,
+          dias_atraso: diasAtraso,
+          linha_digitavel: f.linha_digitavel,
+          gateway_link: f.gateway_link,
+        };
+      });
+
+      return { invoices, error: null };
+    } catch (err) {
+      console.error(`[${config.provider}] fetchInvoices error:`, err);
+      return {
+        invoices: [] as ErpInvoice[],
+        error: `${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`,
+      };
+    }
+  });
+
+  const results = await Promise.all(promises);
+  for (const r of results) {
+    allInvoices.push(...r.invoices);
+    if (r.error) allErrors.push(r.error);
+  }
+
+  return { invoices: allInvoices, errors: allErrors };
+}
+
+/**
  * Testa conexão com um provider específico.
  */
 export async function testConnection(
   provider: ErpProvider,
   credentials: ErpCredentials
-): Promise<TestResult> {
+) {
   const driver = getProvider(provider);
   return driver.testConnection(credentials);
 }
@@ -252,7 +358,6 @@ export async function fetchClientSignal(
   encryptionKey: string,
   clientId: string
 ): Promise<{ signal: any; report: string }> {
-  // Atualmente apenas IXC suporta diagnóstico de sinal
   const { data: config } = await supabaseAdmin
     .from("erp_configs")
     .select("*")
@@ -273,7 +378,6 @@ export async function fetchClientSignal(
     throw new Error("Provider não suporta diagnóstico de sinal");
   }
 
-  // clientId here should be the cliente_erp_id (person ID), not contract/fiber ID
   const rawSignal = await driver.fetchRawSignal(creds, clientId);
   const result = analyzeOnuSignal({ tx: rawSignal.tx, rx: rawSignal.rx });
 

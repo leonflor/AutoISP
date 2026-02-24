@@ -15,7 +15,7 @@ export interface ErpClient {
   data_vencimento: string | null;
   plano: string | null;
   login: string | null;
-  status_contrato: string;
+  status_internet: string;
   conectado: boolean;
   signal_db: number | null;
   signal_quality: SignalQuality;
@@ -81,9 +81,9 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
     }
     if (status && status !== "all") {
       if (status === "nao_ativo") {
-        if (c.status_contrato === "ativo") return false;
+        if (c.status_internet === "ativo") return false;
       } else {
-        if (c.status_contrato !== status) return false;
+        if (c.status_internet !== status) return false;
       }
     }
     if (provider && provider !== "all" && c.provider !== provider) return false;
@@ -95,8 +95,8 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
 
   const stats = {
     total: allClients.length,
-    ativos: allClients.filter((c) => c.status_contrato === "ativo").length,
-    nao_ativos: allClients.filter((c) => c.status_contrato !== "ativo").length,
+    ativos: allClients.filter((c) => c.status_internet === "ativo").length,
+    nao_ativos: allClients.filter((c) => c.status_internet !== "ativo").length,
     conectados: allClients.filter((c) => c.conectado).length,
   };
 

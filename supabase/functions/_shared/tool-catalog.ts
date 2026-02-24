@@ -17,7 +17,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     handler: "erp_search",
     display_name: "Busca Clientes no ERP",
     description:
-      "Busca clientes no sistema ERP do provedor por CPF ou CNPJ. Pode retornar um ou mais clientes com dados de contrato, status de conexão e sinal.",
+      "Busca clientes com contrato ativo no sistema ERP do provedor por CPF ou CNPJ. Retorna dados de contrato, status da internet e sinal.",
     parameters_schema: {
       type: "object",
       properties: {
@@ -31,7 +31,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Lista de clientes encontrados com nome, CPF, plano, status, sinal e provedor ERP.",
+      "Lista de clientes encontrados com nome, CPF, plano, status_internet (ativo/bloqueado/financeiro_em_atraso/outros), sinal e provedor ERP.",
     requires_erp: true,
   },
 
@@ -39,20 +39,20 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     handler: "erp_invoice_search",
     display_name: "Consulta de Faturas",
     description:
-      "Consulta faturas e débitos de um cliente no ERP. Retorna faturas abertas, vencidas e total devedor.",
+      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Retorna faturas pendentes com valores, vencimentos e total devedor.",
     parameters_schema: {
       type: "object",
       properties: {
         cliente_id: {
           type: "string",
-          description: "CPF/CNPJ ou ID do cliente no ERP",
+          description: "CPF/CNPJ do cliente",
         },
       },
       required: ["cliente_id"],
       additionalProperties: false,
     },
     response_description:
-      "Faturas do cliente com número, valor, vencimento, status e total em aberto.",
+      "Faturas em aberto com valor, vencimento, dias de atraso, linha digitável e total em aberto.",
     requires_erp: true,
   },
 
@@ -74,28 +74,6 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     },
     response_description:
       "Diagnóstico com potência RX/TX em dBm, qualidade do sinal e recomendações.",
-    requires_erp: true,
-  },
-
-  erp_active_client_search: {
-    handler: "erp_active_client_search",
-    display_name: "Busca Cliente Ativo",
-    description:
-      "Busca clientes com contrato ativo no ERP por CPF ou CNPJ. Retorna apenas clientes cujo status de contrato seja 'ativo'.",
-    parameters_schema: {
-      type: "object",
-      properties: {
-        busca: {
-          type: "string",
-          description: "CPF ou CNPJ do cliente",
-          minLength: 11,
-        },
-      },
-      required: ["busca"],
-      additionalProperties: false,
-    },
-    response_description:
-      "Cliente ativo com nome, CPF, plano, conexão e provedor ERP. Retorna vazio se nenhum cliente ativo for encontrado.",
     requires_erp: true,
   },
 };
