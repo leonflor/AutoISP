@@ -76,7 +76,7 @@ export function AgentFlowStepsEditor({ flow, agentId }: AgentFlowStepsEditorProp
       tool_handler: s.tool_handler || null,
       condition_to_advance: s.condition_to_advance || undefined,
       fallback_instruction: s.fallback_instruction || undefined,
-      conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : undefined,
+      conditional_routes: s.conditional_routes.length > 0 ? s.conditional_routes : [],
     }));
     saveSteps.mutate({ flowId: flow.id, agentId, steps: payload }, { onSuccess: () => setDirty(false) });
   };
