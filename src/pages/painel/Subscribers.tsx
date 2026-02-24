@@ -14,20 +14,16 @@ import { SignalDiagnosticsDialog } from '@/components/painel/subscribers/SignalD
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
-  nao_ativo: 'bg-red-500/10 text-red-600 border-red-500/20',
-  suspenso: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  cancelado: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
   bloqueado: 'bg-red-500/10 text-red-600 border-red-500/20',
-  desconhecido: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
+  financeiro_em_atraso: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+  outros: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
 };
 
 const statusLabels: Record<string, string> = {
   ativo: 'Ativo',
-  nao_ativo: 'Não Ativo',
-  suspenso: 'Suspenso',
-  cancelado: 'Cancelado',
   bloqueado: 'Bloqueado',
-  desconhecido: 'Desconhecido',
+  financeiro_em_atraso: 'Financeiro em Atraso',
+  outros: 'Outros',
 };
 
 const providerColors: Record<string, string> = {
@@ -231,8 +227,8 @@ export default function SubscribersPage() {
                         <TableCell className="text-muted-foreground">{client.plano || '—'}</TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">{client.login || '—'}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={statusColors[client.status_contrato] || statusColors.desconhecido}>
-                            {statusLabels[client.status_contrato] || client.status_contrato}
+                          <Badge variant="outline" className={statusColors[client.status_internet] || statusColors.outros}>
+                            {statusLabels[client.status_internet] || client.status_internet}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
