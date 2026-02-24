@@ -90,6 +90,16 @@ export interface RawContrato {
   status_internet: string;
 }
 
+export interface RawContratoDetalhado extends RawContrato {
+  endereco: string | null;
+  numero: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  complemento: string | null;
+}
+
 export interface RawFibraRecord {
   id: string;
   id_login: string;
@@ -162,4 +172,7 @@ export interface ErpProviderDriver {
 
   /** Busca sinal bruto de um cliente (diagnóstico ONU sob demanda) */
   fetchRawSignal?(creds: ErpCredentials, clientId: string): Promise<RawSignalData>;
+
+  /** Busca contratos detalhados com endereço de instalação */
+  fetchContratosDetalhados?(creds: ErpCredentials, filtro: { id_cliente: string }): Promise<RawContratoDetalhado[]>;
 }

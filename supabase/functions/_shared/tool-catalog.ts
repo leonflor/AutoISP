@@ -76,6 +76,27 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       "Dados do cliente incluindo cliente_erp_id (usar em onu_diagnostics), nome, CPF/CNPJ, status e plano.",
     requires_erp: true,
   },
+
+  erp_contract_lookup: {
+    handler: "erp_contract_lookup",
+    display_name: "Consulta de Contrato",
+    description:
+      "Consulta contratos ativos de um cliente por ID. Retorna ID do contrato, endereço de instalação, plano contratado e status.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        client_id: {
+          type: "string",
+          description: "ID do cliente no ERP (obtido via erp_client_lookup)",
+        },
+      },
+      required: ["client_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Contratos ativos com contrato_id, endereço completo, plano, status e dia de vencimento.",
+    requires_erp: true,
+  },
 };
 
 /**

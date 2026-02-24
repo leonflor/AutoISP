@@ -7,6 +7,7 @@ import type {
   ErpCredentials,
   RawCliente,
   RawContrato,
+  RawContratoDetalhado,
   RawRadusuario,
   RawFibraRecord,
   RawFatura,
@@ -215,6 +216,37 @@ async function fetchRawSignal(
   };
 }
 
+async function fetchContratosDetalhados(
+  creds: ErpCredentials,
+  filtro: { id_cliente: string }
+): Promise<RawContratoDetalhado[]> {
+  const baseUrl = normalizeUrl(creds.apiUrl);
+  const headers = buildAuth(creds.username || "", creds.password || "");
+
+  const recs = await ixcFetch(baseUrl, headers, "cliente_contrato", {
+    qtype: "cliente_contrato.id_cliente",
+    query: filtro.id_cliente,
+    oper: "=",
+  });
+
+  const ativos = recs.filter((ct: any) => ct.status === "A");
+
+  return ativos.map((ct: any) => ({
+    id: String(ct.id),
+    id_cliente: String(ct.id_cliente || ""),
+    plano: ct.contrato || ct.id_vd_contrato || null,
+    dia_vencimento: ct.dia_vencimento || null,
+    status_internet: ct.status_internet || "normal",
+    endereco: ct.endereco || null,
+    numero: ct.numero || null,
+    bairro: ct.bairro || null,
+    cidade: ct.cidade || null,
+    estado: ct.estado || null,
+    cep: ct.cep || null,
+    complemento: ct.complemento || null,
+  }));
+}
+
 // ── Provider Export ──
 
 export const ixcProvider: ErpProviderDriver = {
@@ -258,4 +290,5 @@ export const ixcProvider: ErpProviderDriver = {
   fetchFibra: fetchFibra,
   fetchFaturas: fetchFaturas,
   fetchRawSignal: fetchRawSignal,
+  fetchContratosDetalhados: fetchContratosDetalhados,
 };

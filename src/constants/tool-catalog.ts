@@ -48,4 +48,15 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     response_description: "Dados do cliente com cliente_erp_id, nome, status e plano.",
     requires_erp: true,
   },
+  {
+    handler: "erp_contract_lookup",
+    display_name: "Consulta de Contrato",
+    description:
+      "Consulta contratos ativos de um cliente por ID. Retorna ID do contrato, endereço de instalação, plano contratado e status.",
+    parameters: [
+      { name: "client_id", type: "string", description: "ID do cliente no ERP (obtido via erp_client_lookup)", required: true },
+    ],
+    response_description: "Contratos ativos com contrato_id, endereço completo, plano, status e dia de vencimento.",
+    requires_erp: true,
+  },
 ];

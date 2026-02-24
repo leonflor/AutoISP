@@ -12,6 +12,7 @@ import type {
   ErpInvoice,
   InternetStatus,
   FaturaFilter,
+  RawContratoDetalhado,
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 
@@ -336,6 +337,88 @@ export async function fetchInvoices(
   }
 
   return { invoices: allInvoices, errors: allErrors };
+}
+
+/**
+ * Busca contratos detalhados de um cliente por ID (com endereço).
+ */
+export interface ContractResult {
+  contrato_id: string;
+  endereco_completo: string | null;
+  plano: string | null;
+  status_internet: string;
+  dia_vencimento: string | null;
+  provider_name: string;
+}
+
+export async function fetchClientContracts(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  clientId: string
+): Promise<{ contracts: ContractResult[]; errors: string[] }> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  if (configs.length === 0) return { contracts: [], errors: [] };
+
+  const allContracts: ContractResult[] = [];
+  const allErrors: string[] = [];
+
+  const promises = configs.map(async (config) => {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      const creds = await resolveCredentials(config, encryptionKey);
+
+      let detalhados: RawContratoDetalhado[] = [];
+
+      if (driver.fetchContratosDetalhados) {
+        detalhados = await driver.fetchContratosDetalhados(creds, { id_cliente: clientId });
+      } else if (driver.fetchContratos) {
+        const simples = await driver.fetchContratos(creds, { id_cliente: clientId });
+        detalhados = simples.map((c) => ({
+          ...c,
+          endereco: null,
+          numero: null,
+          bairro: null,
+          cidade: null,
+          estado: null,
+          cep: null,
+          complemento: null,
+        }));
+      }
+
+      const contracts: ContractResult[] = detalhados.map((ct) => {
+        const parts = [ct.endereco, ct.numero, ct.complemento, ct.bairro, ct.cidade, ct.estado, ct.cep].filter(Boolean);
+        const endereco = parts.length > 0 ? parts.join(", ") : null;
+
+        return {
+          contrato_id: ct.id,
+          endereco_completo: endereco,
+          plano: ct.plano,
+          status_internet: normalizeInternetStatus(ct.status_internet, providerKey),
+          dia_vencimento: ct.dia_vencimento,
+          provider_name: providerName,
+        };
+      });
+
+      return { contracts, error: null };
+    } catch (err) {
+      console.error(`[${config.provider}] fetchClientContracts error:`, err);
+      return {
+        contracts: [] as ContractResult[],
+        error: `${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`,
+      };
+    }
+  });
+
+  const results = await Promise.all(promises);
+  for (const r of results) {
+    allContracts.push(...r.contracts);
+    if (r.error) allErrors.push(r.error);
+  }
+
+  return { contracts: allContracts, errors: allErrors };
 }
 
 /**
