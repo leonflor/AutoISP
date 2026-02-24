@@ -303,18 +303,19 @@ const OpenAIIntegration = () => {
               <div className="space-y-4">
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                    <strong>✓ Implementado:</strong> Arquitetura de Procedimentos Reutilizáveis — tools são registradas em <code>ai_agent_tools</code>, agrupadas em <code>ai_procedures</code> via <code>ai_procedure_tools</code>, e vinculadas a agentes via <code>ai_agent_procedures</code>. O <code>ai-chat</code> carrega tools dos procedures ativos do agente.
+                    <strong>✓ Implementado:</strong> Catálogo Hardcoded de Tools — as ferramentas são definidas em <code>_shared/tool-catalog.ts</code> (backend) e <code>constants/tool-catalog.ts</code> (frontend). Cada etapa de fluxo referencia a tool via <code>ai_agent_flow_steps.tool_handler</code> (string). Fluxos são vinculados a agentes via <code>ai_agent_flow_links</code>.
                   </p>
                 </div>
 
                 <div>
-                  <h4 className="mb-3 text-sm font-medium">Arquitetura de Procedures:</h4>
+                  <h4 className="mb-3 text-sm font-medium">Arquitetura de Fluxos + Tools:</h4>
                   <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-                    <li>Tools e Fluxos são cadastrados globalmente pelo Admin</li>
-                    <li>Agrupados em <strong>Procedimentos</strong> (<code className="text-xs">ai_procedures</code>) — pacotes reutilizáveis</li>
-                    <li>Vinculados a agentes via <code className="text-xs">ai_agent_procedures</code> (checkbox na aba Procedimentos)</li>
-                    <li>O <code className="text-xs">ai-chat</code> carrega tools via: agent → procedures → procedure_tools → tools</li>
-                    <li>Handler registry em <code className="text-xs">_shared/tool-handlers.ts</code> mapeia <code>handler_type</code> para funções executáveis</li>
+                    <li>Tools são definidas no catálogo hardcoded (<code className="text-xs">tool-catalog.ts</code>) com JSON Schema para function calling</li>
+                    <li>Fluxos conversacionais (<code className="text-xs">ai_agent_flows</code>) contêm etapas (<code className="text-xs">ai_agent_flow_steps</code>)</li>
+                    <li>Cada etapa pode referenciar uma tool via <code className="text-xs">tool_handler</code> (string, ex: "erp_search")</li>
+                    <li>Fluxos são vinculados a agentes via <code className="text-xs">ai_agent_flow_links</code></li>
+                    <li>O <code className="text-xs">ai-chat</code> filtra tools do catálogo conforme fluxos ativos do agente</li>
+                    <li>Handler registry em <code className="text-xs">_shared/tool-handlers.ts</code> mapeia <code>handler</code> para funções executáveis</li>
                     <li><strong>Tool Call Loop:</strong> até 3 iterações de function calling antes da resposta final</li>
                   </ol>
                 </div>
@@ -342,8 +343,8 @@ const OpenAIIntegration = () => {
                       <TableRow>
                         <TableCell className="font-mono text-xs">erp_invoice_search</TableCell>
                         <TableCell className="font-mono text-xs">consultar_faturas</TableCell>
-                        <TableCell className="text-sm">Lista faturas do cliente</TableCell>
-                        <TableCell><Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-600">Mock</Badge></TableCell>
+                        <TableCell className="text-sm">Lista faturas em aberto via IXC <code>/fn_areceber</code> (SGP/MK retornam [])</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional (IXC)</Badge></TableCell>
                         <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                       <TableRow>
