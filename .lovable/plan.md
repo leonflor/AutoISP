@@ -1,39 +1,99 @@
 
 
-# Remover `erp_search` do Catalogo de Tools de IA
+# Nova Tool: Busca de Cliente por CPF/CNPJ (`erp_client_lookup`)
 
-## Contexto
+## Objetivo
 
-O `erp_search` (busca de clientes no ERP por CPF/CNPJ) e uma funcionalidade da pagina de **Assinantes** (`fetch-erp-clients` edge function), nao uma ferramenta que o agente de IA deve invocar via function calling. As tools de IA devem ser apenas `erp_invoice_search` (faturas) e `onu_diagnostics` (sinal ONU).
+Criar uma tool de IA que busca um cliente pelo CPF/CNPJ e retorna seus dados cadastrais — especialmente o `cliente_erp_id` — para que a IA possa reutilizá-lo em chamadas subsequentes (ex: `onu_diagnostics` que exige o ID do cliente no ERP).
 
-A funcao `searchClients()` no `erp-driver.ts` **nao sera removida** — ela continua sendo usada pela edge function `fetch-erp-clients` e pelo handler de `erp_search` no `tool-handlers.ts`. Porem, o `erp_search` sera removido de todos os catalogos e referencias como "tool de IA".
+## Diferença do antigo `erp_search`
 
-## Arquivos a Alterar
+O antigo `erp_search` fazia busca genérica (nome ou CPF) e retornava uma lista completa de campos. Esta nova tool:
+- Busca **exclusivamente por CPF/CNPJ** (parâmetro obrigatório com `minLength: 11`)
+- Retorna dados enxutos focados no que a IA precisa: **ID do cliente no ERP**, nome, CPF/CNPJ, status, plano
+- O `cliente_erp_id` é destacado na resposta para encadeamento com outras tools
 
-### 1. `supabase/functions/_shared/tool-catalog.ts`
-- Remover a entrada `erp_search` do `TOOL_CATALOG`
-- Ficam apenas `erp_invoice_search` e `onu_diagnostics`
+## Alterações
 
-### 2. `supabase/functions/_shared/tool-handlers.ts`
-- Remover o `erpSearchHandler` e sua entrada no registry `handlers`
-- Remover import de `searchClients` (so usado pelo handler removido; `fetchClientSignal` e `fetchInvoices` permanecem)
+### 1. Backend — `supabase/functions/_shared/tool-catalog.ts`
 
-### 3. `src/constants/tool-catalog.ts`
-- Remover a entrada `erp_search` do array `TOOL_CATALOG`
-- Ficam 2 tools: `erp_invoice_search` e `onu_diagnostics`
+Adicionar entrada `erp_client_lookup`:
 
-### 4. Guia do Projeto — 4 arquivos com referencias
+```
+erp_client_lookup: {
+  handler: "erp_client_lookup",
+  display_name: "Busca Cliente por CPF/CNPJ",
+  description: "Busca dados cadastrais de um cliente no ERP por CPF ou CNPJ. Retorna o ID do cliente no ERP (necessário para outras ferramentas como diagnóstico de sinal), nome, status do contrato e plano.",
+  parameters_schema: {
+    type: "object",
+    properties: {
+      cpf_cnpj: {
+        type: "string",
+        description: "CPF ou CNPJ do cliente (somente números ou formatado)",
+        minLength: 11
+      }
+    },
+    required: ["cpf_cnpj"],
+    additionalProperties: false
+  },
+  response_description: "Dados do cliente incluindo cliente_erp_id (usar em onu_diagnostics), nome, CPF/CNPJ, status e plano.",
+  requires_erp: true
+}
+```
 
-| Arquivo | Linha | Alteracao |
-|---|---|---|
-| `src/components/guia-projeto/integracoes/ERPIntegration.tsx` | ~613 | Remover a linha `erp_search → searchClients()` da lista de tools; manter `searchClients` como funcao interna do driver |
-| `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx` | ~315, ~337 | Remover `erp_search` dos exemplos de tool_handler e da tabela de tools |
-| `src/components/guia-projeto/integracoes/FluxosConversacionaisSection.tsx` | ~135 | Trocar exemplo `erp_search` por `erp_invoice_search` |
-| `src/components/guia-projeto/features/modules/IAFeatures.tsx` | ~204 | Remover `erp_search` da descricao do catalogo de ferramentas |
+### 2. Backend — `supabase/functions/_shared/tool-handlers.ts`
 
-## Resumo de Impacto
+Adicionar handler `erpClientLookupHandler` que:
+- Recebe `cpf_cnpj` como argumento obrigatório
+- Usa `searchClients()` do erp-driver (já existente)
+- Filtra resultado pelo CPF/CNPJ exato (limpando pontuação)
+- Retorna dados enxutos: `cliente_erp_id`, `nome`, `cpf_cnpj`, `status_internet`, `plano`, `provider_name`, `conectado`
+- Se não encontrar, retorna mensagem informativa
+- Se encontrar múltiplos (multi-ERP), retorna todos
 
-- **Tools de IA restantes:** 2 (`erp_invoice_search`, `onu_diagnostics`)
-- **Funcionalidade de busca de assinantes:** Intacta (`fetch-erp-clients` + `searchClients()` no driver)
-- **Nenhuma edge function precisa ser redeployada** alem do bundle `_shared` que e incluido automaticamente
+Adicionar import de `searchClients` e registrar no `handlers`.
+
+### 3. Frontend — `src/constants/tool-catalog.ts`
+
+Adicionar entrada espelho para exibição no admin:
+
+```
+{
+  handler: "erp_client_lookup",
+  display_name: "Busca Cliente por CPF/CNPJ",
+  description: "Busca dados cadastrais de um cliente no ERP por CPF ou CNPJ. Retorna o ID do cliente (necessário para diagnóstico de sinal), nome, status e plano.",
+  parameters: [
+    { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true }
+  ],
+  response_description: "Dados do cliente com cliente_erp_id, nome, status e plano.",
+  requires_erp: true
+}
+```
+
+### 4. Guia do Projeto — atualizar referências
+
+Atualizar `IAFeatures.tsx` e `OpenAIIntegration.tsx` para listar 3 tools no catálogo (adicionando `erp_client_lookup`).
+
+## Fluxo de Uso pela IA
+
+```text
+Usuário: "Minha internet tá lenta, CPF 123.456.789-00"
+  ↓
+IA chama erp_client_lookup(cpf_cnpj: "12345678900")
+  ↓ retorna { cliente_erp_id: "4521", nome: "João", status: "ativo", ... }
+  ↓
+IA chama onu_diagnostics(client_id: "4521")  ← reutiliza o ID
+  ↓ retorna diagnóstico de sinal
+  ↓
+IA responde com diagnóstico completo
+```
+
+## Resumo
+
+| Arquivo | Ação |
+|---|---|
+| `_shared/tool-catalog.ts` | Adicionar `erp_client_lookup` |
+| `_shared/tool-handlers.ts` | Adicionar handler + import `searchClients` |
+| `src/constants/tool-catalog.ts` | Adicionar entrada espelho |
+| Guia (2 arquivos) | Atualizar contagem/lista de tools |
 
