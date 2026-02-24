@@ -144,26 +144,33 @@ const ERPIntegration = () => {
 {`┌─────────────────────────────────────────────────────────────────────────┐
 │  CAMADA 1 — Tipos Padrão (erp-types.ts)                                │
 │  Define O QUE será exibido/consultado                                   │
-│  • ErpClient, ErpCredentials, TestResult, ContractStatus                │
+│  • ErpClient, ErpInvoice, ErpCredentials, TestResult                   │
+│  • InternetStatus: "ativo" | "bloqueado" | "financeiro_em_atraso"      │
+│    | "outros"                                                           │
 │  • ErpProvider: "ixc" | "mk_solutions" | "sgp" | "hubsoft"            │
-│  • PROVIDER_DISPLAY_NAMES: mapa chave → nome legível                   │
-│  • field_availability: Record<string, boolean>                          │
-│  • provider e provider_name OBRIGATÓRIOS em toda interface              │
+│  • Tipos brutos: RawCliente, RawContrato, RawFatura, RawFibraRecord,  │
+│    RawRadusuario, RawSignalData                                         │
+│  • ErpProviderDriver: contrato granular (fetchClientes, fetchContratos,│
+│    fetchFaturas, fetchRadusuarios, fetchFibra, fetchRawSignal)          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  CAMADA 2 — Driver / Orquestrador (erp-driver.ts)                      │
 │  Decide DE ONDE buscar e NORMALIZA os dados                             │
 │  • resolveCredentials(): decrypt AES-256-GCM                            │
-│  • normalizeClient(): status, conexão, field_availability               │
+│  • composeIxcClients(): 4 chamadas paralelas → ErpClient[]             │
+│  • composeSimpleClients(): SGP/MK → ErpClient[]                        │
+│  • normalizeInternetStatus(): IXC_INTERNET_STATUS_MAP → InternetStatus │
+│  • fetchInvoices(): CPF → id_cliente → faturas reais → ErpInvoice[]    │
+│  • fetchAllClients(), searchClients(), fetchClientSignal()              │
 │  • INJETA provider + provider_name em cada registro                     │
-│  • fetchAllClients(), searchClients(), testConnection()                 │
-│  • fetchClientSignal(): diagnóstico ONU                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  CAMADA 3 — Providers / Conectores (erp-providers/*.ts)                │
-│  Conexão EFETIVA com cada ERP                                           │
-│  • Retorna dados BRUTOS (RawErpClient) sem normalizar                  │
-│  • Cada provider implementa ErpProviderDriver                           │
-│  • supportedFields(): indica campos disponíveis                         │
+│  Conexão EFETIVA com cada ERP — dados BRUTOS, sem normalização         │
+│  • IXC: 6 funções granulares (fetchClientes, fetchContratos,           │
+│    fetchRadusuarios, fetchFibra, fetchFaturas, fetchRawSignal)          │
+│  • SGP: fetchClientes + stubs (contratos/faturas retornam [])          │
+│  • MK: fetchClientes + stubs (contratos/faturas retornam [])           │
 │  • Registry: getProvider("ixc") → ErpProviderDriver                    │
+│  • Filtros ERP-específicos aplicados aqui (ex: status='A' no IXC)      │
 └─────────────────────────────────────────────────────────────────────────┘`}
               </pre>
             </div>
@@ -172,7 +179,9 @@ const ERPIntegration = () => {
               <h4 className="mb-3 font-medium">Fluxo de uma Requisição</h4>
               <div className="rounded-lg bg-muted/50 p-4">
                 <pre className="overflow-x-auto text-xs">
-{`Frontend (useErpClients)
+{`═══ FLUXO 1: Listagem de Assinantes ═══
+
+Frontend (useErpClients)
     │
     ▼
 Edge Function (fetch-erp-clients)
@@ -181,20 +190,52 @@ Edge Function (fetch-erp-clients)
 CAMADA 2: fetchAllClients(supabaseAdmin, ispId, encryptionKey)
     ├── Consulta erp_configs (quais ERPs ativos)
     ├── Para cada config:
-    │       │
-    │       ▼
-    │   CAMADA 3: provider.fetchRawClients(credentials)
-    │       ├── Conecta ao endpoint específico
-    │       └── Retorna dados brutos (sem provider, sem normalização)
-    │       │
-    │   CAMADA 2: normalizeClient(rawData, provider, providerName)
-    │       ├── INJETA provider e provider_name (obrigatório)
-    │       ├── Mapeia status proprietário → ContractStatus padrão
-    │       ├── Mapeia conexão proprietária → boolean padrão
-    │       └── Marca campos indisponíveis (field_availability)
+    │
+    │   ┌─ IXC (composição granular) ──────────────────────────┐
+    │   │  CAMADA 3: Promise.all([                             │
+    │   │    fetchRadusuarios(creds),                          │
+    │   │    fetchClientes(creds),                             │
+    │   │    fetchContratos(creds),  // filtra status='A'      │
+    │   │    fetchFibra(creds),                                │
+    │   │  ])                                                   │
+    │   │  CAMADA 2: composeIxcClients()                       │
+    │   │    ├── Join radusuario → cliente → contrato → fibra  │
+    │   │    ├── normalizeInternetStatus(status_internet)      │
+    │   │    └── INJETA provider + provider_name               │
+    │   └──────────────────────────────────────────────────────┘
+    │
+    │   ┌─ SGP / MK (composição simples) ─────────────────────┐
+    │   │  CAMADA 3: fetchClientes(creds)                     │
+    │   │  CAMADA 2: composeSimpleClients()                   │
+    │   │    ├── status_internet = "ativo" (padrão)           │
+    │   │    └── INJETA provider + provider_name               │
+    │   └──────────────────────────────────────────────────────┘
     │
     ▼
-CAMADA 1: ErpClient[] (cada registro com provider obrigatório)`}
+CAMADA 1: ErpClient[] (cada registro com provider + status_internet)
+
+
+═══ FLUXO 2: Consulta de Faturas (IA) ═══
+
+Tool Handler (erp_invoice_search) recebe { cpf_cnpj }
+    │
+    ▼
+CAMADA 2: fetchInvoices(supabase, ispId, encryptionKey, cpfCnpj)
+    ├── Consulta erp_configs (quais ERPs ativos)
+    ├── Para cada config:
+    │       │
+    │   CAMADA 3 (IXC):
+    │       ├── fetchClientes(creds, { cpf_cnpj })  → id_cliente
+    │       └── fetchFaturas(creds, { cpf_cnpj })
+    │              ├── POST /fn_areceber (status='A')
+    │              └── Retorna RawFatura[]
+    │
+    │   CAMADA 2: normaliza cada fatura
+    │       ├── Calcula dias_atraso = hoje - data_vencimento
+    │       └── INJETA provider + provider_name
+    │
+    ▼
+CAMADA 1: ErpInvoice[] (faturas reais com dias_atraso)`}
                 </pre>
               </div>
             </div>
@@ -213,37 +254,32 @@ CAMADA 1: ErpClient[] (cada registro com provider obrigatório)`}
                   <TableRow>
                     <TableCell><Badge variant="outline">1</Badge></TableCell>
                     <TableCell><code className="text-xs">_shared/erp-types.ts</code></TableCell>
-                    <TableCell>Interfaces, enums, contrato do provider</TableCell>
+                    <TableCell>Interfaces (ErpClient, ErpInvoice), InternetStatus, tipos brutos (RawFatura, RawContrato, etc.), ErpProviderDriver</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell><Badge variant="outline">2</Badge></TableCell>
                     <TableCell><code className="text-xs">_shared/erp-driver.ts</code></TableCell>
-                    <TableCell>Orquestração, decrypt, normalização, origem</TableCell>
+                    <TableCell>Orquestração, composição granular (composeIxcClients/composeSimpleClients), normalização status_internet, fetchInvoices, decrypt AES-256-GCM</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell><Badge variant="outline">3</Badge></TableCell>
                     <TableCell><code className="text-xs">_shared/erp-providers/ixc.ts</code></TableCell>
-                    <TableCell>Conexão bruta com IXC Soft</TableCell>
+                    <TableCell>6 funções granulares: fetchClientes, fetchContratos, fetchRadusuarios, fetchFibra, fetchFaturas, fetchRawSignal</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell><Badge variant="outline">3</Badge></TableCell>
                     <TableCell><code className="text-xs">_shared/erp-providers/sgp.ts</code></TableCell>
-                    <TableCell>Conexão bruta com SGP</TableCell>
+                    <TableCell>fetchClientes + stubs para contratos/faturas (retornam [])</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell><Badge variant="outline">3</Badge></TableCell>
                     <TableCell><code className="text-xs">_shared/erp-providers/mk.ts</code></TableCell>
-                    <TableCell>Conexão bruta com MK-Solutions</TableCell>
+                    <TableCell>fetchClientes + stubs para contratos/faturas (retornam [])</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell><Badge variant="outline">3</Badge></TableCell>
                     <TableCell><code className="text-xs">_shared/erp-providers/index.ts</code></TableCell>
                     <TableCell>Registry: getProvider(name)</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell><Badge variant="outline">—</Badge></TableCell>
-                    <TableCell><code className="text-xs">_shared/erp-fetcher.ts</code></TableCell>
-                    <TableCell>Fachada retrocompatível (delega ao driver)</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -359,58 +395,65 @@ CAMADA 1: ErpClient[] (cada registro com provider obrigatório)`}
           <AccordionTrigger className="hover:no-underline">
             <div className="flex items-center gap-2">
               <Code className="h-4 w-4 text-primary" />
-              <span className="font-semibold">Normalização de Status</span>
+              <span className="font-semibold">Normalização de status_internet</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              Cada ERP utiliza valores diferentes para representar o mesmo conceito. A <strong>Camada 2 (Driver)</strong> normaliza 
-              todos os valores para o enum <code>ContractStatus</code>: <code>"ativo" | "suspenso" | "cancelado" | "bloqueado" | "inadimplente" | "desconhecido"</code>.
+              O campo <code>status_internet</code> vem do <code>cliente_contrato.status_internet</code> bruto do IXC. 
+              A <strong>Camada 2 (Driver)</strong> normaliza esse campo para o tipo <code>InternetStatus</code>:{" "}
+              <code>"ativo" | "bloqueado" | "financeiro_em_atraso" | "outros"</code>.
             </p>
 
+            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 mb-4">
+              <h4 className="mb-2 font-medium text-blue-600">Importante</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• O filtro de <strong>contratos ativos</strong> (<code>status='A'</code>) ocorre na <strong>Camada 3</strong> — apenas contratos com status ativo são retornados</li>
+                <li>• <code>status_internet</code> indica o <strong>estado da conexão</strong> dentro de um contrato ativo (bloqueio, redução, etc.)</li>
+                <li>• SGP e MK retornam <code>"ativo"</code> como padrão (não possuem contratos granulares)</li>
+              </ul>
+            </div>
+
+            <h4 className="font-medium text-foreground">Mapeamento IXC (IXC_INTERNET_STATUS_MAP)</h4>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ERP</TableHead>
-                  <TableHead>Valor Bruto</TableHead>
-                  <TableHead>→ Status Normalizado</TableHead>
+                  <TableHead>Valor Bruto (IXC)</TableHead>
+                  <TableHead>→ InternetStatus</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell className="font-medium">IXC</TableCell>
-                  <TableCell><code className="text-xs">contrato.status = "A"</code></TableCell>
+                  <TableCell><code className="text-xs">normal</code></TableCell>
                   <TableCell><Badge className="bg-green-500/10 text-green-600">ativo</Badge></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">IXC</TableCell>
-                  <TableCell><code className="text-xs">contrato.status = "S"</code></TableCell>
-                  <TableCell><Badge className="bg-yellow-500/10 text-yellow-600">suspenso</Badge></TableCell>
+                  <TableCell><code className="text-xs">bloqueado</code></TableCell>
+                  <TableCell><Badge className="bg-red-500/10 text-red-600">bloqueado</Badge></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">IXC</TableCell>
-                  <TableCell><code className="text-xs">ativo = "N"</code></TableCell>
-                  <TableCell><Badge className="bg-red-500/10 text-red-600">cancelado</Badge></TableCell>
+                  <TableCell><code className="text-xs">bloqueio_manual</code></TableCell>
+                  <TableCell><Badge className="bg-red-500/10 text-red-600">bloqueado</Badge></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">SGP</TableCell>
-                  <TableCell><code className="text-xs">"ativo"</code></TableCell>
-                  <TableCell><Badge className="bg-green-500/10 text-green-600">ativo</Badge></TableCell>
+                  <TableCell><code className="text-xs">bloqueio_automatico</code></TableCell>
+                  <TableCell><Badge className="bg-red-500/10 text-red-600">bloqueado</Badge></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">SGP</TableCell>
-                  <TableCell><code className="text-xs">"off"</code></TableCell>
-                  <TableCell><Badge className="bg-red-500/10 text-red-600">cancelado</Badge></TableCell>
+                  <TableCell><code className="text-xs">reduzido</code></TableCell>
+                  <TableCell><Badge className="bg-yellow-500/10 text-yellow-600">financeiro_em_atraso</Badge></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">MK</TableCell>
-                  <TableCell><code className="text-xs">"Bloqueado"</code></TableCell>
-                  <TableCell><Badge className="bg-orange-500/10 text-orange-600">bloqueado</Badge></TableCell>
+                  <TableCell><code className="text-xs">pendente_reativa</code></TableCell>
+                  <TableCell><Badge className="bg-red-500/10 text-red-600">bloqueado</Badge></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">Qualquer</TableCell>
-                  <TableCell><code className="text-xs">(valor desconhecido)</code></TableCell>
-                  <TableCell><Badge className="bg-muted text-muted-foreground">desconhecido</Badge></TableCell>
+                  <TableCell><code className="text-xs">desativado</code></TableCell>
+                  <TableCell><Badge className="bg-red-500/10 text-red-600">bloqueado</Badge></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell><code className="text-xs">(qualquer outro valor)</code></TableCell>
+                  <TableCell><Badge className="bg-muted text-muted-foreground">outros</Badge></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -563,12 +606,13 @@ CREATE POLICY "ISP admins" ON erp_configs FOR ALL
             <div className="mt-4 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
               <h4 className="mb-2 font-medium text-green-600">Tool Handlers (IA)</h4>
               <p className="text-sm text-muted-foreground">
-                Os agentes de IA utilizam <code>_shared/tool-handlers.ts</code> que delega para o driver:
+                Os agentes de IA utilizam <code>_shared/tool-handlers.ts</code> que delega para o driver. 
+                Cada tool é um <strong>passo atômico</strong> no fluxo conversacional do agente:
               </p>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <li>• <code>erp_search</code> → <code>searchClients()</code></li>
-                <li>• <code>onu_diagnostics</code> → <code>fetchClientSignal()</code></li>
-                <li>• <code>erp_invoice_search</code> → mock (integração futura)</li>
+                <li>• <code>erp_search</code> → <code>searchClients()</code> — busca cliente por CPF/CNPJ, retorna <code>status_internet</code></li>
+                <li>• <code>erp_invoice_search</code> → <code>fetchInvoices()</code> — faturas reais via IXC <code>/fn_areceber</code> (SGP/MK retornam <code>[]</code>)</li>
+                <li>• <code>onu_diagnostics</code> → <code>fetchClientSignal()</code> — diagnóstico ONU com análise de qualidade</li>
               </ul>
             </div>
           </AccordionContent>
@@ -716,10 +760,16 @@ CREATE POLICY "ISP admins" ON erp_configs FOR ALL
             <div className="rounded-lg bg-muted/50 p-4">
               <pre className="overflow-x-auto text-xs">
 {`// 1. Criar erp-providers/hubsoft.ts implementando ErpProviderDriver
+//    Implementar funções granulares por endpoint:
 export const hubsoftProvider: ErpProviderDriver = {
   supportedFields() { return ["login", "plano"]; },
-  async fetchRawClients(creds) { /* ... */ },
   async testConnection(creds) { /* ... */ },
+
+  // Funções granulares (opcionais por provider):
+  async fetchClientes(creds, filtro?) { /* GET /clientes */ },
+  async fetchContratos(creds, filtro?) { /* GET /contratos?status=A */ },
+  async fetchFaturas(creds, filtro) { /* GET /faturas?status=aberto */ },
+  // fetchRadusuarios, fetchFibra, fetchRawSignal — opcionais
 };
 
 // 2. Registrar no erp-providers/index.ts
@@ -729,14 +779,20 @@ const providers = {
   hubsoft: hubsoftProvider,
 };
 
-// 3. Adicionar mapeamento de status no erp-driver.ts
-const HUBSOFT_STATUS_MAP: Record<string, ContractStatus> = {
-  "10": "ativo",
-  "20": "suspenso",
-  // ...
+// 3. Adicionar mapeamento de status_internet no erp-driver.ts
+//    (a normalização ocorre na Camada 2, com mapa por provider)
+const HUBSOFT_INTERNET_STATUS_MAP: Record<string, InternetStatus> = {
+  "normal": "ativo",
+  "bloqueado": "bloqueado",
+  // ...demais valores do Hubsoft
 };
 
-// 4. Já existe em PROVIDER_DISPLAY_NAMES:
+// 4. Se o provider usa composição granular (como IXC),
+//    adicionar função composeHubsoftClients() no driver.
+//    Se usa composição simples (como SGP/MK),
+//    composeSimpleClients() já funciona automaticamente.
+
+// 5. Já existe em PROVIDER_DISPLAY_NAMES:
 // hubsoft: "Hubsoft"
 
 // PRONTO! Zero alterações nas edge functions ou frontend.`}
@@ -784,9 +840,9 @@ const HUBSOFT_STATUS_MAP: Record<string, ContractStatus> = {
                   <TableCell>Verificar <code>field_availability.signal_db</code> — exibir "N/D"</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="font-medium">Status "desconhecido"</TableCell>
-                  <TableCell>Valor do ERP não mapeado no driver</TableCell>
-                  <TableCell>Adicionar mapeamento na tabela de status do provider no driver</TableCell>
+                  <TableCell className="font-medium">Status "outros"</TableCell>
+                  <TableCell>Valor do campo <code className="text-xs">status_internet</code> não mapeado no <code className="text-xs">IXC_INTERNET_STATUS_MAP</code></TableCell>
+                  <TableCell>Adicionar o valor bruto ao mapa do provider correspondente em <code className="text-xs">erp-driver.ts</code></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
