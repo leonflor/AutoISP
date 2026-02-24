@@ -13,28 +13,6 @@ export interface ToolDefinition {
 }
 
 export const TOOL_CATALOG: Record<string, ToolDefinition> = {
-  erp_search: {
-    handler: "erp_search",
-    display_name: "Busca Clientes no ERP",
-    description:
-      "Busca clientes com contrato ativo no sistema ERP do provedor por CPF ou CNPJ. Retorna dados de contrato, status da internet e sinal.",
-    parameters_schema: {
-      type: "object",
-      properties: {
-        busca: {
-          type: "string",
-          description: "CPF ou CNPJ do cliente",
-          minLength: 11,
-        },
-      },
-      required: ["busca"],
-      additionalProperties: false,
-    },
-    response_description:
-      "Lista de clientes encontrados com nome, CPF, plano, status_internet (ativo/bloqueado/financeiro_em_atraso/outros), sinal e provedor ERP.",
-    requires_erp: true,
-  },
-
   erp_invoice_search: {
     handler: "erp_invoice_search",
     display_name: "Consulta de Faturas",

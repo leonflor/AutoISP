@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { searchClients, fetchClientSignal, fetchInvoices } from "./erp-driver.ts";
+import { fetchClientSignal, fetchInvoices } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -18,56 +18,6 @@ type ToolHandler = (
   args: Record<string, unknown>,
   config?: Record<string, unknown>
 ) => Promise<ToolResult>;
-
-// ── Handler: erp_search ──
-const erpSearchHandler: ToolHandler = async (ctx, args) => {
-  const query = String(args.busca || args.query || args.cpf || args.nome || "");
-  if (!query || query.length < 2) {
-    return { success: false, error: "Informe ao menos 2 caracteres para busca" };
-  }
-
-  try {
-    const result = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, query);
-
-    if (result.clients.length === 0) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: "Nenhum cliente encontrado com esse dado.",
-          erros: result.errors,
-        },
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        encontrados: result.clients.length,
-        clientes: result.clients.slice(0, 10).map((c) => ({
-          nome: c.nome,
-          cpf_cnpj: c.cpf_cnpj,
-          plano: c.plano,
-          login: c.login,
-          status_internet: c.status_internet,
-          conectado: c.conectado,
-          vencimento: c.data_vencimento,
-          erp: c.provider_name,
-          contrato_id: c.contrato_id,
-          cliente_erp_id: c.cliente_erp_id,
-          signal_db: c.signal_db,
-          signal_quality: c.signal_quality,
-        })),
-        erros: result.errors,
-      },
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `Erro ao buscar no ERP: ${err instanceof Error ? err.message : "desconhecido"}`,
-    };
-  }
-};
 
 // ── Handler: erp_invoice_search ──
 const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
@@ -145,7 +95,6 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
 
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
-  erp_search: erpSearchHandler,
   erp_invoice_search: erpInvoiceSearchHandler,
   onu_diagnostics: onuDiagnosticsHandler,
 };
