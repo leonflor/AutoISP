@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchClientSignal, fetchInvoices, searchClients } from "./erp-driver.ts";
+import { fetchClientSignal, fetchInvoices, searchClients, fetchClientContracts } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -144,11 +144,56 @@ const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
   }
 };
 
+// ── Handler: erp_contract_lookup ──
+const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
+  const clientId = String(args.client_id || "");
+  if (!clientId) {
+    return { success: false, error: "Informe o ID do cliente no ERP (client_id)" };
+  }
+
+  try {
+    const result = await fetchClientContracts(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, clientId);
+
+    if (result.contracts.length === 0) {
+      return {
+        success: true,
+        data: {
+          encontrados: 0,
+          mensagem: "Nenhum contrato ativo encontrado para este cliente.",
+          erros: result.errors,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        encontrados: result.contracts.length,
+        contratos: result.contracts.map((c) => ({
+          contrato_id: c.contrato_id,
+          endereco_completo: c.endereco_completo,
+          plano: c.plano,
+          status_internet: c.status_internet,
+          dia_vencimento: c.dia_vencimento,
+          provider_name: c.provider_name,
+        })),
+        erros: result.errors,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Erro ao buscar contratos: ${err instanceof Error ? err.message : "desconhecido"}`,
+    };
+  }
+};
+
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_invoice_search: erpInvoiceSearchHandler,
   onu_diagnostics: onuDiagnosticsHandler,
   erp_client_lookup: erpClientLookupHandler,
+  erp_contract_lookup: erpContractLookupHandler,
 };
 
 /**

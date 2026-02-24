@@ -321,7 +321,7 @@ const OpenAIIntegration = () => {
                 </div>
 
                 <div>
-                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas (2 handlers):</h4>
+                  <h4 className="mb-3 text-sm font-medium">Tools Implementadas (4 handlers):</h4>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -352,6 +352,13 @@ const OpenAIIntegration = () => {
                         <TableCell className="font-mono text-xs">buscar_cliente</TableCell>
                         <TableCell className="text-sm">Busca cliente por CPF/CNPJ — retorna cliente_erp_id para encadeamento com outras tools</TableCell>
                         <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional</Badge></TableCell>
+                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-xs">erp_contract_lookup</TableCell>
+                        <TableCell className="font-mono text-xs">consultar_contrato</TableCell>
+                        <TableCell className="text-sm">Consulta contratos por ID do cliente — retorna endereço de instalação, plano e status</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional (IXC)</Badge></TableCell>
                         <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                     </TableBody>
