@@ -37,4 +37,15 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       "Diagnóstico com potência RX/TX em dBm, qualidade do sinal e recomendações.",
     requires_erp: true,
   },
+  {
+    handler: "erp_client_lookup",
+    display_name: "Busca Cliente por CPF/CNPJ",
+    description:
+      "Busca dados cadastrais de um cliente no ERP por CPF ou CNPJ. Retorna o ID do cliente (necessário para diagnóstico de sinal), nome, status e plano.",
+    parameters: [
+      { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
+    ],
+    response_description: "Dados do cliente com cliente_erp_id, nome, status e plano.",
+    requires_erp: true,
+  },
 ];

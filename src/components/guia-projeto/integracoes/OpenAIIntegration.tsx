@@ -312,7 +312,7 @@ const OpenAIIntegration = () => {
                   <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
                     <li>Tools são definidas no catálogo hardcoded (<code className="text-xs">tool-catalog.ts</code>) com JSON Schema para function calling</li>
                     <li>Fluxos conversacionais (<code className="text-xs">ai_agent_flows</code>) contêm etapas (<code className="text-xs">ai_agent_flow_steps</code>)</li>
-                    <li>Cada etapa pode referenciar uma tool via <code className="text-xs">tool_handler</code> (string, ex: "erp_invoice_search")</li>
+                    <li>Cada etapa pode referenciar uma tool via <code className="text-xs">tool_handler</code> (string, ex: "erp_invoice_search", "erp_client_lookup")</li>
                     <li>Fluxos são vinculados a agentes via <code className="text-xs">ai_agent_flow_links</code></li>
                     <li>O <code className="text-xs">ai-chat</code> filtra tools do catálogo conforme fluxos ativos do agente</li>
                     <li>Handler registry em <code className="text-xs">_shared/tool-handlers.ts</code> mapeia <code>handler</code> para funções executáveis</li>
@@ -345,6 +345,13 @@ const OpenAIIntegration = () => {
                         <TableCell className="font-mono text-xs">diagnostico_sinal_onu</TableCell>
                         <TableCell className="text-sm">Diagnóstico de sinal ONU — classifica potência óptica (Excelente/Bom/Alerta/Crítico)</TableCell>
                         <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional (IXC)</Badge></TableCell>
+                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-xs">erp_client_lookup</TableCell>
+                        <TableCell className="font-mono text-xs">buscar_cliente</TableCell>
+                        <TableCell className="text-sm">Busca cliente por CPF/CNPJ — retorna cliente_erp_id para encadeamento com outras tools</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional</Badge></TableCell>
                         <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                     </TableBody>
