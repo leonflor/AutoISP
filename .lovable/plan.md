@@ -1,62 +1,109 @@
 
 
-# Remover Dead Code: Tabela ai_agent_tools + Hook + Tabelas Procedures Legadas
+# Atualizar Guia com Implementacoes Feitas Nao Documentadas
 
-## Diagnostico
+## Discrepancias Encontradas
 
-Confirmei que:
-- `useAgentTools.ts` nao e importado por nenhum outro arquivo (0 referencias externas)
-- A tabela `ai_agent_tools` nao e referenciada por nenhuma edge function
-- As tabelas legadas do sistema "Procedures" (`ai_procedures`, `ai_procedure_tools`, `ai_procedure_flows`, `ai_agent_procedures`) tambem nao sao referenciadas por nenhum codigo — sao dead code completo desde a migracao para o sistema de fluxos
+Apos varredura completa do codigo vs guia, identifiquei **5 discrepancias** entre o que esta implementado e o que o guia documenta.
 
-## Plano
+---
 
-### 1. Deletar arquivo `src/hooks/admin/useAgentTools.ts`
+### Discrepancia 1: ResumoProjetoTab — Referencia a "Procedures" (removido)
 
-Hook completamente sem uso apos a unificacao do `AgentFlowStepsEditor` para `TOOL_CATALOG`.
+**Arquivo:** `src/components/guia-projeto/ResumoProjetoTab.tsx` (linhas 343-346)
 
-### 2. Migracao SQL — Dropar 5 tabelas obsoletas
+O Resumo Executivo menciona:
+- "sistema de fluxos conversacionais com procedures"
+- "Agent → Procedures → Fluxos → Steps → tool_handler via catalogo hardcoded"
 
-Ordem de DROP respeitando foreign keys (tabelas-filhas primeiro):
+A arquitetura "Procedures" foi completamente removida (tabelas `ai_procedures`, `ai_procedure_tools`, `ai_agent_procedures` dropadas na migracao recente). A arquitetura atual e:
+- **Agent → Flow Links → Flows → Steps → tool_handler**
 
-```sql
--- 1. Tabelas de junção das Procedures (dependem de ai_procedures)
-DROP TABLE IF EXISTS ai_procedure_tools;
-DROP TABLE IF EXISTS ai_procedure_flows;
-DROP TABLE IF EXISTS ai_agent_procedures;
+**Correcao:** Atualizar o Resumo Executivo para refletir a arquitetura de fluxos diretos sem procedures.
 
--- 2. Tabela principal Procedures
-DROP TABLE IF EXISTS ai_procedures;
+---
 
--- 3. Tabela ai_agent_tools (dead code — backend usa TOOL_CATALOG hardcoded)
-DROP TABLE IF EXISTS ai_agent_tools;
-```
+### Discrepancia 2: OpenAIIntegration — Prompt Hierarquico menciona "Procedures" (linhas 156-159)
 
-Essas 5 tabelas nao possuem dados relevantes e nao sao referenciadas por nenhum codigo no frontend nem no backend.
+**Arquivo:** `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx` (linhas 156-159)
 
-### 3. Coluna `tool_id` em `ai_agent_flow_steps`
+Camadas 6 e 7 do prompt hierarquico dizem:
+- "Ferramentas (Tools) — Carregadas via Procedures vinculados ao agente"
+- "Fluxos Conversacionais — Instrucoes estruturadas via Procedures"
 
-A coluna `tool_id` (UUID, FK para `ai_agent_tools`) ficara orfã apos dropar `ai_agent_tools`. Sera removida na mesma migracao:
+No `ai-chat` real (linhas 228-277), tools e fluxos sao carregados diretamente via `ai_agent_flow_links` → `ai_agent_flows` → `ai_agent_flow_steps`, sem "Procedures".
 
-```sql
-ALTER TABLE ai_agent_flow_steps DROP COLUMN IF EXISTS tool_id;
-```
+**Correcao:** Atualizar para:
+- "Ferramentas (Tools) — Filtradas do catalogo conforme fluxos vinculados via flow_links"
+- "Fluxos Conversacionais — Carregados via ai_agent_flow_links"
 
-O backend e o frontend ja usam exclusivamente `tool_handler` (string).
+---
 
-### 4. Coluna `agent_id` em `ai_agent_flows`
+### Discrepancia 3: AgentesIAClienteFeatures — Menciona "procedures" (linha 118)
 
-A coluna `agent_id` na tabela `ai_agent_flows` era do sistema antigo (fluxos per-agent). Agora a vinculacao e feita via `ai_agent_flow_links`. Porem, o `AgentFlowsTab` ainda usa `agent_id` para listar fluxos per-agent. **Nao sera removida** nesta etapa.
+**Arquivo:** `src/components/guia-projeto/features/modules/cliente/AgentesIAClienteFeatures.tsx` (linha 118)
+
+Feature F-CLI-052 diz: "tools via procedures"
+
+**Correcao:** Mudar para "tools via catalogo hardcoded e fluxos vinculados"
+
+---
+
+### Discrepancia 4: ResumoProjetoTab — Menciona "Hubsoft" como ERP integrado
+
+**Arquivo:** `src/components/guia-projeto/ResumoProjetoTab.tsx` (linha 343)
+
+Diz: "integracao multi-ERP (IXC, SGP, MK-Solutions, Hubsoft)"
+
+Na realidade, Hubsoft existe apenas como tipo em `erp-types.ts` e display name, mas **nao tem provider implementado** (nao existe `erp-providers/hubsoft.ts`). O guia de ERP corretamente marca Hubsoft como "Pendente" na tabela, mas o Resumo Executivo implica que ja esta integrado.
+
+**Correcao:** Mudar para "integracao multi-ERP (IXC, SGP, MK-Solutions)" e mencionar Hubsoft como planejado.
+
+---
+
+### Discrepancia 5: PainelAdminSection — Falta modulos implementados (WhatsApp, IA submenu)
+
+**Arquivo:** `src/components/guia-projeto/plataformas/PainelAdminSection.tsx` (linhas 23-34)
+
+A lista de modulos no guia tem 10 items mas **falta o modulo WhatsApp** que existe no AdminSidebar e tem pagina implementada (`/admin/whatsapp` → `WhatsApp.tsx`). O sidebar real tambem organiza IA como submenu com 5 itens (Templates, Ferramentas, Fluxos, Logs, Clausulas LGPD), mas o guia lista apenas "Agentes IA Template" como um unico modulo.
+
+**Correcao:** Adicionar "WhatsApp" como modulo e expandir a descricao de IA para refletir os 5 sub-modulos reais.
+
+---
+
+## Plano de Alteracoes
+
+### Arquivo 1: `src/components/guia-projeto/ResumoProjetoTab.tsx`
+
+**Linha 343-346 (Resumo Executivo):**
+- Remover "com procedures" da frase
+- Trocar "(IXC, SGP, MK-Solutions, Hubsoft)" por "(IXC, SGP, MK-Solutions)"
+- Trocar "Agent → Procedures → Fluxos → Steps → tool_handler" por "Agent → Flow Links → Flows → Steps → tool_handler"
+- Adicionar "Hubsoft planejado" como nota
+
+### Arquivo 2: `src/components/guia-projeto/integracoes/OpenAIIntegration.tsx`
+
+**Linhas 156-159 (Prompt Hierarquico — Camadas 6 e 7):**
+- Camada 6: "Ferramentas (Tools) — Filtradas do catalogo conforme fluxos vinculados (ai_agent_flow_links)"
+- Camada 7: "Fluxos Conversacionais — Carregados via ai_agent_flow_links com steps e rotas condicionais"
+
+### Arquivo 3: `src/components/guia-projeto/features/modules/cliente/AgentesIAClienteFeatures.tsx`
+
+**Linha 118:**
+- Trocar "tools via procedures" por "tools via catalogo hardcoded e fluxos vinculados"
+
+### Arquivo 4: `src/components/guia-projeto/plataformas/PainelAdminSection.tsx`
+
+**Linhas 23-34 (lista de modulos):**
+- Adicionar modulo "WhatsApp" com descricao: "Configuracao global da Meta Business API, webhook URL, testes de conexao"
+- Expandir "Agentes IA Template" para "IA (5 sub-modulos)" com descricao: "Templates de agentes, catalogo de ferramentas (read-only), fluxos conversacionais globais, logs de processamento RAG, clausulas LGPD"
 
 ## Resumo de Impacto
 
-| Item | Acao |
+| Arquivo | Alteracao |
 |---|---|
-| `src/hooks/admin/useAgentTools.ts` | **DELETAR** arquivo |
-| `ai_procedure_tools` (tabela) | **DROP** |
-| `ai_procedure_flows` (tabela) | **DROP** |
-| `ai_agent_procedures` (tabela) | **DROP** |
-| `ai_procedures` (tabela) | **DROP** |
-| `ai_agent_tools` (tabela) | **DROP** |
-| `ai_agent_flow_steps.tool_id` (coluna) | **DROP COLUMN** |
+| `ResumoProjetoTab.tsx` | Remover "Procedures" e "Hubsoft" do resumo executivo |
+| `OpenAIIntegration.tsx` | Corrigir camadas 6-7 do prompt hierarquico |
+| `AgentesIAClienteFeatures.tsx` | Corrigir referencia a "procedures" |
+| `PainelAdminSection.tsx` | Adicionar WhatsApp + expandir descricao IA |
 
