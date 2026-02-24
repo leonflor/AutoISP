@@ -765,17 +765,16 @@ const ImplementacaoTab = () => {
             ))}
           </div>
           <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/) — 9 módulos</h4>
+            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/) — 8 módulos</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
               <li><code className="rounded bg-muted px-1">_shared/tool-handlers.ts</code> — Registry de handlers para function calling (mapeia handler_type → função executável)</li>
               <li><code className="rounded bg-muted px-1">_shared/tool-catalog.ts</code> — Catálogo de tools para function calling (definições OpenAI)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-fetcher.ts</code> — Lógica centralizada de busca em ERPs com descriptografia de credenciais</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-types.ts</code> — Tipos padrão de ERP (ErpClient, ErpProvider, ContractStatus)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Interface base do driver de ERP</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-types.ts</code> — Tipos padrão de ERP (ErpClient, ErpInvoice, InternetStatus, RawFatura, ErpProviderDriver)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Orquestrador: composição granular, normalização status_internet, fetchInvoices, decrypt AES-256-GCM</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-providers/index.ts</code> — Registry de providers ERP (IXC, SGP, MK)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/ixc.ts</code> — Conector IXC Soft</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/sgp.ts</code> — Conector SGP</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/mk.ts</code> — Conector MK-Solutions</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/ixc.ts</code> — Conector IXC Soft — 6 funções granulares (clientes, contratos, radusuarios, fibra, faturas, sinal)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/sgp.ts</code> — Conector SGP — clientes + stubs para contratos/faturas</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/mk.ts</code> — Conector MK-Solutions — clientes + stubs para contratos/faturas</li>
               <li><code className="rounded bg-muted px-1">_shared/onu-signal-analyzer.ts</code> — Análise de qualidade de sinal ONU (rx/tx)</li>
             </ul>
           </div>
