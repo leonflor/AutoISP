@@ -491,9 +491,7 @@ export async function fetchClientContracts(
           ct.numero ? `nº ${ct.numero}` : null,
           ct.complemento,
           ct.bairro,
-          ct.cidade,
-          ct.estado,
-        ].filter(p => p && String(p).trim() !== "" && String(p).trim() !== "0").map(p => String(p).trim());
+        ].filter(p => p && String(p).trim() !== "" && String(p).trim() !== "0" && String(p).trim() !== "SN").map(p => String(p).trim());
         const endereco = partes.length > 0 ? partes.join(", ") : null;
 
         return {
