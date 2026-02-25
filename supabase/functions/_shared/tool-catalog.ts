@@ -17,7 +17,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     handler: "erp_invoice_search",
     display_name: "Consulta de Faturas",
     description:
-      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Quando o cliente tem múltiplos contratos, use o parâmetro endereco para filtrar o contrato desejado (obtido via erp_contract_lookup).",
+      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Aceita parâmetro opcional de endereço para filtrar por contrato.",
     parameters_schema: {
       type: "object",
       properties: {
@@ -79,7 +79,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Dados do cliente com nome e CPF/CNPJ. Use erp_contract_lookup para contratos e erp_onu_diagnostics para sinal.",
+      "Dados do cliente com nome e CPF/CNPJ.",
     requires_erp: true,
   },
 
@@ -87,7 +87,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     handler: "erp_contract_lookup",
     display_name: "Consulta de Contrato",
     description:
-      "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereços de instalação dos contratos. Ao listar para o cliente, exiba APENAS uma lista numerada com os endereços, sem plano, sem status, sem vencimento. Exemplo: '1. Rua X, 123, Bairro, Cidade'. Pergunte sobre qual contrato quer falar.",
+      "Consulta contratos ativos de um cliente no ERP por CPF/CNPJ. Retorna endereços de instalação dos contratos.",
     parameters_schema: {
       type: "object",
       properties: {
@@ -101,7 +101,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Use o campo 'instrucao_exibicao' como resposta ao cliente. NÃO reformate, NÃO adicione informações extras. Os dados em '_detalhes_internos' são para uso posterior apenas.",
+      "Retorna 'instrucao_exibicao' com texto pronto para o cliente e '_detalhes_internos' para uso posterior.",
     requires_erp: true,
   },
 };
