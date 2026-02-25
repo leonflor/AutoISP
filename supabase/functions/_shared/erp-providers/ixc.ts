@@ -282,6 +282,9 @@ async function fetchContratosDetalhados(
   });
 
   const ativos = recs.filter((ct: any) => ct.status === "A");
+  console.log(`[IXC] fetchContratosDetalhados raw (${ativos.length} ativos):`, JSON.stringify(ativos.map((ct: any) => ({
+    id: ct.id, endereco: ct.endereco, numero: ct.numero, complemento: ct.complemento, bairro: ct.bairro, cidade: ct.cidade, estado: ct.estado
+  }))));
 
   return ativos.map((ct: any) => ({
     id: String(ct.id),

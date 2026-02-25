@@ -688,7 +688,7 @@ Deno.serve(async (req) => {
           // Tools are now resolved by handler name directly (fnName === handler_type)
           const result = await executeToolHandler(fnName, toolCtx, fnArgs);
 
-          console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`);
+          console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`, JSON.stringify(result));
 
           messages.push({
             role: "tool",
