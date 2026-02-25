@@ -1,56 +1,114 @@
 
+Objetivo
+- Corrigir o `erp_contract_lookup` para enviar ao agente de IA o payload estruturado “dado original por contrato” (com `ordem`, `endereco`, `numero`, etc.), em vez de depender de `lista_formatada` pronta.
 
-# Plano: Adicionar log de depuração para capturar payload exato do IXC
+Diagnóstico atual
+- Hoje o handler retorna:
+  - `encontrados`
+  - `lista_formatada` (string pronta)
+  - `erros`
+- Isso força formatação no backend e perde granularidade dos campos originais.
+- No `erp-driver.ts`, já existe composição de `endereco_completo`, mas os campos crus não estão sendo devolvidos no contrato final da Camada 2 para a Camada 1 (tool handler).
+- O bug de `nº SN` também acontece porque o prefixo `nº` é aplicado antes da filtragem semântica.
 
-## Diagnóstico
+Plano de implementação (arquivo por arquivo)
 
-O código atual em `erp-driver.ts` e `tool-handlers.ts` está correto conforme as alterações anteriores. O problema pode ser:
+1) `supabase/functions/_shared/erp-driver.ts`
+- Expandir `ContractResult` para incluir campos estruturados de endereço:
+  - `endereco`
+  - `numero`
+  - `complemento`
+  - `bairro`
+  - `cidade`
+  - `estado`
+  - `cep`
+- No mapeamento de `detalhados.map((ct) => ...)`:
+  - Preservar os campos crus (string ou null) vindos do provider.
+  - Ajustar saneamento de `endereco_completo`:
+    - remover vírgula no final de `endereco` (`replace(/,\s*$/, "")`)
+    - só incluir `numero` quando válido (`!== ""`, `!== "0"`, `!== "SN"`)
+    - manter `cidade/estado` fora do `endereco_completo` se continuarem vindo como ID numérico.
+- Resultado: Camada 2 passa a entregar contrato com campos estruturados + campo composto opcional.
 
-1. **O deploy não foi aplicado** — a edge function pode estar rodando uma versão cacheada
-2. **O IXC retorna dados diferentes do esperado** — os campos `endereco`, `numero`, `bairro` podem conter valores inesperados no endpoint `cliente_contrato`
+2) `supabase/functions/_shared/tool-handlers.ts` (handler `erp_contract_lookup`)
+- Alterar o payload final para estrutura orientada a objeto:
+  - substituir (ou despriorizar) `lista_formatada`
+  - adicionar `contratos: []` com itens no formato:
+    - `ordem`
+    - `contrato_id`
+    - `endereco`
+    - `numero`
+    - `complemento`
+    - `bairro`
+    - `cidade`
+    - `estado`
+    - `cep`
+    - `endereco_completo` (opcional para fallback)
+    - `provider_name`
+- Filtrar contratos “vazios de endereço” no payload final apenas se todos os campos de endereço vierem nulos/vazios (decisão para reduzir ruído), mantendo `contrato_id` quando necessário para rastreabilidade.
+- Manter `encontrados` coerente com o array efetivamente retornado.
+- Manter `erros` inalterado.
 
-Para depurar, precisamos ver o payload cru (raw) que o IXC retorna **e** o payload final que a tool entrega ao agente.
+3) `supabase/functions/_shared/tool-catalog.ts`
+- Atualizar `response_description` de `erp_contract_lookup` para refletir o novo contrato estruturado.
+- Isso melhora a expectativa do modelo ao interpretar o retorno da tool.
 
-## Alterações
+4) (Opcional, recomendado) `supabase/functions/ai-chat/index.ts`
+- Manter log atual de resultado completo (`JSON.stringify(result)`), pois ele já permite auditoria do payload exato enviado ao modelo.
+- Sem mudança funcional adicional obrigatória aqui.
 
-### 1. Adicionar log detalhado no IXC provider (`erp-providers/ixc.ts`)
-
-Na função `fetchContratosDetalhados` (linha 284-299), adicionar um `console.log` dos registros brutos retornados pelo IXC **antes** do mapeamento:
-
-```typescript
-const ativos = recs.filter((ct: any) => ct.status === "A");
-console.log(`[IXC] fetchContratosDetalhados raw (${ativos.length} ativos):`, JSON.stringify(ativos.map((ct: any) => ({
-  id: ct.id, endereco: ct.endereco, numero: ct.numero, complemento: ct.complemento, bairro: ct.bairro, cidade: ct.cidade, estado: ct.estado
-}))));
+Formato alvo do payload (exemplo)
+```json
+{
+  "success": true,
+  "data": {
+    "encontrados": 6,
+    "contratos": [
+      {
+        "ordem": 1,
+        "contrato_id": "123",
+        "endereco": "Quadra Central 1",
+        "numero": null,
+        "complemento": null,
+        "bairro": "Sobradinho",
+        "cidade": "5564",
+        "estado": "8",
+        "cep": null,
+        "endereco_completo": "Quadra Central 1, Sobradinho",
+        "provider_name": "IXC Soft"
+      }
+    ],
+    "erros": []
+  }
+}
 ```
 
-### 2. Adicionar log do payload final no ai-chat (`ai-chat/index.ts`)
+Compatibilidade e risco
+- Risco principal: fluxos/prompts que esperam `lista_formatada`.
+- Mitigação recomendada:
+  - fase 1: retornar `contratos` + manter `lista_formatada` temporariamente (compatível)
+  - fase 2: remover `lista_formatada` após confirmar que o agente está formatando via estrutura.
+- Isso evita quebra imediata em produção.
 
-Na linha 691, expandir o log para incluir o payload completo da tool:
+Validação (obrigatória)
+1. Redeploy da edge function `ai-chat`.
+2. Executar fluxo com CNPJ `12.059.400/0001-51`.
+3. Conferir log `🔧 Tool result: erp_contract_lookup` e validar:
+   - presença de `data.contratos[]` estruturado
+   - ausência de dependência exclusiva de `lista_formatada`
+   - `encontrados` consistente com quantidade retornada.
+4. Teste ponta a ponta no chat:
+   - agente deve montar lista numerada a partir de `contratos[].ordem` e campos de endereço.
+   - validar desktop e mobile.
 
-```typescript
-console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`, JSON.stringify(result));
-```
+Seção técnica (resumo para implementação)
+- Camada 2 (`erp-driver`) deve carregar dados estruturados.
+- Camada 1 (`tool-handlers`) deve expor estrutura em JSON sem “render pronto”.
+- Catálogo (`tool-catalog`) deve descrever novo shape para orientar function-calling.
+- Logging existente em `ai-chat` já é suficiente para depurar o payload final enviado ao modelo.
 
-### 3. Redeploy da edge function `ai-chat`
-
-Após as alterações, fazer redeploy para garantir que o runtime usa o código atualizado.
-
-### 4. Teste e leitura dos logs
-
-Após o deploy, você testa no painel (diz "boleto", informa o CNPJ `12.059.400/0001-51`) e eu leio os logs da edge function para ver:
-- O payload bruto do IXC (campos de endereço reais)
-- O payload final enviado ao modelo (com `lista_formatada`)
-
-## Resultado esperado
-
-Nos logs aparecerá algo como:
-
-```
-[IXC] fetchContratosDetalhados raw (6 ativos): [{"id":"123","endereco":"Quadra Central 1","numero":"SN","complemento":null,"bairro":"Sobradinho","cidade":"5564","estado":"8"}]
-
-🔧 Tool result: erp_contract_lookup -> success=true {"success":true,"data":{"encontrados":6,"lista_formatada":"1. Quadra Central 1, Sobradinho\n\n2. ..."}}
-```
-
-Com isso saberemos exatamente o que está acontecendo e se o deploy está realmente ativo.
-
+<lov-actions>
+<lov-suggestion message="Teste o fluxo de consulta de contratos ponta a ponta com o CNPJ 12.059.400/0001-51 e valide no log que o payload chega com data.contratos estruturado.">Validar ponta a ponta</lov-suggestion>
+<lov-suggestion message="Implemente compatibilidade temporária retornando contratos estruturados e lista_formatada ao mesmo tempo, depois remova lista_formatada em uma segunda etapa.">Compatibilidade gradual</lov-suggestion>
+<lov-suggestion message="Adicione uma etapa de normalização para resolver cidade/estado quando vierem como IDs do IXC, consultando tabela de referência antes de enviar ao agente.">Resolver cidade/estado por ID</lov-suggestion>
+</lov-actions>
