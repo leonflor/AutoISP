@@ -187,13 +187,25 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
       };
     }
 
+    // Filter out contracts with no address data at all
+    const comEndereco = result.contracts.filter((c) =>
+      c.endereco || c.bairro || c.complemento
+    );
+
     return {
       success: true,
       data: {
-        encontrados: result.contracts.length,
-        lista_formatada: result.contracts.map((c) =>
-          `${c.ordem}. ${c.endereco_completo || "Endereço não disponível"}`
-        ).join("\n\n"),
+        encontrados: comEndereco.length,
+        contratos: comEndereco.map((c) => ({
+          ordem: c.ordem,
+          contrato_id: c.contrato_id,
+          endereco: c.endereco,
+          numero: c.numero,
+          complemento: c.complemento,
+          bairro: c.bairro,
+          endereco_completo: c.endereco_completo,
+          provider_name: c.provider_name,
+        })),
         erros: result.errors,
       },
     };

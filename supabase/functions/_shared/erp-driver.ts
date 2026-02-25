@@ -441,6 +441,13 @@ export async function fetchInvoices(
 export interface ContractResult {
   ordem: number;
   contrato_id: string;
+  endereco: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
   endereco_completo: string | null;
   plano: string | null;
   status_internet: string;
@@ -486,18 +493,31 @@ export async function fetchClientContracts(
       }
 
       const contracts: ContractResult[] = detalhados.map((ct) => {
+        const rawEndereco = ct.endereco ? String(ct.endereco).trim().replace(/,\s*$/, "") : null;
+        const rawNumero = ct.numero ? String(ct.numero).trim() : null;
+        const cleanNumero = (rawNumero && rawNumero !== "" && rawNumero !== "0" && rawNumero !== "SN") ? rawNumero : null;
+        const rawComplemento = ct.complemento ? String(ct.complemento).trim() : null;
+        const rawBairro = ct.bairro ? String(ct.bairro).trim() : null;
+
         const partes = [
-          ct.endereco,
-          ct.numero ? `nº ${ct.numero}` : null,
-          ct.complemento,
-          ct.bairro,
-        ].filter(p => p && String(p).trim() !== "" && String(p).trim() !== "0" && String(p).trim() !== "SN").map(p => String(p).trim());
-        const endereco = partes.length > 0 ? partes.join(", ") : null;
+          rawEndereco,
+          cleanNumero ? `nº ${cleanNumero}` : null,
+          rawComplemento,
+          rawBairro,
+        ].filter(p => p && p !== "" && p !== "0");
+        const enderecoCompleto = partes.length > 0 ? partes.join(", ") : null;
 
         return {
           ordem: 0,
           contrato_id: ct.id,
-          endereco_completo: endereco,
+          endereco: rawEndereco || null,
+          numero: cleanNumero || null,
+          complemento: rawComplemento || null,
+          bairro: rawBairro || null,
+          cidade: ct.cidade ? String(ct.cidade).trim() : null,
+          estado: ct.estado ? String(ct.estado).trim() : null,
+          cep: ct.cep ? String(ct.cep).trim() : null,
+          endereco_completo: enderecoCompleto,
           plano: ct.plano,
           status_internet: normalizeInternetStatus(ct.status_internet, providerKey),
           dia_vencimento: ct.dia_vencimento,

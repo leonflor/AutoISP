@@ -101,7 +101,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Retorna 'instrucao_exibicao' com texto pronto para o cliente e '_detalhes_internos' para uso posterior.",
+      "Retorna array 'contratos' com objetos contendo: ordem, contrato_id, endereco, numero, complemento, bairro, endereco_completo e provider_name. Use os campos estruturados para formatar a lista para o cliente.",
     requires_erp: true,
   },
 };
