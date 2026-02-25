@@ -57,7 +57,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     parameters: [
       { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
     ],
-    response_description: "Contratos ativos com endereço completo. Apresenta lista numerada de endereços ao cliente.",
+    response_description: "Retorna 'instrucao_exibicao' com texto pronto para o cliente e '_detalhes_internos' para uso posterior.",
     requires_erp: true,
   },
 ];

@@ -101,7 +101,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Contratos ativos com contrato_id e endereço completo. Ao apresentar ao cliente, liste SOMENTE os endereços numerados. Os demais campos (plano, status, vencimento) são internos para uso posterior quando o cliente escolher um contrato.",
+      "Use o campo 'instrucao_exibicao' como resposta ao cliente. NÃO reformate, NÃO adicione informações extras. Os dados em '_detalhes_internos' são para uso posterior apenas.",
     requires_erp: true,
   },
 };
