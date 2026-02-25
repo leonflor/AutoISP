@@ -53,11 +53,11 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     handler: "erp_contract_lookup",
     display_name: "Consulta de Contrato",
     description:
-      "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereço de instalação, plano contratado e status.",
+      "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereços de instalação dos contratos.",
     parameters: [
       { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
     ],
-    response_description: "Contratos ativos com contrato_id, endereço completo, plano, status e dia de vencimento.",
+    response_description: "Contratos ativos com endereço completo. Apresenta lista numerada de endereços ao cliente.",
     requires_erp: true,
   },
 ];

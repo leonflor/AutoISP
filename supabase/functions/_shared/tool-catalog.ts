@@ -87,7 +87,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     handler: "erp_contract_lookup",
     display_name: "Consulta de Contrato",
     description:
-      "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna ID do contrato, endereço de instalação, plano contratado e status. Quando houver múltiplos contratos, pergunte ao cliente qual endereço para consultas financeiras.",
+      "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereços de instalação dos contratos. Ao listar para o cliente, exiba APENAS uma lista numerada com os endereços, sem plano, sem status, sem vencimento. Exemplo: '1. Rua X, 123, Bairro, Cidade'. Pergunte sobre qual contrato quer falar.",
     parameters_schema: {
       type: "object",
       properties: {
@@ -101,7 +101,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Contratos ativos com contrato_id, endereço completo, plano, status e dia de vencimento. Quando houver múltiplos contratos, pergunte ao cliente qual endereço para consultas financeiras.",
+      "Contratos ativos com contrato_id e endereço completo. Ao apresentar ao cliente, liste SOMENTE os endereços numerados. Os demais campos (plano, status, vencimento) são internos para uso posterior quando o cliente escolher um contrato.",
     requires_erp: true,
   },
 };
