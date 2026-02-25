@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchClientSignal, fetchInvoices, searchClients, fetchClientContracts } from "./erp-driver.ts";
+import { fetchClientSignal, fetchInvoices, fetchClientContracts, resolveClienteErpId } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -81,26 +81,20 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
   }
 
   try {
-    // Resolver cliente_erp_id via CPF/CNPJ
-    const clientResult = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
-    const matched = clientResult.clients.filter((c) => {
-      const cleanDoc = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-      return cleanDoc === cpfCnpj;
-    });
+    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
 
-    if (matched.length === 0) {
-      return { success: true, data: { encontrados: 0, mensagem: "Nenhum cliente encontrado com este CPF/CNPJ." } };
+    if (!resolved.client) {
+      return { success: true, data: { encontrados: 0, mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.", erros: resolved.errors } };
     }
 
-    const clienteErpId = String(matched[0].cliente_erp_id || matched[0].erp_id);
-    const result = await fetchClientSignal(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, clienteErpId);
+    const result = await fetchClientSignal(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, resolved.client.id);
 
     return {
       success: true,
       data: {
         cpf_cnpj: cpfCnpj,
-        cliente_erp_id: clienteErpId,
-        nome: matched[0].nome,
+        cliente_erp_id: resolved.client.id,
+        nome: resolved.client.nome,
         diagnostico: result.signal,
         relatorio: result.report,
       },
@@ -121,21 +115,15 @@ const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
   }
 
   try {
-    const result = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
+    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
 
-    // Filter exact match by cleaned CPF/CNPJ
-    const matched = result.clients.filter((c) => {
-      const cleanDoc = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-      return cleanDoc === cpfCnpj;
-    });
-
-    if (matched.length === 0) {
+    if (!resolved.client) {
       return {
         success: true,
         data: {
           encontrados: 0,
           mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.",
-          erros: result.errors,
+          erros: resolved.errors,
         },
       };
     }
@@ -143,14 +131,14 @@ const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
     return {
       success: true,
       data: {
-        encontrados: matched.length,
-        clientes: matched.map((c) => ({
-          cliente_erp_id: c.id,
-          nome: c.nome,
-          cpf_cnpj: c.cpf_cnpj,
-          provider_name: c.provider_name,
-        })),
-        erros: result.errors,
+        encontrados: 1,
+        clientes: [{
+          cliente_erp_id: resolved.client.id,
+          nome: resolved.client.nome,
+          cpf_cnpj: resolved.client.cpf_cnpj,
+          provider_name: resolved.client.providerName,
+        }],
+        erros: resolved.errors,
       },
     };
   } catch (err) {
@@ -169,26 +157,20 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
   }
 
   try {
-    // Resolver cliente_erp_id via CPF/CNPJ
-    const clientResult = await searchClients(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
-    const matched = clientResult.clients.filter((c) => {
-      const cleanDoc = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-      return cleanDoc === cpfCnpj;
-    });
+    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
 
-    if (matched.length === 0) {
+    if (!resolved.client) {
       return {
         success: true,
         data: {
           encontrados: 0,
           mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.",
-          erros: clientResult.errors,
+          erros: resolved.errors,
         },
       };
     }
 
-    const clienteErpId = String(matched[0].cliente_erp_id || matched[0].erp_id);
-    const result = await fetchClientContracts(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, clienteErpId);
+    const result = await fetchClientContracts(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, resolved.client.id);
 
     if (result.contracts.length === 0) {
       return {
@@ -206,7 +188,7 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
       data: {
         encontrados: result.contracts.length,
         cpf_cnpj: cpfCnpj,
-        nome: matched[0].nome,
+        nome: resolved.client.nome,
         contratos: result.contracts.map((c) => ({
           contrato_id: c.contrato_id,
           endereco_completo: c.endereco_completo,
