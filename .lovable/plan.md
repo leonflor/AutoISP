@@ -1,94 +1,54 @@
 
 
-# Historico dos ultimos 10 prompts na auditoria
+# Corrigir formatacao de contratos no retorno da ferramenta
 
 ## Problema
 
-Hoje a auditoria gera o prompt sob demanda (on-the-fly) mas nao armazena historico. O admin nao consegue ver como o prompt estava em momentos anteriores — so ve o estado atual.
+O `instrucao_exibicao` em `tool-handlers.ts` (linha 194) tem dois problemas:
 
-## Abordagem
+1. **Contem instrucoes comportamentais** ("Apresente EXATAMENTE assim") — contradiz a limpeza que acabamos de fazer nas descriptions do catalogo. Esse tipo de instrucao deve estar na `instruction` da etapa do fluxo, nao no retorno dos dados.
 
-Dois passos: (1) salvar o system prompt no `ai_usage.metadata` a cada chamada real do `ai-chat`, e (2) no frontend, buscar os ultimos 10 registros de `ai_usage` daquele `isp_agent_id` e permitir navegar entre eles no dialog de auditoria.
+2. **Usa `\n` simples** para separar os enderecos. No Markdown (usado pelo `ReactMarkdown` no `AgentTestDialog`), `\n` simples nao cria quebra de linha visivel — precisa de `\n\n` (paragrafo) ou dois espacos antes do `\n`.
 
-Nao precisa de tabela nova. O campo `metadata` (jsonb) do `ai_usage` ja existe e ja armazena informacoes parciais. Basta incluir o `system_prompt` nele.
+## Solucao
 
-## Alteracoes
+Remover o campo `instrucao_exibicao` com texto comportamental. Em vez disso, formatar a `lista_enderecos` de forma que os dados ja estejam estruturados para o agente usar. A IA vai formatar conforme a `instruction` da etapa do fluxo.
 
-### 1. `ai-chat/index.ts` — salvar o prompt no metadata do ai_usage
+### Alteracao em `tool-handlers.ts` (linhas 193-199)
 
-Nos dois pontos onde `ai_usage.insert` e chamado (streaming ~linha 813 e non-streaming ~linha 854), adicionar `system_prompt: systemPrompt` dentro do `metadata`:
-
+**Antes:**
 ```typescript
-metadata: {
-  model,
-  isp_agent_id: ispAgent.id,
-  system_prompt: systemPrompt,
-  knowledge_items: knowledgeBase.length,
-  document_chunks: documentChunks.length,
-  security_clauses: securityClauses?.length || 0
-}
+encontrados: result.contracts.length,
+instrucao_exibicao: "Apresente EXATAMENTE assim, sem nenhuma informação adicional:\nSobre qual contrato você gostaria de falar?\n" +
+      result.contracts.map((c) => `${c.ordem}. ${c.endereco_completo}`).join("\n"),
+lista_enderecos: result.contracts.map((c) => ({
+  numero: c.ordem,
+  endereco: c.endereco_completo,
+})),
 ```
 
-### 2. `audit-prompt/index.ts` — retornar historico dos ultimos 10
-
-Apos montar o prompt atual, buscar os ultimos 10 registros de `ai_usage` que contenham `system_prompt` no metadata para aquele `isp_agent_id`:
-
+**Depois:**
 ```typescript
-const { data: history } = await supabaseAdmin
-  .from("ai_usage")
-  .select("id, created_at, tokens_total, tokens_input, tokens_output, metadata")
-  .eq("metadata->>isp_agent_id", isp_agent_id)
-  .not("metadata->system_prompt", "is", null)
-  .order("created_at", { ascending: false })
-  .limit(10);
+encontrados: result.contracts.length,
+lista_enderecos: result.contracts.map((c) => ({
+  numero: c.ordem,
+  endereco: c.endereco_completo,
+})),
 ```
 
-Adicionar o array `history` na resposta JSON, cada item com `{ id, created_at, prompt, tokens_total }`.
+Remove `instrucao_exibicao` e mantem `lista_enderecos` como dado puro. A etapa do fluxo que usa `erp_contract_lookup` ja deve ter uma `instruction` dizendo como apresentar (lista numerada com espacamento).
 
-### 3. `useAuditPrompt.ts` — tipar o historico
+## Sobre o espacamento no Markdown
 
-Adicionar ao `AuditPromptResult`:
-
-```typescript
-history: {
-  id: string;
-  created_at: string;
-  prompt: string;
-  tokens_total: number;
-}[];
-```
-
-### 4. `PromptAuditDialog.tsx` — UI de navegacao entre prompts
-
-- Adicionar um seletor (tabs ou lista lateral) com os ultimos 10 prompts por data
-- O primeiro item e "Atual (simulado)" — o prompt gerado on-the-fly
-- Os demais sao historicos reais com timestamp
-- Ao selecionar um item, exibir o prompt correspondente na area principal
-- Mostrar tokens usados em cada registro historico
-
-Layout: adicionar acima da area de prompt uma barra com botoes de data, tipo:
-```
-[Atual] [25/02 14:30 - 1.2k tokens] [25/02 13:15 - 980 tokens] ...
-```
-
-### 5. `AiAgentDetail.tsx` — sem alteracao necessaria
-
-A chamada ja passa o `ispAgentId` e o dialog ja recebe `data` — o historico vem junto automaticamente.
+O problema de "sem espaco entre linhas" e resolvido pelo Markdown: quando a IA gera a lista usando `1. Endereco X\n\n2. Endereco Y` (com linha em branco entre itens), o `ReactMarkdown` renderiza com espacamento. A IA naturalmente faz isso quando nao recebe instrucoes conflitantes como "Apresente EXATAMENTE assim" que a forca a copiar texto literal sem formatacao Markdown.
 
 ## Arquivos alterados
 
 | Arquivo | Mudanca |
 |---|---|
-| `supabase/functions/ai-chat/index.ts` | Salvar `system_prompt` no `metadata` do `ai_usage` |
-| `supabase/functions/audit-prompt/index.ts` | Buscar ultimos 10 de `ai_usage` e retornar como `history` |
-| `src/hooks/admin/useAuditPrompt.ts` | Tipar `history` no resultado |
-| `src/components/admin/ai-agents/PromptAuditDialog.tsx` | Adicionar navegacao entre prompt atual e historicos |
+| `supabase/functions/_shared/tool-handlers.ts` | Remover `instrucao_exibicao`, manter apenas `lista_enderecos` como dado estruturado |
 
 ## Deploy
 
-Edge functions `ai-chat` e `audit-prompt`.
-
-## Observacao
-
-O `system_prompt` pode ter ~2-5KB por registro. Em 10 registros sao ~50KB — insignificante para jsonb. A longo prazo, se necessario, pode-se truncar ou comprimir, mas por agora nao ha problema.
+Edge function `ai-chat` (que importa `tool-handlers.ts`).
 
