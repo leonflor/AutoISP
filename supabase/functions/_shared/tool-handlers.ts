@@ -195,14 +195,6 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
           numero: c.ordem,
           endereco: c.endereco_completo,
         })),
-        _detalhes_internos: result.contracts.map((c) => ({
-          contrato_id: c.contrato_id,
-          endereco_completo: c.endereco_completo,
-          plano: c.plano,
-          status_internet: c.status_internet,
-          dia_vencimento: c.dia_vencimento,
-          provider_name: c.provider_name,
-        })),
         erros: result.errors,
       },
     };
