@@ -17,21 +17,22 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     handler: "erp_invoice_search",
     display_name: "Consulta de Faturas",
     description:
-      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Retorna faturas pendentes com valores, vencimentos e total devedor.",
+      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Quando o cliente tem múltiplos contratos, use o parâmetro endereco para filtrar o contrato desejado.",
     parameters: [
-      { name: "cliente_id", type: "string", description: "CPF/CNPJ do cliente", required: true },
+      { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
+      { name: "endereco", type: "string", description: "Endereço parcial para filtrar o contrato desejado (opcional)", required: false },
     ],
     response_description:
-      "Faturas em aberto com valor, vencimento, dias de atraso e total em aberto.",
+      "Faturas em aberto com valor, vencimento, dias de atraso, contrato_id, endereço e total em aberto.",
     requires_erp: true,
   },
   {
     handler: "erp_onu_diagnostics",
     display_name: "Diagnóstico de Sinal ONU",
     description:
-      "Executa diagnóstico de sinal óptico (ONU/ONT) do cliente. Retorna níveis de potência RX/TX e análise de qualidade.",
+      "Executa diagnóstico de sinal óptico (ONU/ONT) do cliente por CPF/CNPJ. Retorna níveis de potência RX/TX e análise de qualidade.",
     parameters: [
-      { name: "client_id", type: "string", description: "ID do cliente no ERP", required: true },
+      { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
     ],
     response_description:
       "Diagnóstico com potência RX/TX em dBm, qualidade do sinal e recomendações.",
@@ -41,20 +42,20 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     handler: "erp_client_lookup",
     display_name: "Busca Cliente por CPF/CNPJ",
     description:
-      "Busca dados cadastrais de um cliente no ERP por CPF ou CNPJ. Retorna o ID do cliente (necessário para diagnóstico de sinal), nome, status e plano.",
+      "Busca dados cadastrais de um cliente no ERP por CPF ou CNPJ. Retorna nome e CPF/CNPJ confirmado.",
     parameters: [
       { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
     ],
-    response_description: "Dados do cliente com cliente_erp_id, nome, status e plano.",
+    response_description: "Dados do cliente com nome e CPF/CNPJ.",
     requires_erp: true,
   },
   {
     handler: "erp_contract_lookup",
     display_name: "Consulta de Contrato",
     description:
-      "Consulta contratos ativos de um cliente por ID. Retorna ID do contrato, endereço de instalação, plano contratado e status.",
+      "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereço de instalação, plano contratado e status.",
     parameters: [
-      { name: "client_id", type: "string", description: "ID do cliente no ERP (obtido via erp_client_lookup)", required: true },
+      { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
     ],
     response_description: "Contratos ativos com contrato_id, endereço completo, plano, status e dia de vencimento.",
     requires_erp: true,

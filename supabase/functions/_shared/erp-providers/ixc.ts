@@ -159,25 +159,41 @@ async function fetchFaturas(
 
   const idCliente = clientes[0].id;
 
-  // Passo 2: buscar faturas em aberto (status='A' = a receber)
-  const recs = await ixcFetch(baseUrl, headers, "fn_areceber", {
-    qtype: "fn_areceber.id_cliente",
-    query: idCliente,
-    oper: "=",
-  });
+  // Passo 2: buscar contratos ativos do cliente
+  const contratos = await fetchContratos(creds, { id_cliente: idCliente });
+  if (contratos.length === 0) {
+    console.log(`[IXC] fetchFaturas: nenhum contrato ativo para cliente ${idCliente}`);
+    return [];
+  }
 
-  // Filtra apenas faturas com status 'A' (a receber / em aberto)
-  const abertas = recs.filter((f: any) => f.status === "A");
+  // Passo 3: buscar faturas por id_contrato (cadeia correta)
+  const allFaturas: RawFatura[] = [];
 
-  return abertas.map((f: any) => ({
-    id: String(f.id),
-    id_cliente: String(f.id_cliente || idCliente),
-    data_vencimento: f.data_vencimento || "",
-    valor: parseFloat(f.valor || "0"),
-    valor_pago: f.valor_pago ? parseFloat(f.valor_pago) : null,
-    linha_digitavel: f.linha_digitavel || null,
-    gateway_link: f.gateway_link || f.url_gateway || null,
-  }));
+  for (const contrato of contratos) {
+    const recs = await ixcFetch(baseUrl, headers, "fn_areceber", {
+      qtype: "fn_areceber.id_contrato",
+      query: contrato.id,
+      oper: "=",
+    });
+
+    // Filtra apenas faturas com status 'A' (a receber / em aberto)
+    const abertas = recs.filter((f: any) => f.status === "A");
+
+    for (const f of abertas) {
+      allFaturas.push({
+        id: String(f.id),
+        id_cliente: String(f.id_cliente || idCliente),
+        id_contrato: contrato.id,
+        data_vencimento: f.data_vencimento || "",
+        valor: parseFloat(f.valor || "0"),
+        valor_pago: f.valor_pago ? parseFloat(f.valor_pago) : null,
+        linha_digitavel: f.linha_digitavel || null,
+        gateway_link: f.gateway_link || f.url_gateway || null,
+      });
+    }
+  }
+
+  return allFaturas;
 }
 
 async function fetchRawSignal(
