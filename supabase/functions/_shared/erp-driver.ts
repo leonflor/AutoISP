@@ -70,17 +70,74 @@ export async function resolveCredentials(
 
 const IXC_INTERNET_STATUS_MAP: Record<string, InternetStatus> = {
   normal: "ativo",
+  ativo: "ativo",
+  ativado: "ativo",
   bloqueado: "bloqueado",
   bloqueio_manual: "bloqueado",
   bloqueio_automatico: "bloqueado",
   reduzido: "financeiro_em_atraso",
   pendente_reativa: "bloqueado",
   desativado: "bloqueado",
+  cancelado: "bloqueado",
+  suspenso: "bloqueado",
 };
 
 function normalizeInternetStatus(rawStatus: string, _provider: ErpProvider): InternetStatus {
   const key = rawStatus.toLowerCase().trim();
-  return IXC_INTERNET_STATUS_MAP[key] || "outros";
+  const mapped = IXC_INTERNET_STATUS_MAP[key];
+  if (!mapped) {
+    console.warn(`[normalizeInternetStatus] Status não mapeado: "${rawStatus}" (key: "${key}")`);
+  }
+  return mapped || "outros";
+}
+
+// ── Resolução leve: CPF/CNPJ → cliente_erp_id (sem carregar radusuarios) ──
+
+export interface ResolvedClient {
+  id: string;
+  nome: string;
+  cpf_cnpj: string;
+  provider: ErpProvider;
+  providerName: string;
+}
+
+export async function resolveClienteErpId(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  cpfCnpj: string
+): Promise<{ client: ResolvedClient | null; errors: string[] }> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const errors: string[] = [];
+  const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      const creds = await resolveCredentials(config, encryptionKey);
+
+      if (!driver.fetchClientes) continue;
+
+      const clientes = await driver.fetchClientes(creds, { cpf_cnpj: cpfCnpj });
+      const match = clientes.find((c) => {
+        const docClean = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+        return docClean === cleanCpf;
+      });
+
+      if (match) {
+        return {
+          client: { id: match.id, nome: match.nome, cpf_cnpj: match.cpf_cnpj, provider: providerKey, providerName },
+          errors,
+        };
+      }
+    } catch (err) {
+      errors.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return { client: null, errors };
 }
 
 // ── Resolver configs ativos do ISP ──
@@ -294,16 +351,11 @@ export async function fetchInvoices(
   let contratoEnderecoMap: Map<string, string> = new Map();
 
   if (endereco) {
-    // Resolver cliente primeiro para obter cliente_erp_id
-    const clientResult = await searchClients(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
-    const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
-    const matched = clientResult.clients.filter((c) => {
-      const cleanDoc = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-      return cleanDoc === cleanCpf;
-    });
+    // Resolver cliente de forma leve (sem carregar radusuarios)
+    const resolved = await resolveClienteErpId(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
 
-    if (matched.length > 0) {
-      const clienteErpId = String(matched[0].cliente_erp_id || matched[0].erp_id);
+    if (resolved.client) {
+      const clienteErpId = resolved.client.id;
       const contractResult = await fetchClientContracts(supabaseAdmin, ispId, encryptionKey, clienteErpId);
 
       const enderecoLower = endereco.toLowerCase();
@@ -431,7 +483,8 @@ export async function fetchClientContracts(
       }
 
       const contracts: ContractResult[] = detalhados.map((ct) => {
-        const parts = [ct.endereco, ct.numero, ct.complemento, ct.bairro, ct.cidade, ct.estado, ct.cep].filter(Boolean);
+        const parts = [ct.endereco, ct.numero, ct.complemento, ct.bairro, ct.cidade, ct.estado, ct.cep]
+          .filter((p) => p && p.trim() !== "" && p.trim() !== "0");
         const endereco = parts.length > 0 ? parts.join(", ") : null;
 
         return {
