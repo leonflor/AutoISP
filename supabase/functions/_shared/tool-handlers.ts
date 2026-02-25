@@ -191,10 +191,10 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
       success: true,
       data: {
         encontrados: result.contracts.length,
-        instrucao_exibicao: "Apresente EXATAMENTE assim, sem nenhuma informação adicional:\nSobre qual contrato você gostaria de falar?\n" +
-          result.contracts.map((c, i) => `${i + 1}. ${c.endereco_completo}`).join("\n"),
-        lista_enderecos: result.contracts.map((c, i) => ({
-          numero: i + 1,
+    instrucao_exibicao: "Apresente EXATAMENTE assim, sem nenhuma informação adicional:\nSobre qual contrato você gostaria de falar?\n" +
+          result.contracts.map((c) => `${c.ordem}. ${c.endereco_completo}`).join("\n"),
+        lista_enderecos: result.contracts.map((c) => ({
+          numero: c.ordem,
           endereco: c.endereco_completo,
         })),
         _detalhes_internos: result.contracts.map((c) => ({
