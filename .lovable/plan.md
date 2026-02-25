@@ -1,43 +1,33 @@
 
 
-# Diagnóstico: IA inventa endereços e não exibe lista numerada
+# Correções pendentes na listagem de contratos
 
-## Problemas encontrados
+## Problemas identificados na resposta
 
-### Problema 1 — Endereço incompleto (causa do "na altura de...")
+### Problema 1 — Código numérico da cidade no endereço
 
-No arquivo `supabase/functions/_shared/erp-driver.ts` (linha 489-494), o campo `endereco_completo` é montado usando **apenas** `ct.endereco` (rua), ignorando os demais campos retornados pelo IXC:
+O IXC retorna `cidade` como **ID numérico** (ex: `5564`, `5563`) em vez do nome da cidade. A lógica atual em `erp-driver.ts` inclui esse valor diretamente no endereço, gerando saídas como:
 
-```text
-ct.endereco  = "Rua das Flores"
-ct.numero    = "123"          ← ignorado
-ct.bairro    = "Centro"       ← ignorado
-ct.cidade    = "São Paulo"    ← ignorado
+```
+Quadra Central 1, nº SN, Sobradinho, 5564
+                                       ^^^^
+                                       ID numérico, não nome
 ```
 
-Como a IA recebe apenas "Rua das Flores" sem número, ela **inventa** complementos como "na altura de..." para parecer informativa.
+O campo `bairro` retorna o nome correto ("Sobradinho", "Cruzeiro"), mas `cidade` e possivelmente `estado` são IDs internos do IXC.
 
-### Problema 2 — Migração anterior aplicada no ID errado
-
-A migração `20260225165917` atualizou o ID `886d4ad6-...`, que **não existe** no banco. O ID real da etapa "Listar contratos" é `0c89d6bc-5504-4b12-9e10-e88fadb621df`. A instrução nunca foi atualizada.
-
-### Problema 3 — Dados internos vazam para a IA
-
-O `tool-handlers.ts` retorna `_detalhes_internos` com plano, status e vencimento. A IA vê esses campos e pode usá-los mesmo que a instrução diga para não exibir.
-
----
-
-## Plano de correção
-
-### 1. Montar endereço completo no erp-driver.ts
-
-**Arquivo:** `supabase/functions/_shared/erp-driver.ts` (linhas 488-494)
-
-Substituir a lógica que usa apenas `ct.endereco` por uma função que concatena todos os campos de endereço disponíveis:
+**Correção:** Excluir `ct.cidade` e `ct.estado` da composição do endereço no `erp-driver.ts`, mantendo apenas `endereco`, `numero`, `complemento` e `bairro` — campos que retornam texto legível.
 
 ```typescript
-// Antes:
-const endereco = ct.endereco && ct.endereco.trim() !== "" ? ct.endereco.trim() : null;
+// Antes (linha 489-496):
+const partes = [
+  ct.endereco,
+  ct.numero ? `nº ${ct.numero}` : null,
+  ct.complemento,
+  ct.bairro,
+  ct.cidade,   // ← ID numérico "5564"
+  ct.estado,   // ← possivelmente numérico também
+].filter(...)
 
 // Depois:
 const partes = [
@@ -45,43 +35,59 @@ const partes = [
   ct.numero ? `nº ${ct.numero}` : null,
   ct.complemento,
   ct.bairro,
-  ct.cidade,
-  ct.estado,
-].filter(p => p && String(p).trim() !== "").map(p => String(p).trim());
-const endereco = partes.length > 0 ? partes.join(", ") : null;
+].filter(p => p && String(p).trim() !== "" && String(p).trim() !== "0" && String(p).trim() !== "SN")
+ .map(p => String(p).trim());
 ```
 
-Resultado: `"Rua das Flores, nº 123, Centro, São Paulo, SP"`
+Nota: também filtrar `"SN"` (Sem Número) para evitar exibir "nº SN" que não agrega informação.
 
-### 2. Remover `_detalhes_internos` da resposta visível
+### Problema 2 — Lista não aparece numerada
 
-**Arquivo:** `supabase/functions/_shared/tool-handlers.ts` (handler `erp_contract_lookup`)
+A IA recebe os dados como JSON com campo `numero` mas monta a resposta sem formatação numerada. Isso ocorre porque a **instrução no banco** já foi corrigida, mas a IA precisa de um formato mais explícito nos dados retornados pela ferramenta.
 
-Mover os detalhes internos para um campo que a IA não processe, ou removê-los da resposta da tool call. Manter apenas `lista_enderecos` com `numero` e `endereco`.
+**Correção:** Pré-formatar a resposta da tool no `tool-handlers.ts` para que o JSON já contenha a lista formatada como texto, facilitando a exibição:
 
-### 3. Corrigir instrução no banco (ID correto)
-
-**Migração SQL** para atualizar o registro correto:
-
-```sql
-UPDATE public.ai_agent_flow_steps
-SET instruction = 'Exiba apenas os endereços de instalação em lista numerada com duplo espaçamento entre itens. Não exiba plano, status ou vencimento nesta etapa. Pergunte qual contrato o cliente deseja tratar.',
-    updated_at = now()
-WHERE id = '0c89d6bc-5504-4b12-9e10-e88fadb621df';
+```typescript
+// Em tool-handlers.ts, handler erp_contract_lookup:
+return {
+  success: true,
+  data: {
+    encontrados: result.contracts.length,
+    lista_formatada: result.contracts.map((c) =>
+      `${c.ordem}. ${c.endereco_completo || "Endereço não disponível"}`
+    ).join("\n\n"),
+    erros: result.errors,
+  },
+};
 ```
 
-### 4. Remover migração anterior inválida
-
-Deletar `supabase/migrations/20260225165917_3409290c-80bf-4a79-8dfc-e2b54fa5a0e3.sql` que atualizou um ID inexistente.
-
----
+Substituir `lista_enderecos` (array de objetos) por `lista_formatada` (string pré-formatada com numeração e duplo espaçamento). Isso guia a IA a exibir o texto exatamente como está.
 
 ## Resumo das alterações
 
 | Arquivo | Alteração |
 |---|---|
-| `supabase/functions/_shared/erp-driver.ts` | Montar `endereco_completo` com rua + nº + bairro + cidade + estado |
-| `supabase/functions/_shared/tool-handlers.ts` | Remover `_detalhes_internos` da resposta do `erp_contract_lookup` |
-| Nova migração SQL | Atualizar instrução no ID correto `0c89d6bc-...` |
-| Migração antiga | Remover arquivo com ID errado |
+| `supabase/functions/_shared/erp-driver.ts` | Remover `ct.cidade` e `ct.estado` da composição; filtrar "SN" |
+| `supabase/functions/_shared/tool-handlers.ts` | Substituir `lista_enderecos` por `lista_formatada` (string pré-formatada) |
+| Edge function `ai-chat` | Redeploy após alterações |
+
+## Resultado esperado
+
+```
+Encontrei os seguintes endereços de instalação:
+
+1. Quadra Central 1, Sobradinho
+
+2. Eixo Monumental, sentido Shopping Popular/ Rodoviária, Cruzeiro
+
+3. Rodovia DF-425, Sobradinho
+
+4. Avenida das Jaqueiras, altura do terminal Rodoviário, do Cruzeiro, Sudoeste
+
+5. Avenida de acesso AR12, altura da quadra 14, Sobradinho
+
+6. Avenida do Jaqueiras, entrada do Cruzeiro Novo/ quadra 10, Cruzeiro
+
+Qual contrato você deseja tratar?
+```
 
