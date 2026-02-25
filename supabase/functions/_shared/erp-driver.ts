@@ -486,9 +486,7 @@ export async function fetchClientContracts(
       }
 
       const contracts: ContractResult[] = detalhados.map((ct) => {
-        const parts = [ct.endereco, ct.numero, ct.complemento, ct.bairro, ct.cidade, ct.estado, ct.cep]
-          .filter((p) => p && p.trim() !== "" && p.trim() !== "0");
-        const endereco = parts.length > 0 ? parts.join(", ") : null;
+        const endereco = ct.endereco && ct.endereco.trim() !== "" ? ct.endereco.trim() : null;
 
         return {
           ordem: 0,
