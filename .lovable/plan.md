@@ -1,57 +1,27 @@
 
 
-# Adicionar numero de ordem ao retorno de `fetchClientContracts`
+# Alterar `erp_contract_lookup` para usar apenas `endereco` do contrato
 
 ## Problema
-A funcao `fetchClientContracts` retorna contratos sem numero de ordem. O numero so e adicionado no handler (`tool-handlers.ts`) com `map((c, i) => ...)`. Se outro consumidor usar `fetchClientContracts`, nao tera o numero.
+Atualmente a linha 489-491 concatena todos os campos de endereço (`endereco`, `numero`, `complemento`, `bairro`, `cidade`, `estado`, `cep`) em `endereco_completo`. O desejado é usar apenas `ct.endereco` (campo `endereco` de `cliente_contrato`).
 
-## Alteracoes
+## Alteração
 
-### 1. `erp-driver.ts` — Adicionar `ordem` ao `ContractResult` e popular no retorno
+**Arquivo: `supabase/functions/_shared/erp-driver.ts`** — linhas 489-491
 
-**Interface (linha 441-448):**
+De:
 ```typescript
-export interface ContractResult {
-  ordem: number;           // novo
-  contrato_id: string;
-  endereco_completo: string | null;
-  plano: string | null;
-  status_internet: string;
-  dia_vencimento: string | null;
-  provider_name: string;
-}
+const parts = [ct.endereco, ct.numero, ct.complemento, ct.bairro, ct.cidade, ct.estado, ct.cep]
+  .filter((p) => p && p.trim() !== "" && p.trim() !== "0");
+const endereco = parts.length > 0 ? parts.join(", ") : null;
 ```
 
-**Atribuicao (linha 512-516):** Apos `Promise.all`, numerar sequencialmente:
+Para:
 ```typescript
-const results = await Promise.all(promises);
-for (const r of results) {
-  allContracts.push(...r.contracts);
-  if (r.error) allErrors.push(r.error);
-}
-
-// Numerar contratos sequencialmente
-allContracts.forEach((c, i) => { c.ordem = i + 1; });
+const endereco = ct.endereco && ct.endereco.trim() !== "" ? ct.endereco.trim() : null;
 ```
 
-### 2. `tool-handlers.ts` — Usar `c.ordem` em vez de `i + 1`
-
-Nas linhas 194-199, trocar `i + 1` por `c.ordem`:
-```typescript
-instrucao_exibicao: "Apresente EXATAMENTE assim, sem nenhuma informação adicional:\nSobre qual contrato você gostaria de falar?\n" +
-  result.contracts.map((c) => `${c.ordem}. ${c.endereco_completo}`).join("\n"),
-lista_enderecos: result.contracts.map((c) => ({
-  numero: c.ordem,
-  endereco: c.endereco_completo,
-})),
-```
-
-## Arquivos alterados
-
-| Arquivo | Mudanca |
-|---|---|
-| `supabase/functions/_shared/erp-driver.ts` | Adicionar `ordem` a `ContractResult`, numerar apos agregacao |
-| `supabase/functions/_shared/tool-handlers.ts` | Usar `c.ordem` em vez de indice manual |
+Nenhum outro arquivo precisa mudar — `endereco_completo` continua sendo o nome do campo no `ContractResult`, apenas o valor muda.
 
 ## Deploy
 Edge function `ai-chat`.
