@@ -18,11 +18,21 @@ export interface AuditPromptMetadata {
   erp_provider: string | null;
 }
 
+export interface AuditPromptHistoryItem {
+  id: string;
+  created_at: string;
+  prompt: string;
+  tokens_total: number;
+  tokens_input: number;
+  tokens_output: number;
+}
+
 export interface AuditPromptResult {
   prompt: string;
   isp_name: string;
   agent_name: string;
   template_name: string;
+  history: AuditPromptHistoryItem[];
   metadata: AuditPromptMetadata;
 }
 

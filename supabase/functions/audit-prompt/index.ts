@@ -334,12 +334,31 @@ Deno.serve(async (req) => {
       (t) => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasActiveErp)
     );
 
+    // Fetch last 10 historical prompts from ai_usage
+    const { data: usageHistory } = await supabaseAdmin
+      .from("ai_usage")
+      .select("id, created_at, tokens_total, tokens_input, tokens_output, metadata")
+      .filter("metadata->>isp_agent_id", "eq", isp_agent_id)
+      .not("metadata->system_prompt", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const history = (usageHistory || []).map((item: any) => ({
+      id: item.id,
+      created_at: item.created_at,
+      prompt: item.metadata?.system_prompt || "",
+      tokens_total: item.tokens_total || 0,
+      tokens_input: item.tokens_input || 0,
+      tokens_output: item.tokens_output || 0,
+    }));
+
     return new Response(
       JSON.stringify({
         prompt,
         isp_name: ispName,
         agent_name: ispAgent.display_name || template.name,
         template_name: template.name,
+        history,
         metadata: {
           template_id: template.id,
           template_name: template.name,

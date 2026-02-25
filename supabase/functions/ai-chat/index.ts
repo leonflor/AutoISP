@@ -820,6 +820,7 @@ Deno.serve(async (req) => {
               metadata: {
                 model,
                 isp_agent_id: ispAgent.id,
+                system_prompt: systemPrompt,
                 knowledge_items: knowledgeBase.length,
                 document_chunks: documentChunks.length,
                 security_clauses: securityClauses?.length || 0
@@ -861,6 +862,7 @@ Deno.serve(async (req) => {
       metadata: {
         model,
         isp_agent_id: ispAgent.id,
+        system_prompt: systemPrompt,
         knowledge_items: knowledgeBase.length,
         security_clauses: securityClauses?.length || 0
       }
