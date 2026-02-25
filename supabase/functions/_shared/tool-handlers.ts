@@ -21,15 +21,16 @@ type ToolHandler = (
 
 // ── Handler: erp_invoice_search ──
 const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpj = String(args.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-  if (!cpfCnpj || cpfCnpj.length < 11) {
+  const cpfCnpjRaw = String(args.cpf_cnpj || "");
+  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
+  if (!cpfDigits || cpfDigits.length < 11) {
     return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
   }
 
   const endereco = args.endereco ? String(args.endereco) : undefined;
 
   try {
-    const result = await fetchInvoices(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj, endereco);
+    const result = await fetchInvoices(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw, endereco);
 
     if (result.invoices.length === 0) {
       return {
@@ -75,13 +76,14 @@ const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
 
 // ── Handler: erp_onu_diagnostics ──
 const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpj = String(args.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-  if (!cpfCnpj || cpfCnpj.length < 11) {
+  const cpfCnpjRaw = String(args.cpf_cnpj || "");
+  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
+  if (!cpfDigits || cpfDigits.length < 11) {
     return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
   }
 
   try {
-    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
+    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw);
 
     if (!resolved.client) {
       return { success: true, data: { encontrados: 0, mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.", erros: resolved.errors } };
@@ -92,7 +94,7 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
     return {
       success: true,
       data: {
-        cpf_cnpj: cpfCnpj,
+        cpf_cnpj: cpfCnpjRaw,
         cliente_erp_id: resolved.client.id,
         nome: resolved.client.nome,
         diagnostico: result.signal,
@@ -109,13 +111,14 @@ const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
 
 // ── Handler: erp_client_lookup ──
 const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpj = String(args.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-  if (!cpfCnpj || cpfCnpj.length < 11) {
+  const cpfCnpjRaw = String(args.cpf_cnpj || "");
+  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
+  if (!cpfDigits || cpfDigits.length < 11) {
     return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
   }
 
   try {
-    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
+    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw);
 
     if (!resolved.client) {
       return {
@@ -151,13 +154,14 @@ const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
 
 // ── Handler: erp_contract_lookup ──
 const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpj = String(args.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-  if (!cpfCnpj || cpfCnpj.length < 11) {
+  const cpfCnpjRaw = String(args.cpf_cnpj || "");
+  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
+  if (!cpfDigits || cpfDigits.length < 11) {
     return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
   }
 
   try {
-    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpj);
+    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw);
 
     if (!resolved.client) {
       return {
@@ -187,7 +191,7 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
       success: true,
       data: {
         encontrados: result.contracts.length,
-        cpf_cnpj: cpfCnpj,
+        cpf_cnpj: cpfCnpjRaw,
         nome: resolved.client.nome,
         contratos: result.contracts.map((c) => ({
           contrato_id: c.contrato_id,

@@ -72,6 +72,7 @@ const IXC_INTERNET_STATUS_MAP: Record<string, InternetStatus> = {
   normal: "ativo",
   ativo: "ativo",
   ativado: "ativo",
+  a: "ativo",
   bloqueado: "bloqueado",
   bloqueio_manual: "bloqueado",
   bloqueio_automatico: "bloqueado",
@@ -79,6 +80,7 @@ const IXC_INTERNET_STATUS_MAP: Record<string, InternetStatus> = {
   pendente_reativa: "bloqueado",
   desativado: "bloqueado",
   cancelado: "bloqueado",
+  ca: "bloqueado",
   suspenso: "bloqueado",
 };
 
