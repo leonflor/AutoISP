@@ -347,7 +347,9 @@ export function AgentTestDialog({
       <DialogContent
         className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
         onClick={() => {
-          if (!isLoading && selectedAgentId && textareaRef.current) {
+          const selection = window.getSelection();
+          const hasSelection = selection && selection.toString().length > 0;
+          if (!hasSelection && !isLoading && selectedAgentId && textareaRef.current) {
             textareaRef.current.focus();
           }
         }}
