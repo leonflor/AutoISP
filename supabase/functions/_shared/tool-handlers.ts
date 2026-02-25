@@ -191,10 +191,9 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
       success: true,
       data: {
         encontrados: result.contracts.length,
-        lista_enderecos: result.contracts.map((c) => ({
-          numero: c.ordem,
-          endereco: c.endereco_completo,
-        })),
+        lista_formatada: result.contracts.map((c) =>
+          `${c.ordem}. ${c.endereco_completo || "Endereço não disponível"}`
+        ).join("\n\n"),
         erros: result.errors,
       },
     };
