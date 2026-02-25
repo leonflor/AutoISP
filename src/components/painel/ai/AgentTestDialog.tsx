@@ -124,6 +124,7 @@ export function AgentTestDialog({
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasInitializedRef = useRef(false);
+  const wasLoadingRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -141,6 +142,16 @@ export function AgentTestDialog({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Auto-focus textarea after loading finishes (disabled → enabled transition)
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading) {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   const currentAgent = agents.find((a) => a.id === selectedAgentId);
   const template = currentAgent?.ai_agents;
@@ -333,7 +344,14 @@ export function AgentTestDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={() => {
+          if (!isLoading && selectedAgentId && textareaRef.current) {
+            textareaRef.current.focus();
+          }
+        }}
+      >
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Testar Agente</DialogTitle>
           <DialogDescription>
