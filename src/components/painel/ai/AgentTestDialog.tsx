@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from "react";
 import { Send, Bot, User, Loader2, Zap, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
@@ -123,6 +123,7 @@ export function AgentTestDialog({
   const [tokensUsed, setTokensUsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const focusTimeoutRef = useRef<number | null>(null);
   const hasInitializedRef = useRef(false);
   const wasLoadingRef = useRef(false);
 
@@ -152,6 +153,13 @@ export function AgentTestDialog({
     }
     wasLoadingRef.current = isLoading;
   }, [isLoading]);
+
+  // Cleanup focus timeout on unmount/close
+  useEffect(() => {
+    return () => {
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    };
+  }, []);
 
   const currentAgent = agents.find((a) => a.id === selectedAgentId);
   const template = currentAgent?.ai_agents;
@@ -346,11 +354,26 @@ export function AgentTestDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
-        onClick={() => {
-          const selection = window.getSelection();
-          const hasSelection = selection && selection.toString().length > 0;
-          if (!hasSelection && !isLoading && selectedAgentId && textareaRef.current) {
-            textareaRef.current.focus();
+        onClick={(e: ReactMouseEvent) => {
+          // Ignore clicks on interactive elements
+          const target = e.target as HTMLElement;
+          if (target.closest('button, input, textarea, select, a, [role="option"], [role="combobox"], [role="listbox"]')) return;
+          if (isLoading || !selectedAgentId || !textareaRef.current) return;
+
+          // Delay focus to allow double-click / drag-select to register
+          if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+          focusTimeoutRef.current = window.setTimeout(() => {
+            const sel = window.getSelection();
+            if (sel && sel.toString().trim().length > 0) return;
+            if (!isLoading && textareaRef.current) {
+              textareaRef.current.focus();
+            }
+          }, 200);
+        }}
+        onDoubleClick={() => {
+          if (focusTimeoutRef.current) {
+            clearTimeout(focusTimeoutRef.current);
+            focusTimeoutRef.current = null;
           }
         }}
       >
