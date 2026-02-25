@@ -439,6 +439,7 @@ export async function fetchInvoices(
  * Busca contratos detalhados de um cliente por ID (com endereço).
  */
 export interface ContractResult {
+  ordem: number;
   contrato_id: string;
   endereco_completo: string | null;
   plano: string | null;
@@ -490,6 +491,7 @@ export async function fetchClientContracts(
         const endereco = parts.length > 0 ? parts.join(", ") : null;
 
         return {
+          ordem: 0,
           contrato_id: ct.id,
           endereco_completo: endereco,
           plano: ct.plano,
@@ -514,6 +516,9 @@ export async function fetchClientContracts(
     allContracts.push(...r.contracts);
     if (r.error) allErrors.push(r.error);
   }
+
+  // Numerar contratos sequencialmente
+  allContracts.forEach((c, i) => { c.ordem = i + 1; });
 
   return { contracts: allContracts, errors: allErrors };
 }
