@@ -1,83 +1,79 @@
 
 
-# Correção: Listagem de contratos deve exibir apenas endereço
+# Correção: Contratos listados sem numeração e texto embolado
 
 ## Problema
 
-O agente recebe do `erp_contract_lookup` os campos `contrato_id`, `endereco_completo`, `plano`, `status_internet` e `dia_vencimento`. A descrição da ferramenta diz explicitamente "Retorna ID do contrato, endereço de instalação, plano contratado e status", o que leva a IA a exibir todos esses campos na resposta.
+Apesar da descrição da ferramenta instruir a IA a listar apenas endereços numerados, o screenshot mostra que o agente continua exibindo tudo embolado e sem numeração. Isso acontece porque:
 
-O comportamento desejado (definido no fluxo conversacional) é:
-
-```
-De qual contrato quer informações?
-1. Rua A
-2. Rua B
-```
-
-Apenas endereço, numerado, sem plano nem status.
-
-## Causa raiz
-
-A `description` e `response_description` da ferramenta `erp_contract_lookup` instruem a IA a incluir plano e status na apresentação. Mesmo que o passo do fluxo diga "liste os contratos", a IA usa a descrição da ferramenta como guia de formatação.
+1. O handler retorna todos os campos (`plano`, `status_internet`, `dia_vencimento`) junto com `endereco_completo` — a IA tende a usar tudo que recebe
+2. A IA não tem um modelo claro de formatação no próprio dado retornado
 
 ## Solução
 
-Alterar a descrição e `response_description` do `erp_contract_lookup` em ambos os catálogos (backend e frontend) para instruir a IA a apresentar apenas o endereço em lista numerada.
+Duas mudanças complementares:
 
-### Alterações
+### 1. Reestruturar resposta do handler (`tool-handlers.ts`)
 
-**Arquivo: `supabase/functions/_shared/tool-catalog.ts`** (backend — usado pela IA)
+Separar o retorno em dois blocos:
+- `lista_enderecos`: array simples com número + endereço (para exibição ao cliente)
+- `_detalhes_internos`: campos extras marcados como internos (para uso posterior)
 
-Linha 89-91 — `description`:
+Adicionar campo `instrucao_exibicao` com o formato exato esperado.
+
 ```typescript
-description:
-  "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereços de instalação dos contratos. Ao listar para o cliente, exiba APENAS uma lista numerada com os endereços, sem plano, sem status, sem vencimento. Exemplo: '1. Rua X, 123, Bairro, Cidade'. Pergunte sobre qual contrato quer falar.",
+// Linha 190-206 de tool-handlers.ts
+return {
+  success: true,
+  data: {
+    encontrados: result.contracts.length,
+    instrucao_exibicao: "Apresente EXATAMENTE assim, sem nenhuma informação adicional:\nSobre qual contrato você gostaria de falar?\n" +
+      result.contracts.map((c, i) => `${i + 1}. ${c.endereco_completo}`).join("\n"),
+    lista_enderecos: result.contracts.map((c, i) => ({
+      numero: i + 1,
+      endereco: c.endereco_completo,
+    })),
+    _detalhes_internos: result.contracts.map((c) => ({
+      contrato_id: c.contrato_id,
+      endereco_completo: c.endereco_completo,
+      plano: c.plano,
+      status_internet: c.status_internet,
+      dia_vencimento: c.dia_vencimento,
+      provider_name: c.provider_name,
+    })),
+    erros: result.errors,
+  },
+};
 ```
 
-Linha 103-104 — `response_description`:
-```typescript
-response_description:
-  "Contratos ativos com contrato_id e endereço completo. Ao apresentar ao cliente, liste SOMENTE os endereços numerados. Os demais campos (plano, status, vencimento) são internos para uso posterior quando o cliente escolher um contrato.",
-```
+### 2. Reforçar descrição no catálogo (`tool-catalog.ts`)
 
-**Arquivo: `src/constants/tool-catalog.ts`** (frontend — apenas exibição no admin)
-
-Linha 56 — `description`:
-```typescript
-description:
-  "Consulta contratos ativos de um cliente por CPF/CNPJ. Retorna endereços de instalação dos contratos.",
-```
-
-Linha 60 — `response_description`:
-```typescript
-response_description: "Contratos ativos com endereço completo. Apresenta lista numerada de endereços ao cliente.",
-```
-
-### Dados retornados pelo handler
-
-Os campos `plano`, `status_internet` e `dia_vencimento` continuam sendo retornados pelo handler (linhas 196-203 de `tool-handlers.ts`) porque são necessarios em etapas posteriores do fluxo (quando o cliente escolhe um contrato e quer detalhes). A mudança é apenas na instrução de apresentação via descrição da ferramenta.
-
-## Melhoria sugerida
-
-O prompt do fluxo conversacional no passo "LISTAR CONTRATOS" poderia ser reforçado para alinhar com a descrição da ferramenta:
+Atualizar `response_description` para mencionar o campo `instrucao_exibicao`:
 
 ```
-Busque os contratos. Liste APENAS os endereços de instalação com um número de ordem.
-Formato: "De qual contrato quer informações?\n1. [endereço]\n2. [endereço]"
-Não inclua plano, status nem vencimento nesta listagem.
-Pergunte "Sobre qual contrato quer falar?"
+"Use o campo 'instrucao_exibicao' como resposta ao cliente. NÃO reformate, NÃO adicione informações extras. Os dados em '_detalhes_internos' são para uso posterior apenas."
 ```
 
-Essa alteração é feita pelo admin na configuração do fluxo (banco de dados), não no código.
+## Resultado esperado
+
+O agente receberá um texto pronto para copiar:
+
+```
+Sobre qual contrato você gostaria de falar?
+1. Quadra Central 1, SN, Sobradinho, 73000-000
+2. Eixo Monumental, sentido Shopping Popular, 73000-000
+3. Rodovia DF-425, SN, Sobradinho, 73000-000
+```
 
 ## Arquivos alterados
 
 | Arquivo | Mudança |
 |---|---|
-| `supabase/functions/_shared/tool-catalog.ts` | Atualizar `description` e `response_description` do `erp_contract_lookup` |
-| `src/constants/tool-catalog.ts` | Espelhar descrição atualizada no catálogo frontend |
+| `supabase/functions/_shared/tool-handlers.ts` | Reestruturar resposta do `erp_contract_lookup` com `instrucao_exibicao`, `lista_enderecos` e `_detalhes_internos` |
+| `supabase/functions/_shared/tool-catalog.ts` | Atualizar `response_description` para referenciar `instrucao_exibicao` |
+| `src/constants/tool-catalog.ts` | Espelhar descrição atualizada |
 
-## Deploy necessário
+## Deploy
 
-Edge function `ai-chat` (usa o catálogo backend).
+Edge function `ai-chat`.
 
