@@ -273,12 +273,14 @@ export async function searchClients(
 
 /**
  * Busca faturas em aberto de um cliente por CPF/CNPJ.
+ * Quando `endereco` é fornecido, filtra faturas apenas do contrato cujo endereço contém o texto.
  */
 export async function fetchInvoices(
   supabaseAdmin: SupabaseClient,
   ispId: string,
   encryptionKey: string,
-  cpfCnpj: string
+  cpfCnpj: string,
+  endereco?: string
 ): Promise<{ invoices: ErpInvoice[]; errors: string[] }> {
   const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
   if (configs.length === 0) return { invoices: [], errors: [] };
@@ -286,6 +288,39 @@ export async function fetchInvoices(
   const allInvoices: ErpInvoice[] = [];
   const allErrors: string[] = [];
   const today = new Date();
+
+  // Se endereço fornecido, pré-resolver contratos para filtrar por id_contrato
+  let allowedContratoIds: Set<string> | null = null;
+  let contratoEnderecoMap: Map<string, string> = new Map();
+
+  if (endereco) {
+    // Resolver cliente primeiro para obter cliente_erp_id
+    const clientResult = await searchClients(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
+    const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
+    const matched = clientResult.clients.filter((c) => {
+      const cleanDoc = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+      return cleanDoc === cleanCpf;
+    });
+
+    if (matched.length > 0) {
+      const clienteErpId = String(matched[0].cliente_erp_id || matched[0].erp_id);
+      const contractResult = await fetchClientContracts(supabaseAdmin, ispId, encryptionKey, clienteErpId);
+
+      const enderecoLower = endereco.toLowerCase();
+      allowedContratoIds = new Set();
+
+      for (const ct of contractResult.contracts) {
+        if (ct.endereco_completo && ct.endereco_completo.toLowerCase().includes(enderecoLower)) {
+          allowedContratoIds.add(ct.contrato_id);
+          contratoEnderecoMap.set(ct.contrato_id, ct.endereco_completo);
+        }
+      }
+
+      if (allowedContratoIds.size === 0) {
+        return { invoices: [], errors: [`Nenhum contrato encontrado com endereço "${endereco}"`] };
+      }
+    }
+  }
 
   const promises = configs.map(async (config) => {
     try {
@@ -301,7 +336,12 @@ export async function fetchInvoices(
 
       const rawFaturas = await driver.fetchFaturas(creds, { cpf_cnpj: cpfCnpj });
 
-      const invoices: ErpInvoice[] = rawFaturas.map((f) => {
+      // Filtrar por contrato se endereço foi especificado
+      const filtered = allowedContratoIds
+        ? rawFaturas.filter((f) => f.id_contrato && allowedContratoIds!.has(f.id_contrato))
+        : rawFaturas;
+
+      const invoices: ErpInvoice[] = filtered.map((f) => {
         const vencimento = new Date(f.data_vencimento);
         const diffMs = today.getTime() - vencimento.getTime();
         const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
@@ -311,6 +351,8 @@ export async function fetchInvoices(
           provider_name: providerName,
           id: f.id,
           id_cliente: f.id_cliente,
+          id_contrato: f.id_contrato,
+          endereco_contrato: f.id_contrato ? contratoEnderecoMap.get(f.id_contrato) : undefined,
           data_vencimento: f.data_vencimento,
           valor: f.valor,
           valor_pago: f.valor_pago,

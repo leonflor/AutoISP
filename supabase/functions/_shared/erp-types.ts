@@ -110,6 +110,7 @@ export interface RawFibraRecord {
 export interface RawFatura {
   id: string;
   id_cliente: string;
+  id_contrato?: string;
   data_vencimento: string;
   valor: number;
   valor_pago: number | null;
@@ -130,6 +131,8 @@ export interface ErpInvoice {
   provider_name: string;
   id: string;
   id_cliente: string;
+  id_contrato?: string;
+  endereco_contrato?: string;
   data_vencimento: string;
   valor: number;
   valor_pago: number | null;
