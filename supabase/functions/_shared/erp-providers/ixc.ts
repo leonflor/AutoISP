@@ -78,6 +78,24 @@ async function fetchRadusuarios(creds: ErpCredentials): Promise<RawRadusuario[]>
   }));
 }
 
+function formatCpf(digits: string): string {
+  return `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9)}`;
+}
+
+function formatCnpj(digits: string): string {
+  return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12)}`;
+}
+
+function buildDocVariants(input: string): string[] {
+  const digits = input.replace(/\D/g, "");
+  const variants = new Set<string>();
+  variants.add(input);
+  if (digits.length >= 11) variants.add(digits);
+  if (digits.length === 11) variants.add(formatCpf(digits));
+  if (digits.length === 14) variants.add(formatCnpj(digits));
+  return [...variants];
+}
+
 async function fetchClientes(
   creds: ErpCredentials,
   filtro?: { cpf_cnpj: string }
@@ -85,17 +103,35 @@ async function fetchClientes(
   const baseUrl = normalizeUrl(creds.apiUrl);
   const headers = buildAuth(creds.username || "", creds.password || "");
 
-  const filter = filtro
-    ? { qtype: "cliente.cnpj_cpf", query: filtro.cpf_cnpj, oper: "=" }
-    : undefined;
+  if (!filtro) {
+    const recs = await ixcFetch(baseUrl, headers, "cliente");
+    return recs.map((c: any) => ({
+      id: String(c.id),
+      nome: c.razao || c.fantasia || "",
+      cpf_cnpj: c.cnpj_cpf || "",
+    }));
+  }
 
-  const recs = await ixcFetch(baseUrl, headers, "cliente", filter);
+  // Try multiple format variants with early return
+  const variants = buildDocVariants(filtro.cpf_cnpj);
+  console.log(`[IXC] fetchClientes tentando ${variants.length} variante(s) de documento`);
 
-  return recs.map((c: any) => ({
-    id: String(c.id),
-    nome: c.razao || c.fantasia || "",
-    cpf_cnpj: c.cnpj_cpf || "",
-  }));
+  for (const variant of variants) {
+    const recs = await ixcFetch(baseUrl, headers, "cliente", {
+      qtype: "cliente.cnpj_cpf", query: variant, oper: "=",
+    });
+    if (recs.length > 0) {
+      console.log(`[IXC] fetchClientes: encontrado com variante "${variant}"`);
+      return recs.map((c: any) => ({
+        id: String(c.id),
+        nome: c.razao || c.fantasia || "",
+        cpf_cnpj: c.cnpj_cpf || "",
+      }));
+    }
+  }
+
+  console.log(`[IXC] fetchClientes: nenhum resultado para nenhuma variante`);
+  return [];
 }
 
 async function fetchContratos(
