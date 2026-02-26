@@ -157,25 +157,27 @@ export interface ErpProviderDriver {
   testConnection(creds: ErpCredentials): Promise<TestResult>;
 
   // ── Métodos granulares (opcionais por provider) ──
+  // Todos retornam dados CRUS da API (any[]/any).
+  // O mapeamento para tipos Raw é feito exclusivamente no Driver (Camada 2).
 
-  /** Busca clientes brutos */
-  fetchClientes?(creds: ErpCredentials, filtro?: { cpf_cnpj: string }): Promise<RawCliente[]>;
+  /** Busca clientes — retorna dados crus da API */
+  fetchClientes?(creds: ErpCredentials, filtro?: Record<string, string>): Promise<any[]>;
 
-  /** Busca contratos ativos */
-  fetchContratos?(creds: ErpCredentials, filtro?: { id_cliente: string }): Promise<RawContrato[]>;
+  /** Busca contratos — retorna dados crus da API */
+  fetchContratos?(creds: ErpCredentials, filtro?: Record<string, string>): Promise<any[]>;
 
-  /** Busca usuários RADIUS */
-  fetchRadusuarios?(creds: ErpCredentials): Promise<RawRadusuario[]>;
+  /** Busca usuários RADIUS — retorna dados crus da API */
+  fetchRadusuarios?(creds: ErpCredentials): Promise<any[]>;
 
-  /** Busca registros de fibra (sinal em massa) */
-  fetchFibra?(creds: ErpCredentials): Promise<RawFibraRecord[]>;
+  /** Busca registros de fibra (sinal em massa) — retorna dados crus da API */
+  fetchFibra?(creds: ErpCredentials): Promise<any[]>;
 
-  /** Busca faturas em aberto */
-  fetchFaturas?(creds: ErpCredentials, filtro: FaturaFilter): Promise<RawFatura[]>;
+  /** Busca faturas — retorna dados crus da API */
+  fetchFaturas?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
 
-  /** Busca sinal bruto de um cliente (diagnóstico ONU sob demanda) */
-  fetchRawSignal?(creds: ErpCredentials, clientId: string): Promise<RawSignalData>;
+  /** Busca sinal bruto de um cliente (diagnóstico ONU) — retorna dado cru da API */
+  fetchRawSignal?(creds: ErpCredentials, clientId: string): Promise<any>;
 
-  /** Busca contratos detalhados com endereço de instalação */
-  fetchContratosDetalhados?(creds: ErpCredentials, filtro: { id_cliente: string }): Promise<RawContratoDetalhado[]>;
+  /** Busca contratos detalhados com endereço — retorna dados crus da API */
+  fetchContratosDetalhados?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
 }

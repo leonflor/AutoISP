@@ -1,14 +1,11 @@
 // ═══ CAMADA 3 — Provider SGP ═══
-// Conexão efetiva com o SGP. Retorna dados BRUTOS.
+// HTTP puro. Retorna dados CRUS (any[]).
+// Nenhum mapeamento de campos — responsabilidade do Driver (Camada 2).
 
 import type {
   ErpProviderDriver,
   ErpCredentials,
-  RawCliente,
-  RawContrato,
-  RawFatura,
   TestResult,
-  FaturaFilter,
 } from "../erp-types.ts";
 
 function normalizeUrl(apiUrl: string): string {
@@ -22,7 +19,7 @@ export const sgpProvider: ErpProviderDriver = {
     return ["login", "plano"];
   },
 
-  async fetchClientes(creds: ErpCredentials): Promise<RawCliente[]> {
+  async fetchClientes(creds: ErpCredentials, _filtro?: Record<string, string>): Promise<any[]> {
     const baseUrl = normalizeUrl(creds.apiUrl);
 
     const body = new URLSearchParams();
@@ -38,23 +35,15 @@ export const sgpProvider: ErpProviderDriver = {
     if (!resp.ok) throw new Error(`SGP HTTP ${resp.status}`);
 
     const data = await resp.json();
-    const clientes = Array.isArray(data) ? data : data.clientes || data.data || [];
-
-    return clientes.map((r: any) => ({
-      id: String(r.id || r.codigo || r.cd_cliente || ""),
-      nome: r.nome || r.razao_social || r.nm_cliente || "",
-      cpf_cnpj: r.cpf_cnpj || r.cpf || r.cnpj || "",
-    }));
+    return Array.isArray(data) ? data : data.clientes || data.data || [];
   },
 
-  async fetchContratos(): Promise<RawContrato[]> {
-    // SGP não suporta busca granular de contratos por ora
+  async fetchContratos(): Promise<any[]> {
     console.log("[SGP] fetchContratos: stub — sem integração real");
     return [];
   },
 
-  async fetchFaturas(_creds: ErpCredentials, _filtro: FaturaFilter): Promise<RawFatura[]> {
-    // SGP não suporta busca de faturas por ora
+  async fetchFaturas(_creds: ErpCredentials, _filtro: Record<string, string>): Promise<any[]> {
     console.log("[SGP] fetchFaturas: stub — sem integração real");
     return [];
   },
