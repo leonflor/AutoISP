@@ -10,13 +10,32 @@
 
 ```text
 Camada 1 — Tool Handler (tool-handlers.ts)
-  Valida input, chama Driver, monta payload JSON para o modelo.
+  Valida input (CPF/CNPJ), chama Driver, retorna ToolResult<ToolEnvelope>.
 
 Camada 2 — Driver (erp-driver.ts)
-  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
+  Resolve configs ativos, chama Provider, aplica field-maps, retorna ToolEnvelope<ResponseModel>.
 
 Camada 3 — Provider (erp-providers/*.ts)
   HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+```
+
+## Estrutura de arquivos
+
+```text
+supabase/functions/_shared/
+├── response-models.ts     — Interfaces do JSON que a IA recebe (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)
+├── field-maps.ts          — Mapeamento declarativo ERP → modelo, por provider (mapCliente, mapContrato, mapFatura, etc.)
+├── erp-driver.ts          — Orquestrador: buscarCliente(), buscarContratos(), buscarFaturas() + funções de monitoramento em massa
+├── tool-handlers.ts       — Valida input + chama driver + retorna ToolResult
+├── tool-catalog.ts        — JSON Schema das ferramentas (function calling OpenAI)
+├── erp-types.ts           — Tipos compartilhados (ErpProvider, ErpClient, ErpCredentials, ErpProviderDriver)
+├── erp-providers/
+│   ├── index.ts           — Registry de providers
+│   ├── ixc.ts             — HTTP puro IXC
+│   ├── ixc-types.ts       — Modelagem ORM 1:1 dos campos IXC
+│   ├── sgp.ts             — HTTP puro SGP
+│   └── mk.ts              — HTTP puro MK-Solutions
+└── onu-signal-analyzer.ts — Classificação de sinal óptico
 ```
 
 ## Equivalências de campos
@@ -54,5 +73,27 @@ Camada 3 — Provider (erp-providers/*.ts)
 ## Responsabilidades
 
 - **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
-- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
-- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
+- **Driver**: Orquestra configs ativos, aplica `field-maps` para mapeamento declarativo, normaliza status, sanitiza endereço. Retorna `ToolEnvelope<ResponseModel>`.
+- **Tool Handler**: Validação de input, encapsula resultado do driver em `ToolResult`.
+
+## Response Models (o que a IA recebe)
+
+### ClienteResponse (erp_client_lookup)
+```json
+{ "nome": "João Silva", "cpf_cnpj": "123.456.789-00", "erp": "IXC Soft" }
+```
+
+### ContratoResponse (erp_contract_lookup)
+```json
+{ "ordem": 1, "contrato_id": "123", "endereco": "Rua A", "numero": "100", "complemento": null, "bairro": "Centro", "endereco_completo": "Rua A, nº 100, Centro", "plano": "100MB", "status": "ativo", "dia_vencimento": "10", "erp": "IXC Soft" }
+```
+
+### FaturaResponse (erp_invoice_search)
+```json
+{ "id": "456", "contrato_id": "123", "endereco": "Rua A, nº 100, Centro", "valor": 99.90, "vencimento": "2025-01-10", "dias_atraso": 15, "linha_digitavel": "23793...", "gateway_link": "https://...", "erp": "IXC Soft" }
+```
+
+### Envelope padrão
+```json
+{ "encontrados": 2, "itens": [...], "mensagem": "...", "erros": [] }
+```
