@@ -6,6 +6,13 @@
 
 > **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
 
+## Regras de Proteção
+
+> **ALERTA OBRIGATÓRIO**: Os arquivos abaixo NÃO podem ser editados sem ordem expressa do usuário. Qualquer plano que preveja alteração neles deve alertar antes de implementar:
+> - `field-maps.ts` — mapeamento declarativo ERP → modelo
+> - `erp-providers/*.ts` — conectores HTTP dos ERPs
+> - `ixc-types.ts` — modelagem ORM dos campos IXC
+
 ## Fluxo por operação
 
 ```text
