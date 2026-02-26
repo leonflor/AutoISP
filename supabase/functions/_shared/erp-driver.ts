@@ -126,7 +126,7 @@ function buildEnderecoCompleto(raw: { endereco: string | null; numero: string | 
 
   const partes = [
     end,
-    cleanNum ? `nº ${cleanNum}` : null,
+    cleanNum,
     comp,
     bairro,
   ].filter(p => p && p !== "" && p !== "0");
