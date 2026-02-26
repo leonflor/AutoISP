@@ -1,30 +1,58 @@
 
 
-## Plano: Adicionar interface `IxcRadpopRadioClienteFibra` em `ixc-types.ts`
+# Arquitetura ERP — 3 Camadas
 
-### Novo tipo enumerado
+## Regra de Equivalências
 
-```typescript
-/** B = Bridge, R = Router (PPPoE) */
-export type IxcTipoOperacao = "B" | "R";
+> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
+
+## Fluxo por operação
+
+```text
+Camada 1 — Tool Handler (tool-handlers.ts)
+  Valida input, chama Driver, monta payload JSON para o modelo.
+
+Camada 2 — Driver (erp-driver.ts)
+  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
+
+Camada 3 — Provider (erp-providers/*.ts)
+  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
 ```
 
-### Tipos reutilizados
+## Equivalências de campos
 
-- `IxcSimNao` → `endereco_padrao_cliente`, `radpop_estrutura`, `onu_rede_neutra`
-- `tipo_autenticacao` → `string` (sem documentação completa dos valores)
+### IXC → Tipos internos
 
-### FKs
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
 
-- `id_login` → `/radusuarios.id`
-- `id_contrato` → `/cliente_contrato.id`
-- `id_transmissor`, `id_caixa_ftth`, `id_radpop_radio_porta`, `id_condominio`, `id_hardware`, `id_perfil`, `id_projeto`, `id_ramal` — FKs internas
+### MK → Tipos internos
 
-### Interface `IxcRadpopRadioClienteFibra`
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
 
-~70 campos mapeados 1:1 do JSON. Campos de telemetria (`sinal_rx`, `sinal_tx`, `temperatura`, `voltagem`) tipados como `string`.
+### SGP → Tipos internos
 
-### Arquivo alterado
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` / `codigo` / `cd_cliente` | `id` |
+| `nome` / `razao_social` / `nm_cliente` | `nome` |
+| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
 
-Append em `supabase/functions/_shared/erp-providers/ixc-types.ts` após linha 1060.
+## Responsabilidades
 
+- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
+- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
+- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
