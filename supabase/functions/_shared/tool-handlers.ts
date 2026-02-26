@@ -1,5 +1,8 @@
+// ═══ CAMADA 1 — Tool Handlers ═══
+// Valida input, chama Driver (Camada 2), retorna ToolResult com envelope padronizado.
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchInvoices, fetchClientContracts, resolveClienteErpId } from "./erp-driver.ts";
+import { buscarCliente, buscarContratos, buscarFaturas } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -19,174 +22,53 @@ type ToolHandler = (
   config?: Record<string, unknown>
 ) => Promise<ToolResult>;
 
-// ── Handler: erp_invoice_search ──
-const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpjRaw = String(args.cpf_cnpj || "");
-  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
-  if (!cpfDigits || cpfDigits.length < 11) {
-    return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
-  }
+// ── Validação comum ──
 
-  const endereco = args.endereco ? String(args.endereco) : undefined;
-
-  try {
-    const result = await fetchInvoices(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw, endereco);
-
-    if (result.invoices.length === 0) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: endereco
-            ? `Nenhuma fatura em aberto encontrada para o endereço "${endereco}".`
-            : "Nenhuma fatura em aberto encontrada para este cliente.",
-          erros: result.errors,
-        },
-      };
-    }
-
-    const totalAberto = result.invoices.reduce((sum, f) => sum + f.valor, 0);
-
-    return {
-      success: true,
-      data: {
-        encontrados: result.invoices.length,
-        total_aberto: totalAberto,
-        faturas: result.invoices.map((f) => ({
-          id: f.id,
-          contrato_id: f.id_contrato,
-          endereco: f.endereco_contrato,
-          valor: f.valor,
-          vencimento: f.data_vencimento,
-          dias_atraso: f.dias_atraso,
-          linha_digitavel: f.linha_digitavel,
-          gateway_link: f.gateway_link,
-          erp: f.provider_name,
-        })),
-        erros: result.errors,
-      },
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `Erro ao buscar faturas: ${err instanceof Error ? err.message : "desconhecido"}`,
-    };
-  }
-};
+function validateCpfCnpj(raw: unknown): string | null {
+  const digits = String(raw || "").replace(/\D/g, "");
+  return digits.length >= 11 ? String(raw) : null;
+}
 
 // ── Handler: erp_client_lookup ──
+
 const erpClientLookupHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpjRaw = String(args.cpf_cnpj || "");
-  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
-  if (!cpfDigits || cpfDigits.length < 11) {
-    return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
-  }
+  const cpf = validateCpfCnpj(args.cpf_cnpj);
+  if (!cpf) return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
 
-  try {
-    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw);
+  const result = await buscarCliente(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpf);
 
-    if (!resolved.client) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.",
-          erros: resolved.errors,
-        },
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        encontrados: 1,
-        clientes: [{
-          cliente_erp_id: resolved.client.id,
-          nome: resolved.client.nome,
-          cpf_cnpj: resolved.client.cpf_cnpj,
-          provider_name: resolved.client.providerName,
-        }],
-        erros: resolved.errors,
-      },
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `Erro ao buscar cliente: ${err instanceof Error ? err.message : "desconhecido"}`,
-    };
-  }
+  return { success: true, data: result };
 };
 
 // ── Handler: erp_contract_lookup ──
+
 const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpjRaw = String(args.cpf_cnpj || "");
-  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
-  if (!cpfDigits || cpfDigits.length < 11) {
-    return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
-  }
+  const cpf = validateCpfCnpj(args.cpf_cnpj);
+  if (!cpf) return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
 
-  try {
-    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw);
+  const result = await buscarContratos(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpf);
 
-    if (!resolved.client) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.",
-          erros: resolved.errors,
-        },
-      };
-    }
+  return { success: true, data: result };
+};
 
-    const result = await fetchClientContracts(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, resolved.client.id);
+// ── Handler: erp_invoice_search ──
 
-    if (result.contracts.length === 0) {
-      return {
-        success: true,
-        data: {
-          encontrados: 0,
-          mensagem: "Nenhum contrato ativo encontrado para este cliente.",
-          erros: result.errors,
-        },
-      };
-    }
+const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
+  const cpf = validateCpfCnpj(args.cpf_cnpj);
+  if (!cpf) return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
 
-    // Filter out contracts with no address data at all
-    const comEndereco = result.contracts.filter((c) =>
-      c.endereco || c.bairro || c.complemento
-    );
+  const endereco = args.endereco ? String(args.endereco) : undefined;
+  const result = await buscarFaturas(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpf, endereco);
 
-    return {
-      success: true,
-      data: {
-        encontrados: comEndereco.length,
-        contratos: comEndereco.map((c) => ({
-          ordem: c.ordem,
-          contrato_id: c.contrato_id,
-          endereco: c.endereco,
-          numero: c.numero,
-          complemento: c.complemento,
-          bairro: c.bairro,
-          endereco_completo: c.endereco_completo,
-          provider_name: c.provider_name,
-        })),
-        erros: result.errors,
-      },
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `Erro ao buscar contratos: ${err instanceof Error ? err.message : "desconhecido"}`,
-    };
-  }
+  return { success: true, data: result };
 };
 
 // ── Registry ──
+
 const handlers: Record<string, ToolHandler> = {
-  erp_invoice_search: erpInvoiceSearchHandler,
   erp_client_lookup: erpClientLookupHandler,
   erp_contract_lookup: erpContractLookupHandler,
+  erp_invoice_search: erpInvoiceSearchHandler,
 };
 
 /**
