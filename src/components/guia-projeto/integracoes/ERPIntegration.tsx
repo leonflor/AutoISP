@@ -594,12 +594,6 @@ CREATE POLICY "ISP admins" ON erp_configs FOR ALL
                   <TableCell>Testa, criptografa e salva configuração ERP</TableCell>
                   <TableCell><code className="text-xs">testConnection()</code></TableCell>
                 </TableRow>
-                <TableRow>
-                  <TableCell><code className="text-xs bg-muted px-1 rounded">fetch-onu-signal</code></TableCell>
-                  <TableCell>POST</TableCell>
-                  <TableCell>Diagnóstico detalhado de sinal ONU (TX/RX) via IXC</TableCell>
-                  <TableCell><code className="text-xs">fetchClientSignal()</code></TableCell>
-                </TableRow>
               </TableBody>
             </Table>
 
@@ -611,7 +605,7 @@ CREATE POLICY "ISP admins" ON erp_configs FOR ALL
               </p>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                 <li>• <code>erp_invoice_search</code> → <code>fetchInvoices()</code> — faturas reais via IXC <code>/fn_areceber</code> (SGP/MK retornam <code>[]</code>)</li>
-                <li>• <code>erp_onu_diagnostics</code> → <code>fetchClientSignal()</code> — diagnóstico ONU com análise de qualidade</li>
+                
               </ul>
               <p className="mt-2 text-xs text-muted-foreground">
                 <strong>Nota:</strong> <code>searchClients()</code> é usada internamente pela edge function <code>fetch-erp-clients</code> (página Assinantes), não é uma tool de IA.
@@ -646,21 +640,6 @@ CREATE POLICY "ISP admins" ON erp_configs FOR ALL
                 </CardContent>
               </Card>
 
-              <Card className="border-muted">
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded bg-green-500/10">
-                      <Activity className="h-4 w-4 text-green-500" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Diagnóstico ONU</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Leitura de sinal TX/RX detalhado via IXC <code>/botao_rel_22991</code>, com análise automática
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               <Card className="border-muted">
                 <CardContent className="pt-4">

@@ -1,5 +1,5 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchClientSignal, fetchInvoices, fetchClientContracts, resolveClienteErpId } from "./erp-driver.ts";
+import { fetchInvoices, fetchClientContracts, resolveClienteErpId } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -70,41 +70,6 @@ const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
     return {
       success: false,
       error: `Erro ao buscar faturas: ${err instanceof Error ? err.message : "desconhecido"}`,
-    };
-  }
-};
-
-// ── Handler: erp_onu_diagnostics ──
-const onuDiagnosticsHandler: ToolHandler = async (ctx, args) => {
-  const cpfCnpjRaw = String(args.cpf_cnpj || "");
-  const cpfDigits = cpfCnpjRaw.replace(/\D/g, "");
-  if (!cpfDigits || cpfDigits.length < 11) {
-    return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
-  }
-
-  try {
-    const resolved = await resolveClienteErpId(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpfCnpjRaw);
-
-    if (!resolved.client) {
-      return { success: true, data: { encontrados: 0, mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.", erros: resolved.errors } };
-    }
-
-    const result = await fetchClientSignal(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, resolved.client.id);
-
-    return {
-      success: true,
-      data: {
-        cpf_cnpj: cpfCnpjRaw,
-        cliente_erp_id: resolved.client.id,
-        nome: resolved.client.nome,
-        diagnostico: result.signal,
-        relatorio: result.report,
-      },
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `Erro ao diagnosticar sinal: ${err instanceof Error ? err.message : "desconhecido"}`,
     };
   }
 };
@@ -220,7 +185,6 @@ const erpContractLookupHandler: ToolHandler = async (ctx, args) => {
 // ── Registry ──
 const handlers: Record<string, ToolHandler> = {
   erp_invoice_search: erpInvoiceSearchHandler,
-  erp_onu_diagnostics: onuDiagnosticsHandler,
   erp_client_lookup: erpClientLookupHandler,
   erp_contract_lookup: erpContractLookupHandler,
 };

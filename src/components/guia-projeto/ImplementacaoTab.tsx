@@ -77,7 +77,7 @@ const ImplementacaoTab = () => {
     "audit-prompt",
     "check-integration",
     "fetch-erp-clients",
-    "fetch-onu-signal",
+    
     "invite-admin",
     "process-document",
     "save-erp-config",
@@ -772,7 +772,7 @@ const ImplementacaoTab = () => {
               <li><code className="rounded bg-muted px-1">_shared/erp-types.ts</code> — Tipos padrão de ERP (ErpClient, ErpInvoice, InternetStatus, RawFatura, ErpProviderDriver)</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Orquestrador: composição granular, normalização status_internet, fetchInvoices, decrypt AES-256-GCM</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-providers/index.ts</code> — Registry de providers ERP (IXC, SGP, MK)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/ixc.ts</code> — Conector IXC Soft — 6 funções granulares (clientes, contratos, radusuarios, fibra, faturas, sinal)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/ixc.ts</code> — Conector IXC Soft — 5 funções granulares (clientes, contratos, radusuarios, fibra, faturas)</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-providers/sgp.ts</code> — Conector SGP — clientes + stubs para contratos/faturas</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-providers/mk.ts</code> — Conector MK-Solutions — clientes + stubs para contratos/faturas</li>
               <li><code className="rounded bg-muted px-1">_shared/onu-signal-analyzer.ts</code> — Análise de qualidade de sinal ONU (rx/tx)</li>

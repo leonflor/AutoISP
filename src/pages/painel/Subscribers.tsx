@@ -10,7 +10,6 @@ import { Search, Users, UserCheck, UserX, Wifi, WifiOff, RefreshCw, AlertTriangl
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { SignalBadge } from '@/components/painel/subscribers/SignalBadge';
-import { SignalDiagnosticsDialog } from '@/components/painel/subscribers/SignalDiagnosticsDialog';
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
@@ -235,12 +234,6 @@ export default function SubscribersPage() {
                           <SignalBadge
                             signalQuality={client.signal_quality}
                             signalDb={client.signal_db}
-                            clickable={client.provider === 'ixc' && client.signal_quality !== 'unknown'}
-                            onClick={() => {
-                              if (client.provider === 'ixc' && client.signal_quality !== 'unknown') {
-                                setDiagClient({ id: client.cliente_erp_id || client.erp_id, name: client.nome });
-                              }
-                            }}
                           />
                         </TableCell>
                         <TableCell className="text-center">
@@ -288,14 +281,6 @@ export default function SubscribersPage() {
         </CardContent>
       </Card>
 
-      {diagClient && (
-        <SignalDiagnosticsDialog
-          open={!!diagClient}
-          onOpenChange={(open) => !open && setDiagClient(null)}
-          clientId={diagClient.id}
-          clientName={diagClient.name}
-        />
-      )}
     </div>
   );
 }
