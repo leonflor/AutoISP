@@ -35,7 +35,7 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       additionalProperties: false,
     },
     response_description:
-      "Faturas em aberto com valor, vencimento, dias de atraso, contrato_id, endereço e total em aberto.",
+      "Faturas em aberto com valor, vencimento, dias de atraso, linha digitável, contrato_id, endereço e total em aberto.",
     requires_erp: true,
   },
 

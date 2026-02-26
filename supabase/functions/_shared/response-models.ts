@@ -33,7 +33,6 @@ export interface FaturaResponse {
   vencimento: string;
   dias_atraso: number;
   linha_digitavel: string | null;
-  gateway_link: string | null;
   erp: string;
 }
 
