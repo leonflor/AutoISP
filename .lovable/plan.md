@@ -1,114 +1,144 @@
 
-Objetivo
-- Corrigir o `erp_contract_lookup` para enviar ao agente de IA o payload estruturado “dado original por contrato” (com `ordem`, `endereco`, `numero`, etc.), em vez de depender de `lista_formatada` pronta.
 
-Diagnóstico atual
-- Hoje o handler retorna:
-  - `encontrados`
-  - `lista_formatada` (string pronta)
-  - `erros`
-- Isso força formatação no backend e perde granularidade dos campos originais.
-- No `erp-driver.ts`, já existe composição de `endereco_completo`, mas os campos crus não estão sendo devolvidos no contrato final da Camada 2 para a Camada 1 (tool handler).
-- O bug de `nº SN` também acontece porque o prefixo `nº` é aplicado antes da filtragem semântica.
+# Refatoração: Provider como camada HTTP pura dentro do Driver
 
-Plano de implementação (arquivo por arquivo)
+## Mudança de responsabilidade
 
-1) `supabase/functions/_shared/erp-driver.ts`
-- Expandir `ContractResult` para incluir campos estruturados de endereço:
-  - `endereco`
-  - `numero`
-  - `complemento`
-  - `bairro`
-  - `cidade`
-  - `estado`
-  - `cep`
-- No mapeamento de `detalhados.map((ct) => ...)`:
-  - Preservar os campos crus (string ou null) vindos do provider.
-  - Ajustar saneamento de `endereco_completo`:
-    - remover vírgula no final de `endereco` (`replace(/,\s*$/, "")`)
-    - só incluir `numero` quando válido (`!== ""`, `!== "0"`, `!== "SN"`)
-    - manter `cidade/estado` fora do `endereco_completo` se continuarem vindo como ID numérico.
-- Resultado: Camada 2 passa a entregar contrato com campos estruturados + campo composto opcional.
+```text
+ANTES                                    DEPOIS
+──────                                   ──────
+Provider: HTTP + mapeamento de campos    Provider: HTTP + filtros HTTP apenas, retorna any[]
+Driver:   normalização de negócio        Driver:   mapeamento de campos + normalização de negócio
+```
 
-2) `supabase/functions/_shared/tool-handlers.ts` (handler `erp_contract_lookup`)
-- Alterar o payload final para estrutura orientada a objeto:
-  - substituir (ou despriorizar) `lista_formatada`
-  - adicionar `contratos: []` com itens no formato:
-    - `ordem`
-    - `contrato_id`
-    - `endereco`
-    - `numero`
-    - `complemento`
-    - `bairro`
-    - `cidade`
-    - `estado`
-    - `cep`
-    - `endereco_completo` (opcional para fallback)
-    - `provider_name`
-- Filtrar contratos “vazios de endereço” no payload final apenas se todos os campos de endereço vierem nulos/vazios (decisão para reduzir ruído), mantendo `contrato_id` quando necessário para rastreabilidade.
-- Manter `encontrados` coerente com o array efetivamente retornado.
-- Manter `erros` inalterado.
+## Fluxo por operação
 
-3) `supabase/functions/_shared/tool-catalog.ts`
-- Atualizar `response_description` de `erp_contract_lookup` para refletir o novo contrato estruturado.
-- Isso melhora a expectativa do modelo ao interpretar o retorno da tool.
+```text
+tool-handlers/contract-lookup.ts (valida CPF, chama driver)
+  ↓
+erp-driver/contract-lookup.ts (itera configs, chama provider, MAPEIA campos, normaliza)
+  ↓
+erp-providers/ixc.ts → ixc_contract_lookup(creds, {id_cliente}) → any[]  (HTTP puro)
+```
 
-4) (Opcional, recomendado) `supabase/functions/ai-chat/index.ts`
-- Manter log atual de resultado completo (`JSON.stringify(result)`), pois ele já permite auditoria do payload exato enviado ao modelo.
-- Sem mudança funcional adicional obrigatória aqui.
+## Mudanças na interface ErpProviderDriver (erp-types.ts)
 
-Formato alvo do payload (exemplo)
-```json
-{
-  "success": true,
-  "data": {
-    "encontrados": 6,
-    "contratos": [
-      {
-        "ordem": 1,
-        "contrato_id": "123",
-        "endereco": "Quadra Central 1",
-        "numero": null,
-        "complemento": null,
-        "bairro": "Sobradinho",
-        "cidade": "5564",
-        "estado": "8",
-        "cep": null,
-        "endereco_completo": "Quadra Central 1, Sobradinho",
-        "provider_name": "IXC Soft"
-      }
-    ],
-    "erros": []
+Todos os métodos passam a retornar `any[]` ou `any` em vez de tipos Raw:
+
+| Método atual | Retorno atual | Retorno novo |
+|---|---|---|
+| `fetchClientes` | `RawCliente[]` | `any[]` |
+| `fetchContratos` | `RawContrato[]` | `any[]` |
+| `fetchContratosDetalhados` | `RawContratoDetalhado[]` | `any[]` |
+| `fetchRadusuarios` | `RawRadusuario[]` | `any[]` |
+| `fetchFibra` | `RawFibraRecord[]` | `any[]` |
+| `fetchFaturas` | `RawFatura[]` | `any[]` |
+| `fetchRawSignal` | `RawSignalData` | `any` |
+
+Os tipos `RawCliente`, `RawContrato`, etc. continuam existindo mas passam a ser usados exclusivamente pelo Driver no momento do mapeamento.
+
+## Mudanças por arquivo
+
+### 1. `erp-types.ts`
+- Atualizar interface `ErpProviderDriver`: métodos retornam `any[]` / `any`
+- Remover o parâmetro tipado `FaturaFilter` dos providers (filtro agora é genérico)
+- Manter tipos Raw como referência interna do Driver
+
+### 2. `erp-providers/ixc.ts`
+- Remover TODO mapeamento de campos (nada de `razao→nome`, `cnpj_cpf→cpf_cnpj`)
+- Cada função retorna `any[]` direto do `ixcFetch`
+- Manter filtros HTTP (ex: `status === "A"` como filtro pós-fetch quando API não suporta filtro direto)
+- Manter helpers: `normalizeUrl`, `buildAuth`, `ixcFetch`, `buildDocVariants`
+- `fetchFaturas` perde a orquestração (não chama mais fetchClientes/fetchContratos internamente). Passa a receber `id_contrato` e faz apenas 1 chamada HTTP ao `/fn_areceber`. A orquestração move para o Driver.
+
+Renomear funções internas:
+- `fetchClientes` → `ixc_client_lookup`
+- `fetchContratos` → `ixc_contract_lookup`  
+- `fetchContratosDetalhados` → `ixc_contract_lookup_detailed`
+- `fetchFaturas` → `ixc_invoice_search` (agora recebe `id_contrato`, não `cpf_cnpj`)
+- `fetchRadusuarios` → `ixc_radusuarios`
+- `fetchFibra` → `ixc_fibra`
+- `fetchRawSignal` → `ixc_onu_diagnostics`
+
+### 3. `erp-providers/mk.ts`
+- Mesmo padrão: remover mapeamento, retornar `any[]`
+- `fetchClientes` → `mk_client_lookup`, retorna `any[]` cru
+
+### 4. `erp-providers/sgp.ts`
+- Mesmo padrão
+
+### 5. `erp-driver.ts` (ou `erp-driver/` se separar por arquivo)
+- Adicionar bloco de mapeamento POR PROVIDER para cada operação:
+
+```text
+// Exemplo em erp_client_lookup:
+const raw = await driver.fetchClientes(creds, { cpf_cnpj });
+const mapped = raw.map((r) => mapClienteFromProvider(providerKey, r));
+
+function mapClienteFromProvider(provider: ErpProvider, raw: any): RawCliente {
+  if (provider === "ixc") {
+    return { id: String(raw.id), nome: raw.razao || raw.fantasia || "", cpf_cnpj: raw.cnpj_cpf || "" };
   }
+  if (provider === "mk_solutions") {
+    return { id: String(raw.CodigoCliente || raw.id), nome: raw.NomeRazaoSocial || "", cpf_cnpj: raw.CpfCnpj || "" };
+  }
+  // sgp...
 }
 ```
 
-Compatibilidade e risco
-- Risco principal: fluxos/prompts que esperam `lista_formatada`.
-- Mitigação recomendada:
-  - fase 1: retornar `contratos` + manter `lista_formatada` temporariamente (compatível)
-  - fase 2: remover `lista_formatada` após confirmar que o agente está formatando via estrutura.
-- Isso evita quebra imediata em produção.
+- `fetchInvoices` assume a orquestração: chama `driver.fetchClientes` → mapeia → chama `driver.fetchContratos` → mapeia → para cada contrato chama `driver.fetchFaturas(creds, contrato.id)` → mapeia
+- Sanitização de endereço (SN, vírgulas) permanece no Driver
+- Normalização de `status_internet` permanece no Driver
 
-Validação (obrigatória)
-1. Redeploy da edge function `ai-chat`.
-2. Executar fluxo com CNPJ `12.059.400/0001-51`.
-3. Conferir log `🔧 Tool result: erp_contract_lookup` e validar:
-   - presença de `data.contratos[]` estruturado
-   - ausência de dependência exclusiva de `lista_formatada`
-   - `encontrados` consistente com quantidade retornada.
-4. Teste ponta a ponta no chat:
-   - agente deve montar lista numerada a partir de `contratos[].ordem` e campos de endereço.
-   - validar desktop e mobile.
+### 6. `tool-handlers.ts`
+- Sem mudança (já chama o Driver)
 
-Seção técnica (resumo para implementação)
-- Camada 2 (`erp-driver`) deve carregar dados estruturados.
-- Camada 1 (`tool-handlers`) deve expor estrutura em JSON sem “render pronto”.
-- Catálogo (`tool-catalog`) deve descrever novo shape para orientar function-calling.
-- Logging existente em `ai-chat` já é suficiente para depurar o payload final enviado ao modelo.
+### 7. `tool-catalog.ts`
+- Sem mudança
 
-<lov-actions>
-<lov-suggestion message="Teste o fluxo de consulta de contratos ponta a ponta com o CNPJ 12.059.400/0001-51 e valide no log que o payload chega com data.contratos estruturado.">Validar ponta a ponta</lov-suggestion>
-<lov-suggestion message="Implemente compatibilidade temporária retornando contratos estruturados e lista_formatada ao mesmo tempo, depois remova lista_formatada em uma segunda etapa.">Compatibilidade gradual</lov-suggestion>
-<lov-suggestion message="Adicione uma etapa de normalização para resolver cidade/estado quando vierem como IDs do IXC, consultando tabela de referência antes de enviar ao agente.">Resolver cidade/estado por ID</lov-suggestion>
-</lov-actions>
+### 8. `.lovable/plan.md`
+- Atualizar com a regra: "Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar."
+
+## Equivalências de campos que serão movidas para o Driver
+
+### IXC → Tipos internos
+
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
+
+### MK → Tipos internos
+
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
+
+### SGP → Tipos internos
+
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` | `id` |
+| `nome` / `razao_social` | `nome` |
+| `cpf` / `cnpj` | `cpf_cnpj` |
+
+## Risco e mitigação
+
+- **Risco**: Quebra de contrato se algum campo do ERP muda de nome numa atualização do IXC/MK/SGP.
+- **Mitigação**: O mapeamento está centralizado no Driver por provider, então a correção é pontual.
+- **Contraponto**: Antes o mapeamento estava espalhado nos providers, agora fica centralizado — mais fácil de auditar.
+
+## Deploy
+
+- Redeploy `ai-chat` após as mudanças
+- Testar com CNPJ `12.059.400/0001-51`
+
