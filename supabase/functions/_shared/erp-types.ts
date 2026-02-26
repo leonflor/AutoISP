@@ -90,16 +90,6 @@ export interface RawContrato {
   status_internet: string;
 }
 
-export interface RawContratoDetalhado extends RawContrato {
-  endereco: string | null;
-  numero: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  estado: string | null;
-  cep: string | null;
-  complemento: string | null;
-}
-
 export interface RawFibraRecord {
   id: string;
   id_login: string;
@@ -171,6 +161,4 @@ export interface ErpProviderDriver {
   fetchFaturas?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
 
 
-  /** Busca contratos detalhados com endereço — retorna dados crus da API */
-  fetchContratosDetalhados?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
 }

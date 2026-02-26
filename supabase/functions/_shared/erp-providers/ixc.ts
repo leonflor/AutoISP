@@ -123,26 +123,6 @@ async function ixc_contract_lookup(
     : recs;
 }
 
-async function ixc_contract_lookup_detailed(
-  creds: ErpCredentials,
-  filtro: Record<string, string>
-): Promise<any[]> {
-  const baseUrl = normalizeUrl(creds.apiUrl);
-  const headers = buildAuth(creds.username || "", creds.password || "");
-
-  const recs = await ixcFetch(baseUrl, headers, "cliente_contrato", {
-    qtype: "cliente_contrato.id_cliente",
-    query: filtro.id_cliente,
-    oper: "=",
-  });
-
-  const ativos = recs.filter((ct: any) => ct.status === "A");
-  console.log(`[IXC] ixc_contract_lookup_detailed raw (${ativos.length} ativos):`, JSON.stringify(ativos.map((ct: any) => ({
-    id: ct.id, endereco: ct.endereco, numero: ct.numero, complemento: ct.complemento, bairro: ct.bairro, cidade: ct.cidade, estado: ct.estado
-  }))));
-
-  return ativos;
-}
 
 async function ixc_radusuarios(creds: ErpCredentials): Promise<any[]> {
   const baseUrl = normalizeUrl(creds.apiUrl);
@@ -215,5 +195,4 @@ export const ixcProvider: ErpProviderDriver = {
   fetchRadusuarios: ixc_radusuarios,
   fetchFibra: ixc_fibra,
   fetchFaturas: ixc_invoice_search,
-  fetchContratosDetalhados: ixc_contract_lookup_detailed,
 };

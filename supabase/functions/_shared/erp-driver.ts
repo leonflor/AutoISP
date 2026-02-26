@@ -13,7 +13,6 @@ import type {
   InternetStatus,
   RawCliente,
   RawContrato,
-  RawContratoDetalhado,
   RawRadusuario,
   RawFibraRecord,
   RawFatura,
@@ -71,22 +70,7 @@ function mapContratoFromProvider(provider: ErpProvider, raw: any): RawContrato {
   };
 }
 
-function mapContratoDetalhadoFromProvider(provider: ErpProvider, raw: any): RawContratoDetalhado {
-  const base = mapContratoFromProvider(provider, raw);
-  if (provider === "ixc") {
-    return {
-      ...base,
-      endereco: raw.endereco || null,
-      numero: raw.numero || null,
-      bairro: raw.bairro || null,
-      cidade: raw.cidade || null,
-      estado: raw.estado || null,
-      cep: raw.cep || null,
-      complemento: raw.complemento || null,
-    };
-  }
-  return { ...base, endereco: null, numero: null, bairro: null, cidade: null, estado: null, cep: null, complemento: null };
-}
+
 
 function mapRadusuarioFromProvider(provider: ErpProvider, raw: any): RawRadusuario {
   if (provider === "ixc") {
@@ -653,20 +637,21 @@ export async function fetchClientContracts(
       const driver = getProvider(providerKey);
       const creds = await resolveCredentials(config, encryptionKey);
 
-      let detalhados: RawContratoDetalhado[] = [];
+      if (!driver.fetchContratos) return { contracts: [], error: null };
 
-      if (driver.fetchContratosDetalhados) {
-        const rawDetalhados = await driver.fetchContratosDetalhados(creds, { id_cliente: clientId });
-        detalhados = rawDetalhados.map((r: any) => mapContratoDetalhadoFromProvider(providerKey, r));
-      } else if (driver.fetchContratos) {
-        const rawSimples = await driver.fetchContratos(creds, { id_cliente: clientId });
-        detalhados = rawSimples.map((r: any) => {
-          const base = mapContratoFromProvider(providerKey, r);
-          return { ...base, endereco: null, numero: null, bairro: null, cidade: null, estado: null, cep: null, complemento: null };
-        });
-      }
+      const rawContratos = await driver.fetchContratos(creds, { id_cliente: clientId });
+      const contratos = rawContratos.map((r: any) => ({
+        ...mapContratoFromProvider(providerKey, r),
+        endereco: r.endereco || null,
+        numero: r.numero || null,
+        bairro: r.bairro || null,
+        cidade: r.cidade || null,
+        estado: r.estado || null,
+        cep: r.cep || null,
+        complemento: r.complemento || null,
+      }));
 
-      const contracts: ContractResult[] = detalhados.map((ct) => {
+      const contracts: ContractResult[] = contratos.map((ct) => {
         const rawEndereco = ct.endereco ? String(ct.endereco).trim().replace(/,\s*$/, "") : null;
         const rawNumero = ct.numero ? String(ct.numero).trim() : null;
         const cleanNumero = (rawNumero && rawNumero !== "" && rawNumero !== "0" && rawNumero !== "SN") ? rawNumero : null;
