@@ -341,13 +341,6 @@ const OpenAIIntegration = () => {
                         <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell className="font-mono text-xs">erp_onu_diagnostics</TableCell>
-                        <TableCell className="font-mono text-xs">diagnostico_sinal_onu</TableCell>
-                        <TableCell className="text-sm">Diagnóstico de sinal ONU — classifica potência óptica (Excelente/Bom/Alerta/Crítico)</TableCell>
-                        <TableCell><Badge variant="outline" className="text-xs border-emerald-500/50 text-emerald-600">Funcional (IXC)</Badge></TableCell>
-                        <TableCell className="text-sm"><Badge variant="outline" className="text-xs">Sim</Badge></TableCell>
-                      </TableRow>
-                      <TableRow>
                         <TableCell className="font-mono text-xs">erp_client_lookup</TableCell>
                         <TableCell className="font-mono text-xs">buscar_cliente</TableCell>
                         <TableCell className="text-sm">Busca cliente por CPF/CNPJ — retorna cliente_erp_id para encadeamento com outras tools</TableCell>

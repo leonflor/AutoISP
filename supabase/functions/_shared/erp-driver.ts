@@ -4,7 +4,6 @@
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifySignalDb } from "./onu-signal-analyzer.ts";
-import { analyzeOnuSignal, formatSignalReport } from "./onu-signal-analyzer.ts";
 import { getProvider } from "./erp-providers/index.ts";
 import type {
   ErpProvider,
@@ -18,7 +17,6 @@ import type {
   RawRadusuario,
   RawFibraRecord,
   RawFatura,
-  RawSignalData,
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 
@@ -140,20 +138,6 @@ function mapFaturaFromProvider(provider: ErpProvider, raw: any, defaults: { id_c
     linha_digitavel: raw.linha_digitavel || null,
     gateway_link: raw.gateway_link || null,
   };
-}
-
-function mapSignalFromProvider(provider: ErpProvider, raw: any): RawSignalData {
-  if (!raw) return { tx: null, rx: null };
-  if (provider === "ixc") {
-    const rx = raw.rx ? parseFloat(raw.rx) : null;
-    const tx = raw.tx ? parseFloat(raw.tx) : null;
-    return {
-      tx: tx !== null && !isNaN(tx) ? tx : null,
-      rx: rx !== null && !isNaN(rx) ? rx : null,
-      raw_record: raw,
-    };
-  }
-  return { tx: null, rx: null, raw_record: raw };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -748,38 +732,3 @@ export async function testConnection(
   return driver.testConnection(credentials);
 }
 
-/**
- * Busca sinal detalhado de um cliente (diagnóstico ONU).
- */
-export async function fetchClientSignal(
-  supabaseAdmin: SupabaseClient,
-  ispId: string,
-  encryptionKey: string,
-  clientId: string
-): Promise<{ signal: any; report: string }> {
-  const { data: config } = await supabaseAdmin
-    .from("erp_configs")
-    .select("*")
-    .eq("isp_id", ispId)
-    .eq("provider", "ixc")
-    .eq("is_active", true)
-    .eq("is_connected", true)
-    .single();
-
-  if (!config) {
-    throw new Error("Nenhuma integração IXC ativa encontrada");
-  }
-
-  const creds = await resolveCredentials(config, encryptionKey);
-  const driver = getProvider("ixc");
-
-  if (!driver.fetchRawSignal) {
-    throw new Error("Provider não suporta diagnóstico de sinal");
-  }
-
-  const rawSignal = await driver.fetchRawSignal(creds, clientId);
-  const mapped = mapSignalFromProvider("ixc", rawSignal);
-  const result = analyzeOnuSignal({ tx: mapped.tx, rx: mapped.rx });
-
-  return { signal: result, report: formatSignalReport(result) };
-}

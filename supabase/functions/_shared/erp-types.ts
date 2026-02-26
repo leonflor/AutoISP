@@ -118,11 +118,6 @@ export interface RawFatura {
   gateway_link: string | null;
 }
 
-export interface RawSignalData {
-  tx: number | null;
-  rx: number | null;
-  raw_record?: Record<string, unknown>;
-}
 
 // ── Fatura Normalizada (Camada 2 → Camada 1) ──
 
@@ -175,8 +170,6 @@ export interface ErpProviderDriver {
   /** Busca faturas — retorna dados crus da API */
   fetchFaturas?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
 
-  /** Busca sinal bruto de um cliente (diagnóstico ONU) — retorna dado cru da API */
-  fetchRawSignal?(creds: ErpCredentials, clientId: string): Promise<any>;
 
   /** Busca contratos detalhados com endereço — retorna dados crus da API */
   fetchContratosDetalhados?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;

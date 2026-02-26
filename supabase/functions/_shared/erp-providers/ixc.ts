@@ -173,31 +173,6 @@ async function ixc_invoice_search(
   return recs.filter((f: any) => f.status === "A");
 }
 
-async function ixc_onu_diagnostics(
-  creds: ErpCredentials,
-  clientId: string
-): Promise<any> {
-  const baseUrl = normalizeUrl(creds.apiUrl);
-  const headers = buildAuth(creds.username || "", creds.password || "");
-
-  const signalResp = await fetch(`${baseUrl}/webservice/v1/botao_rel_22991`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      qtype: "botao_rel_22991.id_cliente",
-      query: clientId,
-      oper: "=",
-      page: "1",
-      rp: "1",
-    }),
-  });
-
-  if (!signalResp.ok) throw new Error(`IXC HTTP ${signalResp.status}`);
-
-  const signalData = await signalResp.json();
-  return signalData.registros?.[0] || signalData.data || null;
-}
-
 // ── Provider Export ──
 
 export const ixcProvider: ErpProviderDriver = {
@@ -240,6 +215,5 @@ export const ixcProvider: ErpProviderDriver = {
   fetchRadusuarios: ixc_radusuarios,
   fetchFibra: ixc_fibra,
   fetchFaturas: ixc_invoice_search,
-  fetchRawSignal: ixc_onu_diagnostics,
   fetchContratosDetalhados: ixc_contract_lookup_detailed,
 };

@@ -27,18 +27,6 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     requires_erp: true,
   },
   {
-    handler: "erp_onu_diagnostics",
-    display_name: "Diagnóstico de Sinal ONU",
-    description:
-      "Executa diagnóstico de sinal óptico (ONU/ONT) do cliente por CPF/CNPJ. Retorna níveis de potência RX/TX e análise de qualidade.",
-    parameters: [
-      { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
-    ],
-    response_description:
-      "Diagnóstico com potência RX/TX em dBm, qualidade do sinal e recomendações.",
-    requires_erp: true,
-  },
-  {
     handler: "erp_client_lookup",
     display_name: "Busca Cliente por CPF/CNPJ",
     description:
