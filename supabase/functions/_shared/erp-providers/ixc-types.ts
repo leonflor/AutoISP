@@ -559,3 +559,197 @@ export interface IxcClienteContrato {
   /** Estrato social (Colômbia) */
   estrato_social_col: string;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Endpoint: /fn_areceber — Contas a Receber (Faturas)
+// ═══════════════════════════════════════════════════════════════
+
+/** A = A receber, R = Recebido, P = Parcial, C = Cancelado */
+export type IxcStatusFatura = "A" | "R" | "P" | "C";
+
+/** M = Recebido de forma manual, R = Recebido automaticamente */
+export type IxcFormaRecebimento = "M" | "R";
+
+/**
+ * Tipo de recebimento — valores por extenso usados pela API IXC.
+ * Boleto, Cheque, Cartão, Dinheiro, Depósito, Gateway, Débito, Fatura,
+ * ArrecadacaoRecebimento, Transferencia, Pix
+ */
+export type IxcTipoRecebimento =
+  | "Boleto"
+  | "Cheque"
+  | "Cartão"
+  | "Dinheiro"
+  | "Depósito"
+  | "Gateway"
+  | "Débito"
+  | "Fatura"
+  | "ArrecadacaoRecebimento"
+  | "Transferencia"
+  | "Pix";
+
+/**
+ * Registro bruto do endpoint `/fn_areceber` do IXC Soft.
+ * Representa uma fatura / título a receber.
+ * Todos os campos string — a API IXC retorna tudo como texto.
+ */
+export interface IxcFnAreceber {
+  id: string;
+
+  // ── Identificação e status ──
+  /** FK → /cliente.id */
+  id_cliente: string;
+  /** FK → /cliente_contrato.id */
+  id_contrato: string;
+  /** A = A receber, R = Recebido, P = Parcial, C = Cancelado */
+  status: IxcStatusFatura;
+  /** Status da cobrança (documentação pendente) */
+  status_cobranca: string;
+  filial_id: string;
+
+  // ── Datas ──
+  /** YYYY-MM-DD */
+  data_emissao: string;
+  /** YYYY-MM-DD */
+  data_vencimento: string;
+  /** YYYY-MM-DD */
+  data_inicial: string;
+  /** YYYY-MM-DD */
+  data_final: string;
+  /** YYYY-MM-DD ou vazio */
+  data_cancelamento: string;
+  /** YYYY-MM-DD HH:MM:SS */
+  baixa_data: string;
+  /** YYYY-MM-DD */
+  pagamento_data: string;
+  /** YYYY-MM-DD */
+  credito_data: string;
+  /** YYYY-MM-DD HH:MM:SS */
+  ultima_atualizacao: string;
+
+  // ── Valores ──
+  /** Valor nominal da fatura (string numérica) */
+  valor: string;
+  /** Valor já recebido */
+  valor_recebido: string;
+  /** Valor em aberto */
+  valor_aberto: string;
+  /** Valor pago na baixa */
+  pagamento_valor: string;
+  /** Valor cancelado */
+  valor_cancelado: string;
+
+  // ── Pagamento ──
+  /** Boleto, Cheque, Cartão, Dinheiro, etc. */
+  tipo_recebimento: IxcTipoRecebimento;
+  /** M = Manual, R = Automático */
+  forma_recebimento: IxcFormaRecebimento;
+  /** P = Padrão, I = Impresso, E = E-mail */
+  tipo_cobranca: IxcTipoCobranca;
+  /** Tipo de pagamento com cartão (vazio se não aplicável) */
+  tipo_pagamento_cartao: string;
+  /** Bandeira do pagamento (vazio se não aplicável) */
+  bandeira_pagamento: string;
+
+  // ── Boleto ──
+  /** Linha digitável do boleto */
+  linha_digitavel: string;
+  /** Nosso número do boleto */
+  nn_boleto: string;
+  /** Campo boleto */
+  boleto: string;
+  /** Link do gateway de pagamento */
+  gateway_link: string;
+  /** Duplicata */
+  duplicata: string;
+
+  // ── PIX ──
+  pix_txid: string;
+  pix_txid_recorrente: string;
+  pix_status_recorrente: string;
+  /** S/N — recebido via PIX */
+  recebido_via_pix: IxcSimNao;
+
+  // ── Flags S/N ──
+  /** S/N — título estornado */
+  estornado: IxcSimNao;
+  /** S/N — título liberado */
+  liberado: IxcSimNao;
+  /** S/N — boleto impresso */
+  impresso: IxcSimNao;
+  /** S/N — parcela proporcional */
+  parcela_proporcional: IxcSimNao;
+  /** S/N — título protestado */
+  titulo_protestado: IxcSimNao;
+  /** S/N — título importado */
+  titulo_importado: IxcSimNao;
+  /** S/N — título renegociado */
+  titulo_renegociado: IxcSimNao;
+  /** S/N — aguardando confirmação de pagamento */
+  aguardando_confirmacao_pagamento: IxcSimNao;
+  /** S/N — parcelado no cartão */
+  parcelado_cartao: IxcSimNao;
+  /** S/N — previsão */
+  previsao: IxcSimNao;
+  /** S/N — libera período */
+  libera_periodo: IxcSimNao;
+  /** S/N — arquivo remessa baixado */
+  arquivo_remessa_baixado: IxcSimNao;
+
+  // ── Referências / FKs ──
+  id_remessa: string;
+  id_carteira_cobranca: string;
+  id_cobranca: string;
+  id_conta: string;
+  id_saida: string;
+  id_mot_cancelamento: string;
+  id_renegociacao: string;
+  id_renegociacao_novo: string;
+  id_contrato_principal: string;
+  id_contrato_avulso: string;
+  id_nota_gerada: string;
+  id_nota_gerada_opc2: string;
+  id_nota_gerada_opc3: string;
+  id_nota_gerada_opc4: string;
+  id_im_imovel: string;
+  id_sip: string;
+  id_lote_geracao_financeiro_fatura: string;
+
+  // ── Parcelas e recorrência ──
+  /** Número da parcela */
+  nparcela: string;
+  /** Número da parcela recorrente */
+  numero_parcela_recorrente: string;
+  /** Documento (número) */
+  documento: string;
+
+  // ── Renegociação ──
+  tipo_renegociacao: string;
+
+  // ── Operador ──
+  /** ID do operador que cancelou */
+  cancelamento_id_operador: string;
+  /** ID do operador que deu baixa */
+  baixa_id_operador: string;
+
+  // ── Diversos ──
+  obs: string;
+  /** Conta de recebimento */
+  conta_recebimento: string;
+  /** Origem de importação */
+  origem_importacao: string;
+  /** Token GerenciaNet */
+  gerencianet_token: string;
+  /** Desconto condicional (valor) */
+  desconto_condicional_valor: string;
+  /** Validade do desconto condicional */
+  validade_desconto_condicional: string;
+  /** Motivo da alteração */
+  motivo_alteracao: string;
+  /** ID remessa alteração */
+  id_remessa_alteracao: string;
+  /** Token recorrente do cartão de crédito */
+  credit_card_recorrente_token: string;
+  /** Bandeira do cartão recorrente */
+  credit_card_recorrente_bandeira_cartao: string;
+}
