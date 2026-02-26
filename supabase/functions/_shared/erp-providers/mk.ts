@@ -1,14 +1,11 @@
 // ═══ CAMADA 3 — Provider MK-Solutions ═══
-// Conexão efetiva com o MK. Retorna dados BRUTOS.
+// HTTP puro. Retorna dados CRUS (any[]).
+// Nenhum mapeamento de campos — responsabilidade do Driver (Camada 2).
 
 import type {
   ErpProviderDriver,
   ErpCredentials,
-  RawCliente,
-  RawContrato,
-  RawFatura,
   TestResult,
-  FaturaFilter,
 } from "../erp-types.ts";
 
 export const mkProvider: ErpProviderDriver = {
@@ -16,7 +13,7 @@ export const mkProvider: ErpProviderDriver = {
     return ["login", "plano"];
   },
 
-  async fetchClientes(creds: ErpCredentials): Promise<RawCliente[]> {
+  async fetchClientes(creds: ErpCredentials, _filtro?: Record<string, string>): Promise<any[]> {
     const resp = await fetch(`${creds.apiUrl}/mk/WSMKIntegracaoGeral.rule`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -38,23 +35,15 @@ export const mkProvider: ErpProviderDriver = {
       throw new Error("Resposta MK não é JSON válido");
     }
 
-    const clientes = Array.isArray(data) ? data : data.clientes || data.lista || [];
-
-    return clientes.map((r: any) => ({
-      id: String(r.CodigoCliente || r.id || ""),
-      nome: r.NomeRazaoSocial || r.nome || "",
-      cpf_cnpj: r.CpfCnpj || r.cpf_cnpj || "",
-    }));
+    return Array.isArray(data) ? data : data.clientes || data.lista || [];
   },
 
-  async fetchContratos(): Promise<RawContrato[]> {
-    // MK não suporta busca granular de contratos por ora
+  async fetchContratos(): Promise<any[]> {
     console.log("[MK] fetchContratos: stub — sem integração real");
     return [];
   },
 
-  async fetchFaturas(_creds: ErpCredentials, _filtro: FaturaFilter): Promise<RawFatura[]> {
-    // MK não suporta busca de faturas por ora
+  async fetchFaturas(_creds: ErpCredentials, _filtro: Record<string, string>): Promise<any[]> {
     console.log("[MK] fetchFaturas: stub — sem integração real");
     return [];
   },
