@@ -1,46 +1,58 @@
 
 
-# Criar `ixc-types.ts` com Union + JSDoc
+# Arquitetura ERP — 3 Camadas
 
-## Arquivo
+## Regra de Equivalências
 
-`supabase/functions/_shared/erp-providers/ixc-types.ts`
+> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
 
-## Estilo dos tipos enumerados
+## Fluxo por operação
 
-Cada union type recebe JSDoc descritivo por valor:
+```text
+Camada 1 — Tool Handler (tool-handlers.ts)
+  Valida input, chama Driver, monta payload JSON para o modelo.
 
-```typescript
-/** S = Sim, N = Não */
-export type IxcSimNao = "S" | "N";
+Camada 2 — Driver (erp-driver.ts)
+  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
 
-/** S = Sim, N = Não, P = Padrão */
-export type IxcSimNaoPadrao = "S" | "N" | "P";
-
-/** F = Física, J = Jurídica, E = Estrangeiro, 1 = Jurídica, 2 = Natural, 3 = Estrangeiro */
-export type IxcTipoPessoa = "F" | "J" | "E" | "1" | "2" | "3";
-
-/** F = Feminino, M = Masculino, NB = Não binário, O = Outro, PNI = Prefiro não dizer */
-export type IxcSexo = "F" | "M" | "NB" | "O" | "PNI";
-
-/** R = Zona rural, U = Zona urbana */
-export type IxcTipoLocalidade = "R" | "U";
-
-/** C = Novo, S = Sondagem, A = Apresentando, N = Negociando, V = Vencemos, P = Perdemos, AB = Abortamos, SV = Sem viabilidade, SP = Sem porta disponível */
-export type IxcStatusProspeccao = "C" | "S" | "A" | "N" | "V" | "P" | "AB" | "SV" | "SP";
-
-/** P = Própria, A = Alugada */
-export type IxcMoradia = "P" | "A";
+Camada 3 — Provider (erp-providers/*.ts)
+  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
 ```
 
-## Conteúdo completo
+## Equivalências de campos
 
-O arquivo conterá:
-1. Os 7 tipos enumerados acima com JSDoc
-2. A interface `IxcCliente` com todos os ~130 campos agrupados por seção (Identificação, Contato, Endereço, etc.)
-3. Campos FK comentados inline: `cidade: string; /** FK → endpoint /cidade */`
+### IXC → Tipos internos
 
-## Mudanças em outros arquivos
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
 
-Nenhuma nesta etapa. O tipo será consumido pelo Driver na próxima etapa.
+### MK → Tipos internos
 
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
+
+### SGP → Tipos internos
+
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` / `codigo` / `cd_cliente` | `id` |
+| `nome` / `razao_social` / `nm_cliente` | `nome` |
+| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
+
+## Responsabilidades
+
+- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
+- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
+- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
