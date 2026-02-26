@@ -70,22 +70,7 @@ function mapContratoFromProvider(provider: ErpProvider, raw: any): RawContrato {
   };
 }
 
-function mapContratoDetalhadoFromProvider(provider: ErpProvider, raw: any): RawContratoDetalhado {
-  const base = mapContratoFromProvider(provider, raw);
-  if (provider === "ixc") {
-    return {
-      ...base,
-      endereco: raw.endereco || null,
-      numero: raw.numero || null,
-      bairro: raw.bairro || null,
-      cidade: raw.cidade || null,
-      estado: raw.estado || null,
-      cep: raw.cep || null,
-      complemento: raw.complemento || null,
-    };
-  }
-  return { ...base, endereco: null, numero: null, bairro: null, cidade: null, estado: null, cep: null, complemento: null };
-}
+
 
 function mapRadusuarioFromProvider(provider: ErpProvider, raw: any): RawRadusuario {
   if (provider === "ixc") {
