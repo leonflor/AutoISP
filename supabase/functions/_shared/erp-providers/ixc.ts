@@ -215,5 +215,4 @@ export const ixcProvider: ErpProviderDriver = {
   fetchRadusuarios: ixc_radusuarios,
   fetchFibra: ixc_fibra,
   fetchFaturas: ixc_invoice_search,
-  fetchContratosDetalhados: ixc_contract_lookup_detailed,
 };
