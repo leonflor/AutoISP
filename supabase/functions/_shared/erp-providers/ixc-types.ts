@@ -753,3 +753,308 @@ export interface IxcFnAreceber {
   /** Bandeira do cartão recorrente */
   credit_card_recorrente_bandeira_cartao: string;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Endpoint: /radusuarios — Usuários RADIUS (conexões PPPoE/Hotspot)
+// ═══════════════════════════════════════════════════════════════
+
+/** S = Sim, N = Não, SS = Sem status */
+export type IxcOnlineStatus = "S" | "N" | "SS";
+
+/** H = Configuração padrão, S = Sempre, N = Nunca */
+export type IxcConfigPadrao = "H" | "S" | "N";
+
+/** N = Não, S = Sim, P = Padrão, MK = Mikrotik, UN = UBNT, WP = WPA2-AES */
+export type IxcAutenticacaoPorMac = "N" | "S" | "P" | "MK" | "UN" | "WP";
+
+/** 58 = 5.8GHz, 24 = 2.4GHz, F = Fibra, L = Cabo, A = ADSL, LTE = LTE, LDD = Link dedicado */
+export type IxcTipoConexaoMapa = "58" | "24" | "F" | "L" | "A" | "LTE" | "LDD";
+
+/** L = PPPoE, H = Hotspot, M = IP x MAC, V = VLAN, D = IPoE, I = Integração, E = Externa */
+export type IxcAutenticacao = "L" | "H" | "M" | "V" | "D" | "I" | "E";
+
+/** D = Padrão, C = Contrato, P = Pré-pago, G = Grátis */
+export type IxcTipoVinculoPlano = "D" | "C" | "P" | "G";
+
+/** C = Comodato, P = Próprio */
+export type IxcTipoEquipamento = "C" | "P";
+
+/** https = HTTPS, http = HTTP */
+export type IxcTipoAcesso = "https" | "http";
+
+/** Registro de usuário RADIUS — mapeamento 1:1 do endpoint `/radusuarios` */
+export interface IxcRadusuarios {
+  /** ID único do registro RADIUS */
+  id: string;
+  /** FK → /cliente.id */
+  id_cliente: string;
+  /** FK → /cliente_contrato.id */
+  id_contrato: string;
+  /** Login PPPoE/Hotspot */
+  login: string;
+  /** Senha de autenticação */
+  senha: string;
+  /** Registro ativo */
+  ativo: IxcSimNao;
+  /** Status de conexão: S = Online, N = Offline, SS = Sem status */
+  online: IxcOnlineStatus;
+  /** Observações */
+  obs: string;
+
+  // ── Rede / IP ──
+
+  /** Endereço IP atribuído */
+  ip: string;
+  /** IP de aviso (página de bloqueio) */
+  ip_aviso: string;
+  /** IP auxiliar */
+  ip_aux: string;
+  /** Porta auxiliar */
+  porta_aux: string;
+  /** Porta HTTP */
+  porta_http: string;
+  /** Porta router 2 */
+  porta_router2: string;
+  /** Endereço MAC */
+  mac: string;
+  /** MAC da ONU */
+  onu_mac: string;
+  /** MTU da conexão */
+  mtu: string;
+  /** VLAN */
+  vlan: string;
+  /** IP da rede VLAN */
+  vlan_ip_rede: string;
+  /** Gateway VLAN */
+  gw_vlan: string;
+  /** Service tag VLAN */
+  service_tag_vlan: IxcSimNao;
+
+  // ── Configuração de preenchimento automático ──
+
+  /** Auto preencher IP */
+  auto_preencher_ip: IxcConfigPadrao;
+  /** Auto preencher MAC */
+  auto_preencher_mac: IxcConfigPadrao;
+  /** Fixar IP */
+  fixar_ip: IxcConfigPadrao;
+  /** Relacionar IP ao login */
+  relacionar_ip_ao_login: IxcConfigPadrao;
+  /** Relacionar MAC ao login */
+  relacionar_mac_ao_login: IxcConfigPadrao;
+  /** Relacionar concentrador ao login */
+  relacionar_concentrador_ao_login: IxcConfigPadrao;
+
+  // ── IPv6 ──
+
+  /** Auto preencher IPv6 */
+  auto_preencher_ipv6: IxcConfigPadrao;
+  /** Fixar IPv6 */
+  fixar_ipv6: IxcConfigPadrao;
+  /** Relacionar IPv6 ao login */
+  relacionar_ipv6_ao_login: IxcConfigPadrao;
+  /** Prefix Delegation IPv6 */
+  pd_ipv6: string;
+  /** Framed: fixar IPv6 */
+  framed_fixar_ipv6: IxcConfigPadrao;
+  /** Framed: auto preencher IPv6 */
+  framed_autopreencher_ipv6: IxcConfigPadrao;
+  /** Framed: relacionar IPv6 ao login */
+  framed_relacionar_ipv6_ao_login: IxcConfigPadrao;
+  /** Framed: Prefix Delegation IPv6 */
+  framed_pd_ipv6: string;
+
+  // ── Autenticação ──
+
+  /** Tipo de autenticação: L = PPPoE, H = Hotspot, M = IP x MAC, etc. */
+  autenticacao: IxcAutenticacao;
+  /** Autenticação por MAC: N, S, P = Padrão, MK = Mikrotik, UN = UBNT, WP = WPA2-AES */
+  autenticacao_por_mac: IxcAutenticacaoPorMac;
+  /** Autenticação MAC habilitada */
+  autenticacao_mac: IxcSimNao;
+  /** Autenticação WPS habilitada */
+  autenticacao_wps: IxcSimNao;
+  /** Autenticação WPA */
+  autenticacao_wpa: string;
+  /** Senha MD5 */
+  senha_md5: IxcSimNao;
+  /** Login simultâneo permitido */
+  login_simultaneo: string;
+  /** Usuário WPA2-AES */
+  usuario_wpa2aes: string;
+  /** Senha WPA2-AES */
+  senha_wpa2aes: string;
+
+  // ── Conexão / Concentrador ──
+
+  /** Tipo de conexão no mapa: F = Fibra, L = Cabo, etc. */
+  tipo_conexao_mapa: IxcTipoConexaoMapa;
+  /** Tipo de conexão (texto): Ethernet, WiFi, etc. */
+  tipo_conexao: string;
+  /** Nome/perfil da conexão */
+  conexao: string;
+  /** FK → concentrador */
+  id_concentrador: string;
+  /** IP do concentrador */
+  concentrador: string;
+  /** Interface de conexão */
+  interface: string;
+  /** Interface de transmissão */
+  interface_transmissao: string;
+  /** Agent Circuit ID */
+  agent_circuit_id: string;
+  /** Acct Session ID */
+  acct_session_id: string;
+
+  // ── Plano / Vínculo ──
+
+  /** Tipo de vínculo com plano: D = Padrão, C = Contrato, P = Pré-pago, G = Grátis */
+  tipo_vinculo_plano: IxcTipoVinculoPlano;
+  /** FK → grupo */
+  id_grupo: string;
+  /** Pool RADIUS */
+  pool_radius: string;
+  /** FK → grupo de pools RADIUS */
+  id_radgrupos_pools: string;
+  /** FK → DNS RADIUS */
+  id_rad_dns: string;
+
+  // ── Equipamento / Infraestrutura ──
+
+  /** Tipo de equipamento: C = Comodato, P = Próprio */
+  tipo_equipamento: IxcTipoEquipamento;
+  /** FK → transmissor */
+  id_transmissor: string;
+  /** FK → porta do transmissor */
+  id_porta_transmissor: string;
+  /** Modelo do transmissor */
+  modelo_tranmissor: string;
+  /** FK → caixa FTTH */
+  id_caixa_ftth: string;
+  /** Porta FTTH */
+  ftth_porta: string;
+  /** FK → hardware */
+  id_hardware: string;
+  /** ONU compartilhada */
+  onu_compartilhada: IxcSimNao;
+  /** Tronco */
+  tronco: string;
+  /** Splitter */
+  splitter: string;
+  /** Ponta */
+  ponta: string;
+
+  // ── Endereço ──
+
+  /** Endereço da conexão */
+  endereco: string;
+  /** Número */
+  numero: string;
+  /** Complemento */
+  complemento: string;
+  /** Bairro */
+  bairro: string;
+  /** FK → cidade */
+  cidade: string;
+  /** CEP */
+  cep: string;
+  /** Referência */
+  referencia: string;
+  /** Bloco */
+  bloco: string;
+  /** Apartamento */
+  apartamento: string;
+  /** Usar endereço padrão do cliente */
+  endereco_padrao_cliente: IxcSimNao;
+  /** Latitude */
+  latitude: string;
+  /** Longitude */
+  longitude: string;
+
+  // ── Condomínio / Prédio ──
+
+  /** FK → condomínio */
+  id_condominio: string;
+  /** FK → prédio */
+  id_predio: string;
+
+  // ── Franquia ──
+
+  /** Franquia máxima (bytes) */
+  franquia_maximo: string;
+  /** Franquia consumida (download) */
+  franquia_consumo: string;
+  /** Franquia consumida (upload) */
+  franquia_consumo_up: string;
+  /** Franquia atingida */
+  franquia_atingida: IxcSimNao;
+
+  // ── Tráfego / Sessão ──
+
+  /** Upload atual (bytes) */
+  upload_atual: string;
+  /** Download atual (bytes) */
+  download_atual: string;
+  /** Tempo conectado (segundos) */
+  tempo_conectado: string;
+  /** Tempo de conexão configurado */
+  tempo_conexao: string;
+  /** Contagem de desconexões */
+  count_desconexao: string;
+  /** Motivo da última desconexão */
+  motivo_desconexao: string;
+  /** Data/hora da última conexão inicial */
+  ultima_conexao_inicial: string;
+  /** Data/hora da última conexão final */
+  ultima_conexao_final: string;
+  /** Data/hora da última atualização */
+  ultima_atualizacao: string;
+
+  // ── WiFi / Router ──
+
+  /** SSID do roteador WiFi */
+  ssid_router_wifi: string;
+  /** SSID do roteador WiFi 5GHz */
+  ssid_router_wifi_5ghz: string;
+  /** Senha da rede sem fio */
+  senha_rede_sem_fio: string;
+  /** Senha da rede sem fio 5GHz */
+  senha_rede_sem_fio_5ghz: string;
+  /** Usuário router 1 */
+  usuario_router1: string;
+  /** Senha router 1 */
+  senha_router1: string;
+  /** Senha router 2 */
+  senha_router2: string;
+  /** Cliente tem a senha do equipamento */
+  cliente_tem_a_senha: IxcSimNao;
+
+  // ── Acesso / Tipo ──
+
+  /** Tipo de acesso: http ou https */
+  tipo_acesso: IxcTipoAcesso;
+
+  // ── Sinal / Atendimento ──
+
+  /** Sinal registrado no último atendimento */
+  sinal_ultimo_atendimento: string;
+  /** Metragem interna */
+  metragem_interna: string;
+  /** Metragem externa */
+  metragem_externa: string;
+
+  // ── Diversos ──
+
+  /** FK → projeto (design de rede) */
+  id_df_projeto: string;
+  /** FK → filial */
+  id_filial: string;
+  /** FK → reserva de rede neutra */
+  id_reserva_rede_neutra: string;
+  /** Pacote LTE */
+  pacote_lte: string;
+  /** LTE ID */
+  lte_id: string;
+  /** FK → integração externa */
+  id_integracao: string;
+}
