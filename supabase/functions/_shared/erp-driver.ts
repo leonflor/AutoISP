@@ -357,7 +357,6 @@ export async function buscarFaturas(
             vencimento: mapped.data_vencimento,
             dias_atraso: diasAtraso,
             linha_digitavel: mapped.linha_digitavel,
-            gateway_link: mapped.gateway_link,
             erp: providerName,
           });
         }
