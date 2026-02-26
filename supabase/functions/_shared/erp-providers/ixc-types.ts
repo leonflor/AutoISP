@@ -1058,3 +1058,173 @@ export interface IxcRadusuarios {
   /** FK → integração externa */
   id_integracao: string;
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  Enum — Tipo de Operação (Bridge / Router)
+// ═══════════════════════════════════════════════════════════════
+
+/** B = Bridge, R = Router (PPPoE) */
+export type IxcTipoOperacao = "B" | "R";
+
+// ═══════════════════════════════════════════════════════════════
+//  Interface — /radpop_radio_cliente_fibra
+//  Dados de ONUs/ONTs de clientes em rede FTTH.
+// ═══════════════════════════════════════════════════════════════
+
+export interface IxcRadpopRadioClienteFibra {
+  /** ID único do registro */
+  id: string;
+  /** Nome/identificador da ONU */
+  nome: string;
+
+  // ── FKs ──
+
+  /** FK → /radusuarios.id */
+  id_login: string;
+  /** FK → /cliente_contrato.id */
+  id_contrato: string;
+  /** FK → transmissor/OLT */
+  id_transmissor: string;
+  /** FK → caixa FTTH */
+  id_caixa_ftth: string;
+  /** FK → porta do transmissor */
+  id_radpop_radio_porta: string;
+  /** FK → condomínio */
+  id_condominio: string;
+  /** FK → hardware */
+  id_hardware: string;
+  /** FK → perfil */
+  id_perfil: string;
+  /** FK → projeto */
+  id_projeto: string;
+  /** FK → ramal */
+  id_ramal: string;
+  /** FK → ONU UNMS */
+  id_onu_unms: string;
+  /** FK → activity */
+  id_activity: string;
+
+  // ── ONU / PON ──
+
+  /** Número da ONU na PON */
+  onu_numero: string;
+  /** Service port */
+  service_port: string;
+  /** Modelo/tipo da ONU */
+  onu_tipo: string;
+  /** Identificador PON (ex: "1/1/1") */
+  ponid: string;
+  /** Endereço MAC da ONU */
+  mac: string;
+  /** Slot number */
+  slotno: string;
+  /** PON number */
+  ponno: string;
+  /** Tipo de autenticação (ex: "MAC") */
+  tipo_autenticacao: string;
+  /** Versão do firmware */
+  versao: string;
+  /** B = Bridge, R = Router (PPPoE) */
+  tipo_operacao: IxcTipoOperacao | "";
+  /** Comandos de provisionamento */
+  comandos: string;
+  /** GEMPORT */
+  gemport: string;
+  /** Sensor ID */
+  senorid: string;
+  /** Causa da última queda */
+  causa_ultima_queda: string;
+  /** S = ONU em rede neutra */
+  onu_rede_neutra: IxcSimNao;
+  /** S = Estrutura radpop */
+  radpop_estrutura: IxcSimNao;
+  /** S = ONU compartilhada */
+  /** (campo não presente no JSON, mas comum na API) */
+
+  // ── Telemetria (strings decimais da API) ──
+
+  /** Sinal RX em dBm (ex: "-22.50") */
+  sinal_rx: string;
+  /** Sinal TX em dBm */
+  sinal_tx: string;
+  /** Temperatura em °C */
+  temperatura: string;
+  /** Voltagem em V */
+  voltagem: string;
+  /** Data/hora da última leitura de sinal */
+  data_sinal: string;
+
+  // ── Acesso / Gerência ──
+
+  /** Login da ONU no cliente */
+  login_onu_cliente: string;
+  /** Senha da ONU no cliente */
+  senha_onu_cliente: string;
+  /** Porta Telnet da ONU */
+  porta_telnet_onu_cliente: string;
+  /** Porta Web da ONU */
+  porta_web_onu_cliente: string;
+  /** IP de gerência */
+  ip_gerencia: string;
+  /** Perfil da ONU no cliente */
+  perfil_onu_cliente: string;
+  /** Script de provisionamento */
+  script_onu_cliente: string;
+
+  // ── VLANs ──
+
+  /** VLAN principal */
+  vlan: string;
+  /** VLAN DHCP */
+  vlan_dhcp: string;
+  /** VLAN TR-069 */
+  vlan_tr69: string;
+  /** VLAN IPTV */
+  vlan_iptv: string;
+  /** VLAN VoIP */
+  vlan_voip: string;
+  /** VLAN PPPoE */
+  vlan_pppoe: string;
+  /** VLAN outros */
+  vlan_outros: string;
+
+  // ── Endereço (quando endereco_padrao_cliente = "N") ──
+
+  /** S = usa endereço do cadastro do cliente */
+  endereco_padrao_cliente: IxcSimNao;
+  /** CEP */
+  cep: string;
+  /** Logradouro */
+  endereco: string;
+  /** Número */
+  numero: string;
+  /** Bairro */
+  bairro: string;
+  /** Cidade */
+  cidade: string;
+  /** Complemento */
+  complemento: string;
+  /** Referência */
+  referencia: string;
+
+  // ── Condomínio ──
+
+  /** Bloco */
+  bloco: string;
+  /** Apartamento */
+  apartamento: string;
+
+  // ── Geolocalização ──
+
+  /** Latitude */
+  latitude: string;
+  /** Longitude */
+  longitude: string;
+  /** Distância da ONU (metros) */
+  distancia_onu: string;
+
+  // ── FTTH ──
+
+  /** Porta FTTH na caixa */
+  porta_ftth: string;
+}
