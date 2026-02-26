@@ -1,58 +1,32 @@
 
 
-# Arquitetura ERP — 3 Camadas
+## Plano: Adicionar tipos enumerados do `/fn_areceber` e interface `IxcFnAreceber`
 
-## Regra de Equivalências
+### Novos tipos enumerados
 
-> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
+```typescript
+/** A = A receber, R = Recebido, P = Parcial, C = Cancelado */
+export type IxcStatusFatura = "A" | "R" | "P" | "C";
 
-## Fluxo por operação
+/** M = Recebido de forma manual, R = Recebido automaticamente */
+export type IxcFormaRecebimento = "M" | "R";
 
-```text
-Camada 1 — Tool Handler (tool-handlers.ts)
-  Valida input, chama Driver, monta payload JSON para o modelo.
-
-Camada 2 — Driver (erp-driver.ts)
-  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
-
-Camada 3 — Provider (erp-providers/*.ts)
-  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+/** Boleto, Cheque, Cartão, Dinheiro, Depósito, Gateway, Débito, Fatura, ArrecadacaoRecebimento, Transferencia, Pix */
+export type IxcTipoRecebimento = "Boleto" | "Cheque" | "Cartão" | "Dinheiro" | "Depósito" | "Gateway" | "Débito" | "Fatura" | "ArrecadacaoRecebimento" | "Transferencia" | "Pix";
 ```
 
-## Equivalências de campos
+- `tipo_cobranca` reutiliza `IxcTipoCobranca` (P/I/E) já existente
+- `status_cobranca` será `string` (documentação pendente)
+- `titulo_renegociado` será `IxcSimNao`
 
-### IXC → Tipos internos
+### Interface `IxcFnAreceber`
 
-| Campo IXC | Campo normalizado | Tipo |
-|---|---|---|
-| `razao` / `fantasia` | `nome` | string |
-| `cnpj_cpf` | `cpf_cnpj` | string |
-| `contrato` / `id_vd_contrato` | `plano` | string |
-| `dia_vencimento` | `dia_vencimento` | string |
-| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
-| `online` (S/N) | `conectado` | boolean |
-| `sinal_rx` | `signal_db` | number |
-| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
-| `status` (A/etc) | filtro ativo/inativo | - |
+~70 campos mapeados 1:1 do JSON, com JSDoc e FKs inline:
+- `id_cliente` → FK `/cliente.id`
+- `id_contrato` → FK `/cliente_contrato.id`
+- Campos S/N: `estornado`, `liberado`, `impresso`, `parcela_proporcional`, `titulo_protestado`, `titulo_importado`, `titulo_renegociado`, `aguardando_confirmacao_pagamento`, `parcelado_cartao`, `recebido_via_pix`, `previsao`, `libera_periodo`, `arquivo_remessa_baixado`
 
-### MK → Tipos internos
+### Arquivo alterado
 
-| Campo MK | Campo normalizado |
-|---|---|
-| `CodigoCliente` | `id` |
-| `NomeRazaoSocial` | `nome` |
-| `CpfCnpj` | `cpf_cnpj` |
+Append em `supabase/functions/_shared/erp-providers/ixc-types.ts` após linha 561.
 
-### SGP → Tipos internos
-
-| Campo SGP | Campo normalizado |
-|---|---|
-| `id` / `codigo` / `cd_cliente` | `id` |
-| `nome` / `razao_social` / `nm_cliente` | `nome` |
-| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
-
-## Responsabilidades
-
-- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
-- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
-- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
