@@ -1,58 +1,48 @@
 
 
-# Arquitetura ERP — 3 Camadas
+## Plano: Adicionar tipos enumerados do `/radusuarios` e interface `IxcRadusuarios`
 
-## Regra de Equivalências
+### Novos tipos enumerados (append após linha 755)
 
-> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
+```typescript
+/** S = Sim, N = Não, SS = Sem status */
+export type IxcOnlineStatus = "S" | "N" | "SS";
 
-## Fluxo por operação
+/** H = Configuração padrão, S = Sempre, N = Nunca */
+export type IxcAutoPreencherIpv6 = "H" | "S" | "N";
 
-```text
-Camada 1 — Tool Handler (tool-handlers.ts)
-  Valida input, chama Driver, monta payload JSON para o modelo.
+/** N = Não, S = Sim, P = Padrão, MK = Mikrotik, UN = UBNT, WP = WPA2-AES */
+export type IxcAutenticacaoPorMac = "N" | "S" | "P" | "MK" | "UN" | "WP";
 
-Camada 2 — Driver (erp-driver.ts)
-  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
+/** 58 = 5.8GHz, 24 = 2.4GHz, F = Fibra, L = Cabo, A = ADSL, LTE = LTE, LDD = Link dedicado */
+export type IxcTipoConexaoMapa = "58" | "24" | "F" | "L" | "A" | "LTE" | "LDD";
 
-Camada 3 — Provider (erp-providers/*.ts)
-  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+/** L = PPPoE, H = Hotspot, M = IP x MAC, V = VLAN, D = IPoE, I = Integração, E = Externa */
+export type IxcAutenticacao = "L" | "H" | "M" | "V" | "D" | "I" | "E";
+
+/** D = Padrão, C = Contrato, P = Pré-pago, G = Grátis */
+export type IxcTipoVinculoPlano = "D" | "C" | "P" | "G";
+
+/** C = Comodato, P = Próprio */
+export type IxcTipoEquipamento = "C" | "P";
+
+/** https = HTTPS, http = HTTP */
+export type IxcTipoAcesso = "https" | "http";
 ```
 
-## Equivalências de campos
+### Reutilização de tipo existente
 
-### IXC → Tipos internos
+- `IxcAutoPreencherIpv6` (`H/S/N`) será reutilizado para todos os 12 campos com padrão `"H"`: `auto_preencher_ip`, `auto_preencher_mac`, `fixar_ip`, `relacionar_ip_ao_login`, `relacionar_mac_ao_login`, `relacionar_concentrador_ao_login`, `auto_preencher_ipv6`, `fixar_ipv6`, `relacionar_ipv6_ao_login`, `framed_fixar_ipv6`, `framed_autopreencher_ipv6`, `framed_relacionar_ipv6_ao_login`
 
-| Campo IXC | Campo normalizado | Tipo |
-|---|---|---|
-| `razao` / `fantasia` | `nome` | string |
-| `cnpj_cpf` | `cpf_cnpj` | string |
-| `contrato` / `id_vd_contrato` | `plano` | string |
-| `dia_vencimento` | `dia_vencimento` | string |
-| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
-| `online` (S/N) | `conectado` | boolean |
-| `sinal_rx` | `signal_db` | number |
-| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
-| `status` (A/etc) | filtro ativo/inativo | - |
+### Interface `IxcRadusuarios`
 
-### MK → Tipos internos
+~100 campos mapeados 1:1 do JSON com JSDoc e FKs inline:
+- `id_cliente` → FK `/cliente.id`
+- `id_contrato` → FK `/cliente_contrato.id`
+- `online` → `IxcOnlineStatus`
+- `ativo`, `service_tag_vlan`, `onu_compartilhada`, `senha_md5`, `cliente_tem_a_senha`, `franquia_atingida`, `autenticacao_wps`, `autenticacao_mac`, `endereco_padrao_cliente` → `IxcSimNao`
 
-| Campo MK | Campo normalizado |
-|---|---|
-| `CodigoCliente` | `id` |
-| `NomeRazaoSocial` | `nome` |
-| `CpfCnpj` | `cpf_cnpj` |
+### Arquivo alterado
 
-### SGP → Tipos internos
+Append em `supabase/functions/_shared/erp-providers/ixc-types.ts` após linha 755.
 
-| Campo SGP | Campo normalizado |
-|---|---|
-| `id` / `codigo` / `cd_cliente` | `id` |
-| `nome` / `razao_social` / `nm_cliente` | `nome` |
-| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
-
-## Responsabilidades
-
-- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
-- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
-- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
