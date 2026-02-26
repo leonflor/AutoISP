@@ -1,6 +1,6 @@
 // ═══ CAMADA 2 — Driver / Orquestrador ERP ═══
-// Resolve credenciais, chama providers (Camada 3), MAPEIA campos crus para tipos internos,
-// normaliza status_internet, orquestra cadeias de chamadas.
+// Resolve credenciais, chama providers (Camada 3), aplica field-maps,
+// retorna Response Models prontos para a IA.
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifySignalDb } from "./onu-signal-analyzer.ts";
@@ -9,120 +9,11 @@ import type {
   ErpProvider,
   ErpClient,
   ErpCredentials,
-  ErpInvoice,
   InternetStatus,
-  RawCliente,
-  RawContrato,
-  RawRadusuario,
-  RawFibraRecord,
-  RawFatura,
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
-
-// ══════════════════════════════════════════════════════════════
-// ── Mapeamento de campos: Provider → Tipos internos (Raw)
-// ══════════════════════════════════════════════════════════════
-// Equivalências documentadas no .lovable/plan.md
-
-function mapClienteFromProvider(provider: ErpProvider, raw: any): RawCliente {
-  if (provider === "ixc") {
-    return {
-      id: String(raw.id),
-      nome: raw.razao || raw.fantasia || "",
-      cpf_cnpj: raw.cnpj_cpf || "",
-    };
-  }
-  if (provider === "mk_solutions") {
-    return {
-      id: String(raw.CodigoCliente || raw.id || ""),
-      nome: raw.NomeRazaoSocial || raw.nome || "",
-      cpf_cnpj: raw.CpfCnpj || raw.cpf_cnpj || "",
-    };
-  }
-  if (provider === "sgp") {
-    return {
-      id: String(raw.id || raw.codigo || raw.cd_cliente || ""),
-      nome: raw.nome || raw.razao_social || raw.nm_cliente || "",
-      cpf_cnpj: raw.cpf_cnpj || raw.cpf || raw.cnpj || "",
-    };
-  }
-  // Fallback genérico
-  return { id: String(raw.id || ""), nome: raw.nome || "", cpf_cnpj: raw.cpf_cnpj || "" };
-}
-
-function mapContratoFromProvider(provider: ErpProvider, raw: any): RawContrato {
-  if (provider === "ixc") {
-    return {
-      id: String(raw.id),
-      id_cliente: String(raw.id_cliente || ""),
-      plano: raw.contrato || raw.id_vd_contrato || null,
-      dia_vencimento: raw.dia_vencimento || null,
-      status_internet: raw.status_internet || "normal",
-    };
-  }
-  // Fallback genérico (MK/SGP stubs retornam [])
-  return {
-    id: String(raw.id || ""),
-    id_cliente: String(raw.id_cliente || ""),
-    plano: raw.plano || null,
-    dia_vencimento: raw.dia_vencimento || null,
-    status_internet: raw.status_internet || "normal",
-  };
-}
-
-
-
-function mapRadusuarioFromProvider(provider: ErpProvider, raw: any): RawRadusuario {
-  if (provider === "ixc") {
-    return {
-      id: String(raw.id),
-      id_cliente: String(raw.id_cliente || ""),
-      id_contrato: String(raw.id_contrato || ""),
-      login: raw.login || "",
-      online: raw.online === "S" ? "S" : "N",
-    };
-  }
-  return { id: String(raw.id || ""), id_cliente: "", id_contrato: "", login: "", online: "N" };
-}
-
-function mapFibraFromProvider(provider: ErpProvider, raw: any): RawFibraRecord {
-  if (provider === "ixc") {
-    const rx = raw.sinal_rx ? parseFloat(raw.sinal_rx) : NaN;
-    const tx = raw.sinal_tx ? parseFloat(raw.sinal_tx) : NaN;
-    return {
-      id: String(raw.id),
-      id_login: String(raw.id_login || ""),
-      sinal_rx: !isNaN(rx) ? rx : null,
-      sinal_tx: !isNaN(tx) ? tx : null,
-    };
-  }
-  return { id: String(raw.id || ""), id_login: "", sinal_rx: null, sinal_tx: null };
-}
-
-function mapFaturaFromProvider(provider: ErpProvider, raw: any, defaults: { id_cliente: string; id_contrato: string }): RawFatura {
-  if (provider === "ixc") {
-    return {
-      id: String(raw.id),
-      id_cliente: String(raw.id_cliente || defaults.id_cliente),
-      id_contrato: defaults.id_contrato,
-      data_vencimento: raw.data_vencimento || "",
-      valor: parseFloat(raw.valor || "0"),
-      valor_pago: raw.valor_pago ? parseFloat(raw.valor_pago) : null,
-      linha_digitavel: raw.linha_digitavel || null,
-      gateway_link: raw.gateway_link || raw.url_gateway || null,
-    };
-  }
-  return {
-    id: String(raw.id || ""),
-    id_cliente: defaults.id_cliente,
-    id_contrato: defaults.id_contrato,
-    data_vencimento: raw.data_vencimento || "",
-    valor: parseFloat(raw.valor || "0"),
-    valor_pago: raw.valor_pago ? parseFloat(raw.valor_pago) : null,
-    linha_digitavel: raw.linha_digitavel || null,
-    gateway_link: raw.gateway_link || null,
-  };
-}
+import { mapCliente, mapContrato, mapFatura, mapRadusuario, mapFibra } from "./field-maps.ts";
+import type { ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope } from "./response-models.ts";
 
 // ══════════════════════════════════════════════════════════════
 // ── Decrypt Helper ──
@@ -223,25 +114,39 @@ async function resolveActiveConfigs(supabaseAdmin: SupabaseClient, ispId: string
 }
 
 // ══════════════════════════════════════════════════════════════
-// ── erp_client_lookup — Resolução leve: CPF/CNPJ → cliente_erp_id ──
+// ── Sanitização de endereço ──
 // ══════════════════════════════════════════════════════════════
 
-export interface ResolvedClient {
-  id: string;
-  nome: string;
-  cpf_cnpj: string;
-  provider: ErpProvider;
-  providerName: string;
+function buildEnderecoCompleto(raw: { endereco: string | null; numero: string | null; complemento: string | null; bairro: string | null }): string | null {
+  const end = raw.endereco ? String(raw.endereco).trim().replace(/,\s*$/, "") : null;
+  const num = raw.numero ? String(raw.numero).trim() : null;
+  const cleanNum = (num && num !== "" && num !== "0" && num !== "SN") ? num : null;
+  const comp = raw.complemento ? String(raw.complemento).trim() : null;
+  const bairro = raw.bairro ? String(raw.bairro).trim() : null;
+
+  const partes = [
+    end,
+    cleanNum ? `nº ${cleanNum}` : null,
+    comp,
+    bairro,
+  ].filter(p => p && p !== "" && p !== "0");
+
+  return partes.length > 0 ? partes.join(", ") : null;
 }
 
-export async function resolveClienteErpId(
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarCliente (erp_client_lookup) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarCliente(
   supabaseAdmin: SupabaseClient,
   ispId: string,
   encryptionKey: string,
   cpfCnpj: string
-): Promise<{ client: ResolvedClient | null; errors: string[] }> {
+): Promise<ToolEnvelope<ClienteResponse>> {
   const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
-  const errors: string[] = [];
+  const erros: string[] = [];
+  const itens: ClienteResponse[] = [];
   const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
 
   for (const config of configs) {
@@ -254,29 +159,239 @@ export async function resolveClienteErpId(
       if (!driver.fetchClientes) continue;
 
       const rawClientes = await driver.fetchClientes(creds, { cpf_cnpj: cpfCnpj });
-      const clientes = rawClientes.map((r: any) => mapClienteFromProvider(providerKey, r));
 
-      const match = clientes.find((c) => {
-        const docClean = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-        return docClean === cleanCpf;
-      });
-
-      if (match) {
-        return {
-          client: { id: match.id, nome: match.nome, cpf_cnpj: match.cpf_cnpj, provider: providerKey, providerName },
-          errors,
-        };
+      for (const raw of rawClientes) {
+        const mapped = mapCliente[providerKey](raw);
+        const docClean = String(mapped.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+        if (docClean === cleanCpf) {
+          itens.push({
+            nome: mapped.nome,
+            cpf_cnpj: mapped.cpf_cnpj,
+            erp: providerName,
+          });
+        }
       }
     } catch (err) {
-      errors.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
     }
   }
 
-  return { client: null, errors };
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0 ? "Nenhum cliente encontrado com este CPF/CNPJ." : undefined,
+    erros,
+  };
 }
 
 // ══════════════════════════════════════════════════════════════
-// ── Composição: IXC (radusuarios + clientes + contratos + fibra) ──
+// ── TOOL: buscarContratos (erp_contract_lookup) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarContratos(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  cpfCnpj: string
+): Promise<ToolEnvelope<ContratoResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: ContratoResponse[] = [];
+  const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      const creds = await resolveCredentials(config, encryptionKey);
+
+      if (!driver.fetchClientes) continue;
+
+      // Passo 1: resolver cliente
+      const rawClientes = await driver.fetchClientes(creds, { cpf_cnpj: cpfCnpj });
+      let clienteId: string | null = null;
+
+      for (const raw of rawClientes) {
+        const mapped = mapCliente[providerKey](raw);
+        const docClean = String(mapped.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+        if (docClean === cleanCpf) {
+          clienteId = mapped.id;
+          break;
+        }
+      }
+
+      if (!clienteId || !driver.fetchContratos) continue;
+
+      // Passo 2: buscar contratos
+      const rawContratos = await driver.fetchContratos(creds, { id_cliente: clienteId });
+
+      for (const raw of rawContratos) {
+        const mapped = mapContrato[providerKey](raw);
+        const endCompleto = buildEnderecoCompleto(mapped);
+        const cleanNumero = mapped.numero && mapped.numero !== "0" && mapped.numero !== "SN"
+          ? mapped.numero : null;
+
+        itens.push({
+          ordem: 0,
+          contrato_id: mapped.id,
+          endereco: mapped.endereco ? String(mapped.endereco).trim().replace(/,\s*$/, "") : null,
+          numero: cleanNumero,
+          complemento: mapped.complemento ? String(mapped.complemento).trim() : null,
+          bairro: mapped.bairro ? String(mapped.bairro).trim() : null,
+          endereco_completo: endCompleto,
+          plano: mapped.plano,
+          status: normalizeInternetStatus(mapped.status_internet, providerKey),
+          dia_vencimento: mapped.dia_vencimento,
+          erp: providerName,
+        });
+      }
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  // Numerar sequencialmente
+  itens.forEach((c, i) => { c.ordem = i + 1; });
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0 ? "Nenhum contrato encontrado para este cliente." : undefined,
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarFaturas (erp_invoice_search) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarFaturas(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  cpfCnpj: string,
+  endereco?: string
+): Promise<ToolEnvelope<FaturaResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  if (configs.length === 0) return { encontrados: 0, itens: [], erros: [] };
+
+  const itens: FaturaResponse[] = [];
+  const erros: string[] = [];
+  const today = new Date();
+  const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
+
+  // Se endereço fornecido, pré-resolver contratos para filtrar
+  let allowedContratoIds: Set<string> | null = null;
+  let contratoEnderecoMap: Map<string, string> = new Map();
+
+  if (endereco) {
+    const contratosResult = await buscarContratos(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
+    const enderecoLower = endereco.toLowerCase();
+    allowedContratoIds = new Set();
+
+    for (const ct of contratosResult.itens) {
+      if (ct.endereco_completo && ct.endereco_completo.toLowerCase().includes(enderecoLower)) {
+        allowedContratoIds.add(ct.contrato_id);
+        contratoEnderecoMap.set(ct.contrato_id, ct.endereco_completo);
+      }
+    }
+
+    if (allowedContratoIds.size === 0) {
+      return { encontrados: 0, itens: [], erros: [`Nenhum contrato encontrado com endereço "${endereco}"`] };
+    }
+  }
+
+  const promises = configs.map(async (config) => {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      const creds = await resolveCredentials(config, encryptionKey);
+
+      if (!driver.fetchFaturas || !driver.fetchClientes) return { faturas: [] as FaturaResponse[], error: null };
+
+      // Passo 1: resolver cliente
+      const rawClientes = await driver.fetchClientes(creds, { cpf_cnpj: cpfCnpj });
+      let clienteId: string | null = null;
+
+      for (const raw of rawClientes) {
+        const mapped = mapCliente[providerKey](raw);
+        const docClean = String(mapped.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
+        if (docClean === cleanCpf) {
+          clienteId = mapped.id;
+          break;
+        }
+      }
+
+      if (!clienteId) return { faturas: [] as FaturaResponse[], error: null };
+
+      // Passo 2: buscar contratos
+      let contratoIds: string[] = [];
+      if (driver.fetchContratos) {
+        const rawContratos = await driver.fetchContratos(creds, { id_cliente: clienteId });
+        contratoIds = rawContratos.map((r: any) => mapContrato[providerKey](r).id);
+      }
+
+      if (contratoIds.length === 0) return { faturas: [] as FaturaResponse[], error: null };
+
+      // Passo 3: buscar faturas por contrato
+      const faturas: FaturaResponse[] = [];
+
+      for (const contratoId of contratoIds) {
+        if (allowedContratoIds && !allowedContratoIds.has(contratoId)) continue;
+
+        const rawFaturas = await driver.fetchFaturas(creds, { id_contrato: contratoId });
+
+        for (const raw of rawFaturas) {
+          const mapped = mapFatura(providerKey, raw, { id_cliente: clienteId, id_contrato: contratoId });
+          const vencimento = new Date(mapped.data_vencimento);
+          const diffMs = today.getTime() - vencimento.getTime();
+          const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+          faturas.push({
+            id: mapped.id,
+            contrato_id: contratoId,
+            endereco: contratoEnderecoMap.get(contratoId) || null,
+            valor: mapped.valor,
+            vencimento: mapped.data_vencimento,
+            dias_atraso: diasAtraso,
+            linha_digitavel: mapped.linha_digitavel,
+            gateway_link: mapped.gateway_link,
+            erp: providerName,
+          });
+        }
+      }
+
+      return { faturas, error: null };
+    } catch (err) {
+      return {
+        faturas: [] as FaturaResponse[],
+        error: `${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`,
+      };
+    }
+  });
+
+  const results = await Promise.all(promises);
+  for (const r of results) {
+    itens.push(...r.faturas);
+    if (r.error) erros.push(r.error);
+  }
+
+  const totalAberto = itens.reduce((sum, f) => sum + f.valor, 0);
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0
+      ? (endereco ? `Nenhuma fatura em aberto para o endereço "${endereco}".` : "Nenhuma fatura em aberto encontrada.")
+      : `${itens.length} fatura(s) em aberto, total R$ ${totalAberto.toFixed(2)}`,
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── Funções de monitoramento em massa (usadas pelo frontend, NÃO pela IA)
 // ══════════════════════════════════════════════════════════════
 
 interface FetchResult {
@@ -296,15 +411,13 @@ async function composeIxcClients(
     driver.fetchFibra!(creds),
   ]);
 
-  // Map raw → typed
-  const rads = rawRads.map((r: any) => mapRadusuarioFromProvider("ixc", r));
-  const clientes = rawClientes.map((r: any) => mapClienteFromProvider("ixc", r));
-  const contratos = rawContratos.map((r: any) => mapContratoFromProvider("ixc", r));
-  const fibra = rawFibra.map((r: any) => mapFibraFromProvider("ixc", r));
+  const rads = rawRads.map((r: any) => mapRadusuario.ixc(r));
+  const clientes = rawClientes.map((r: any) => mapCliente.ixc(r));
+  const contratos = rawContratos.map((r: any) => mapContrato.ixc(r));
+  const fibra = rawFibra.map((r: any) => mapFibra.ixc(r));
 
   console.log(`[IXC] radusuarios: ${rads.length}, clientes: ${clientes.length}, contratos: ${contratos.length}, fibra: ${fibra.length}`);
 
-  // Maps
   const clientesById = new Map(clientes.map((c) => [c.id, c]));
   const contratosById = new Map(contratos.map((ct) => [ct.id, ct]));
   const fibraByIdLogin = new Map(fibra.map((f) => [f.id_login, f]));
@@ -316,7 +429,6 @@ async function composeIxcClients(
     const contrato = rad.id_contrato ? contratosById.get(rad.id_contrato) : null;
     const fibraRec = fibraByIdLogin.get(rad.id);
 
-    // Apenas radusuarios com contrato ativo
     if (!contrato) continue;
 
     results.push({
@@ -347,8 +459,6 @@ async function composeIxcClients(
   return results;
 }
 
-// ── Composição: SGP / MK (simples) ──
-
 async function composeSimpleClients(
   creds: ErpCredentials,
   provider: ErpProvider,
@@ -357,40 +467,35 @@ async function composeSimpleClients(
 ): Promise<ErpClient[]> {
   if (!driver.fetchClientes) return [];
   const rawClientes = await driver.fetchClientes(creds);
-  const clientes = rawClientes.map((r: any) => mapClienteFromProvider(provider, r));
   const supported = driver.supportedFields();
 
-  return clientes.map((c) => ({
-    erp_id: c.id,
-    contrato_id: c.id,
-    cliente_erp_id: c.id,
-    provider,
-    provider_name: providerName,
-    nome: c.nome,
-    cpf_cnpj: c.cpf_cnpj,
-    data_vencimento: null,
-    plano: null,
-    login: null,
-    status_internet: "ativo" as InternetStatus,
-    conectado: false,
-    signal_db: null,
-    signal_quality: classifySignalDb(null),
-    field_availability: {
-      signal_db: supported.includes("signal_db"),
-      login: supported.includes("login"),
-      plano: supported.includes("plano"),
-      contrato: false,
-    },
-  }));
+  return rawClientes.map((r: any) => {
+    const mapped = mapCliente[provider](r);
+    return {
+      erp_id: mapped.id,
+      contrato_id: mapped.id,
+      cliente_erp_id: mapped.id,
+      provider,
+      provider_name: providerName,
+      nome: mapped.nome,
+      cpf_cnpj: mapped.cpf_cnpj,
+      data_vencimento: null,
+      plano: null,
+      login: null,
+      status_internet: "ativo" as InternetStatus,
+      conectado: false,
+      signal_db: null,
+      signal_quality: classifySignalDb(null),
+      field_availability: {
+        signal_db: supported.includes("signal_db"),
+        login: supported.includes("login"),
+        plano: supported.includes("plano"),
+        contrato: false,
+      },
+    };
+  });
 }
 
-// ══════════════════════════════════════════════════════════════
-// ── Métodos Públicos ──
-// ══════════════════════════════════════════════════════════════
-
-/**
- * Busca clientes de TODOS os ERPs ativos do ISP.
- */
 export async function fetchAllClients(
   supabaseAdmin: SupabaseClient,
   ispId: string,
@@ -435,9 +540,6 @@ export async function fetchAllClients(
   return result;
 }
 
-/**
- * Busca clientes filtrados por query (nome ou CPF/CNPJ).
- */
 export async function searchClients(
   supabaseAdmin: SupabaseClient,
   ispId: string,
@@ -462,251 +564,6 @@ export async function searchClients(
 }
 
 /**
- * Busca faturas em aberto de um cliente por CPF/CNPJ.
- * Orquestra a cadeia: fetchClientes → fetchContratos → fetchFaturas (por contrato).
- * Quando `endereco` é fornecido, filtra faturas apenas do contrato cujo endereço contém o texto.
- */
-export async function fetchInvoices(
-  supabaseAdmin: SupabaseClient,
-  ispId: string,
-  encryptionKey: string,
-  cpfCnpj: string,
-  endereco?: string
-): Promise<{ invoices: ErpInvoice[]; errors: string[] }> {
-  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
-  if (configs.length === 0) return { invoices: [], errors: [] };
-
-  const allInvoices: ErpInvoice[] = [];
-  const allErrors: string[] = [];
-  const today = new Date();
-
-  // Se endereço fornecido, pré-resolver contratos para filtrar por id_contrato
-  let allowedContratoIds: Set<string> | null = null;
-  let contratoEnderecoMap: Map<string, string> = new Map();
-
-  if (endereco) {
-    const resolved = await resolveClienteErpId(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
-
-    if (resolved.client) {
-      const clienteErpId = resolved.client.id;
-      const contractResult = await fetchClientContracts(supabaseAdmin, ispId, encryptionKey, clienteErpId);
-
-      const enderecoLower = endereco.toLowerCase();
-      allowedContratoIds = new Set();
-
-      for (const ct of contractResult.contracts) {
-        if (ct.endereco_completo && ct.endereco_completo.toLowerCase().includes(enderecoLower)) {
-          allowedContratoIds.add(ct.contrato_id);
-          contratoEnderecoMap.set(ct.contrato_id, ct.endereco_completo);
-        }
-      }
-
-      if (allowedContratoIds.size === 0) {
-        return { invoices: [], errors: [`Nenhum contrato encontrado com endereço "${endereco}"`] };
-      }
-    }
-  }
-
-  const promises = configs.map(async (config) => {
-    try {
-      const providerKey = config.provider as ErpProvider;
-      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
-      const driver = getProvider(providerKey);
-      const creds = await resolveCredentials(config, encryptionKey);
-
-      if (!driver.fetchFaturas || !driver.fetchClientes) {
-        console.log(`[${providerKey}] fetchFaturas ou fetchClientes não implementado`);
-        return { invoices: [] as ErpInvoice[], error: null };
-      }
-
-      // Passo 1: buscar id_cliente pelo CPF/CNPJ
-      const rawClientes = await driver.fetchClientes(creds, { cpf_cnpj: cpfCnpj });
-      const clientes = rawClientes.map((r: any) => mapClienteFromProvider(providerKey, r));
-      const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
-      const clienteMatch = clientes.find((c) => {
-        const docClean = String(c.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-        return docClean === cleanCpf;
-      });
-
-      if (!clienteMatch) {
-        console.log(`[${providerKey}] fetchInvoices: nenhum cliente encontrado para CPF/CNPJ ${cpfCnpj}`);
-        return { invoices: [] as ErpInvoice[], error: null };
-      }
-
-      // Passo 2: buscar contratos ativos do cliente
-      let contratos: RawContrato[] = [];
-      if (driver.fetchContratos) {
-        const rawContratos = await driver.fetchContratos(creds, { id_cliente: clienteMatch.id });
-        contratos = rawContratos.map((r: any) => mapContratoFromProvider(providerKey, r));
-      }
-
-      if (contratos.length === 0) {
-        console.log(`[${providerKey}] fetchInvoices: nenhum contrato ativo para cliente ${clienteMatch.id}`);
-        return { invoices: [] as ErpInvoice[], error: null };
-      }
-
-      // Passo 3: buscar faturas por id_contrato (cadeia correta)
-      const invoices: ErpInvoice[] = [];
-
-      for (const contrato of contratos) {
-        // Filtrar por contrato se endereço foi especificado
-        if (allowedContratoIds && !allowedContratoIds.has(contrato.id)) continue;
-
-        const rawFaturas = await driver.fetchFaturas(creds, { id_contrato: contrato.id });
-        const faturas = rawFaturas.map((r: any) =>
-          mapFaturaFromProvider(providerKey, r, { id_cliente: clienteMatch.id, id_contrato: contrato.id })
-        );
-
-        for (const f of faturas) {
-          const vencimento = new Date(f.data_vencimento);
-          const diffMs = today.getTime() - vencimento.getTime();
-          const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-
-          invoices.push({
-            provider: providerKey,
-            provider_name: providerName,
-            id: f.id,
-            id_cliente: f.id_cliente,
-            id_contrato: f.id_contrato,
-            endereco_contrato: f.id_contrato ? contratoEnderecoMap.get(f.id_contrato) : undefined,
-            data_vencimento: f.data_vencimento,
-            valor: f.valor,
-            valor_pago: f.valor_pago,
-            dias_atraso: diasAtraso,
-            linha_digitavel: f.linha_digitavel,
-            gateway_link: f.gateway_link,
-          });
-        }
-      }
-
-      return { invoices, error: null };
-    } catch (err) {
-      console.error(`[${config.provider}] fetchInvoices error:`, err);
-      return {
-        invoices: [] as ErpInvoice[],
-        error: `${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`,
-      };
-    }
-  });
-
-  const results = await Promise.all(promises);
-  for (const r of results) {
-    allInvoices.push(...r.invoices);
-    if (r.error) allErrors.push(r.error);
-  }
-
-  return { invoices: allInvoices, errors: allErrors };
-}
-
-/**
- * Busca contratos detalhados de um cliente por ID (com endereço).
- */
-export interface ContractResult {
-  ordem: number;
-  contrato_id: string;
-  endereco: string | null;
-  numero: string | null;
-  complemento: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  estado: string | null;
-  cep: string | null;
-  endereco_completo: string | null;
-  plano: string | null;
-  status_internet: string;
-  dia_vencimento: string | null;
-  provider_name: string;
-}
-
-export async function fetchClientContracts(
-  supabaseAdmin: SupabaseClient,
-  ispId: string,
-  encryptionKey: string,
-  clientId: string
-): Promise<{ contracts: ContractResult[]; errors: string[] }> {
-  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
-  if (configs.length === 0) return { contracts: [], errors: [] };
-
-  const allContracts: ContractResult[] = [];
-  const allErrors: string[] = [];
-
-  const promises = configs.map(async (config) => {
-    try {
-      const providerKey = config.provider as ErpProvider;
-      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
-      const driver = getProvider(providerKey);
-      const creds = await resolveCredentials(config, encryptionKey);
-
-      if (!driver.fetchContratos) return { contracts: [], error: null };
-
-      const rawContratos = await driver.fetchContratos(creds, { id_cliente: clientId });
-      const contratos = rawContratos.map((r: any) => ({
-        ...mapContratoFromProvider(providerKey, r),
-        endereco: r.endereco || null,
-        numero: r.numero || null,
-        bairro: r.bairro || null,
-        cidade: r.cidade || null,
-        estado: r.estado || null,
-        cep: r.cep || null,
-        complemento: r.complemento || null,
-      }));
-
-      const contracts: ContractResult[] = contratos.map((ct) => {
-        const rawEndereco = ct.endereco ? String(ct.endereco).trim().replace(/,\s*$/, "") : null;
-        const rawNumero = ct.numero ? String(ct.numero).trim() : null;
-        const cleanNumero = (rawNumero && rawNumero !== "" && rawNumero !== "0" && rawNumero !== "SN") ? rawNumero : null;
-        const rawComplemento = ct.complemento ? String(ct.complemento).trim() : null;
-        const rawBairro = ct.bairro ? String(ct.bairro).trim() : null;
-
-        const partes = [
-          rawEndereco,
-          cleanNumero ? `nº ${cleanNumero}` : null,
-          rawComplemento,
-          rawBairro,
-        ].filter(p => p && p !== "" && p !== "0");
-        const enderecoCompleto = partes.length > 0 ? partes.join(", ") : null;
-
-        return {
-          ordem: 0,
-          contrato_id: ct.id,
-          endereco: rawEndereco || null,
-          numero: cleanNumero || null,
-          complemento: rawComplemento || null,
-          bairro: rawBairro || null,
-          cidade: ct.cidade ? String(ct.cidade).trim() : null,
-          estado: ct.estado ? String(ct.estado).trim() : null,
-          cep: ct.cep ? String(ct.cep).trim() : null,
-          endereco_completo: enderecoCompleto,
-          plano: ct.plano,
-          status_internet: normalizeInternetStatus(ct.status_internet, providerKey),
-          dia_vencimento: ct.dia_vencimento,
-          provider_name: providerName,
-        };
-      });
-
-      return { contracts, error: null };
-    } catch (err) {
-      console.error(`[${config.provider}] fetchClientContracts error:`, err);
-      return {
-        contracts: [] as ContractResult[],
-        error: `${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`,
-      };
-    }
-  });
-
-  const results = await Promise.all(promises);
-  for (const r of results) {
-    allContracts.push(...r.contracts);
-    if (r.error) allErrors.push(r.error);
-  }
-
-  // Numerar contratos sequencialmente
-  allContracts.forEach((c, i) => { c.ordem = i + 1; });
-
-  return { contracts: allContracts, errors: allErrors };
-}
-
-/**
  * Testa conexão com um provider específico.
  */
 export async function testConnection(
@@ -716,4 +573,3 @@ export async function testConnection(
   const driver = getProvider(provider);
   return driver.testConnection(credentials);
 }
-
