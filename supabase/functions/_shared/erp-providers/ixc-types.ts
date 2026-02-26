@@ -244,3 +244,318 @@ export interface IxcCliente {
   /** String decimal, ex: "0.0000" */
   percentual_reducao: string;
 }
+
+// ═══ Tipos enumerados — /cliente_contrato ═══
+
+/** I = Internet, T = Telefonia, S = Serviços, SVA = SVA */
+export type IxcTipoContrato = "I" | "T" | "S" | "SVA";
+
+/** P = Pré-contrato, A = Ativo, I = Inativo, N = Negativado, D = Desistiu */
+export type IxcStatusContrato = "P" | "A" | "I" | "N" | "D";
+
+/** A = Ativo, D = Desativado, CM = Bloqueio Manual, CA = Bloqueio Automático, FA = Financeiro em atraso, AA = Aguardando Assinatura */
+export type IxcStatusInternet = "A" | "D" | "CM" | "CA" | "FA" | "AA";
+
+/** N = Normal, R = Reduzida */
+export type IxcStatusVelocidade = "N" | "R";
+
+/** P = Configuração padrão (Parâmetros), N = Competência (Previsão não), S = Caixa (Previsão sim), M = Manual */
+export type IxcCcPrevisao = "P" | "N" | "S" | "M";
+
+/** S = Habilitado, N = Desabilitado, P = Padrão */
+export type IxcDesbloqueioConfianca = "S" | "N" | "P";
+
+/** H = Habilitado, D = Desabilitado, P = Padrão */
+export type IxcLiberacaoSuspensaoParcial = "H" | "D" | "P";
+
+/** P = Configuração padrão, I = Impresso, E = E-mail */
+export type IxcTipoCobranca = "P" | "I" | "E";
+
+/** I = Instalação, U = Upgrade, D = Downgrade, M = Mudança de Endereço, T = Mudança de Tecnologia, L = Mudança de titularidade, N = Negociação, R = Reativação */
+export type IxcMotivoInclusao = "I" | "U" | "D" | "M" | "T" | "L" | "N" | "R";
+
+/** M = Manual, A = Automático */
+export type IxcOrigemCancelamento = "M" | "A";
+
+/** R = Regular (inferido do JSON) — documentação pendente para demais valores */
+export type IxcSituacaoFinanceiraContrato = "R" | string;
+
+// ── Interface principal — /cliente_contrato ──
+
+/** Registro bruto do endpoint /cliente_contrato do IXC Soft */
+export interface IxcClienteContrato {
+  // ── Identificação ──
+  id: string;
+  /** FK → /cliente.id */
+  id_cliente: string;
+  /** FK → filial */
+  id_filial: string;
+  /** P = Pré-contrato, A = Ativo, I = Inativo, N = Negativado, D = Desistiu */
+  status: IxcStatusContrato;
+  /** A = Ativo, D = Desativado, CM = Bloqueio Manual, CA = Bloqueio Automático, FA = Financeiro em atraso, AA = Aguardando Assinatura */
+  status_internet: IxcStatusInternet;
+  /** I = Internet, T = Telefonia, S = Serviços, SVA = SVA */
+  tipo: IxcTipoContrato;
+
+  // ── Plano / Contrato ──
+  /** FK → /vd_contrato.id */
+  id_vd_contrato: string;
+  /** Nome legível do plano, ex: "Plano Plus 500/100" */
+  contrato: string;
+  descricao_aux_plano_venda: string;
+  /** Tipo de produtos do plano — documentação pendente para valores */
+  tipo_produtos_plano: string;
+  /** FK → tipo de contrato */
+  id_tipo_contrato: string;
+  /** FK → modelo de contrato */
+  id_modelo: string;
+
+  // ── Datas do contrato ──
+  /** YYYY-MM-DD — data de cadastro no sistema */
+  data_cadastro_sistema: string;
+  /** YYYY-MM-DD */
+  data: string;
+  /** YYYY-MM-DD */
+  data_assinatura: string;
+  /** YYYY-MM-DD */
+  data_ativacao: string;
+  /** YYYY-MM-DD */
+  data_renovacao: string;
+  /** YYYY-MM-DD */
+  data_expiracao: string;
+  /** YYYY-MM-DD */
+  pago_ate_data: string;
+  /** YYYY-MM-DD HH:mm:ss */
+  ultima_atualizacao: string;
+
+  // ── Endereço do contrato ──
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  /** FK → /cidade.id ("0" = não definido) */
+  cidade: string;
+  cep: string;
+  referencia: string;
+  /** FK → condomínio */
+  id_condominio: string;
+  bloco: string;
+  apartamento: string;
+  latitude: string;
+  longitude: string;
+  /** R = Zona rural, U = Zona urbana */
+  tipo_localidade: IxcTipoLocalidade;
+  /** S = usar endereço do cliente, N = usar endereço do contrato */
+  endereco_padrao_cliente: IxcSimNao;
+
+  // ── Financeiro ──
+  /** R = Regular — documentação pendente para demais valores */
+  situacao_financeira_contrato: IxcSituacaoFinanceiraContrato;
+  /** P = Configuração padrão, I = Impresso, E = E-mail */
+  tipo_cobranca: IxcTipoCobranca;
+  /** FK → carteira de cobrança */
+  id_carteira_cobranca: string;
+  /** P = Configuração padrão, N = Competência, S = Caixa, M = Manual */
+  cc_previsao: IxcCcPrevisao;
+  /** String decimal, ex: "300.00" */
+  taxa_instalacao: string;
+  /** String decimal, ex: "0.00" */
+  comissao: string;
+  /** String decimal, ex: "0.00" */
+  desconto_fidelidade: string;
+  /** String decimal, ex: "0.000" */
+  taxa_improdutiva: string;
+  /** Meses de fidelidade, ex: "12" */
+  fidelidade: string;
+  /** FK → condição de pagamento da ativação */
+  id_cond_pag_ativ: string;
+  /** FK → tipo de documento */
+  id_tipo_documento: string;
+  tipo_doc_opc: string;
+  tipo_doc_opc2: string;
+  tipo_doc_opc3: string;
+  tipo_doc_opc4: string;
+  /** FK → tipo de documento da ativação */
+  id_tipo_doc_ativ: string;
+  /** FK → produto de ativação */
+  id_produto_ativ: string;
+  /** Número de parcelas de ativação */
+  ativacao_numero_parcelas: string;
+  /** Vencimentos das parcelas, ex: "10/12/2019 | 10/01/2020 | " */
+  ativacao_vencimentos: string;
+  /** String decimal, ex: "100.00" */
+  ativacao_valor_parcela: string;
+  isentar_contrato: IxcSimNao;
+  /** Número de parcelas em atraso */
+  num_parcelas_atraso: string;
+  /** P = Padrão para agrupar financeiro */
+  agrupar_financeiro_contrato: string;
+  /** FK → indexador de reajuste */
+  id_indexador_reajuste: string;
+
+  // ── Bloqueio / Desbloqueio ──
+  bloqueio_automatico: IxcSimNao;
+  aviso_atraso: IxcSimNao;
+  /** N = Normal, R = Reduzida */
+  status_velocidade: IxcStatusVelocidade;
+  /** S = Habilitado, N = Desabilitado, P = Padrão */
+  desbloqueio_confianca: IxcDesbloqueioConfianca;
+  desbloqueio_confianca_ativo: IxcSimNao;
+  /** P = Padrão — liberação de bloqueio manual */
+  liberacao_bloqueio_manual: string;
+  /** H = Habilitado, D = Desabilitado, P = Padrão */
+  liberacao_suspensao_parcial: IxcLiberacaoSuspensaoParcial;
+  utilizando_auto_libera_susp_parc: IxcSimNao;
+  restricao_auto_desbloqueio: IxcSimNao;
+  motivo_restricao_auto_desbloq: string;
+  restricao_auto_libera_susp_parcial: IxcSimNao;
+  motivo_restri_auto_libera_parc: string;
+  /** P = Padrão — aplicar desconto por tempo de bloqueio */
+  aplicar_desconto_tempo_bloqueio: string;
+  /** YYYY-MM-DD */
+  nao_avisar_ate: string;
+  /** YYYY-MM-DD */
+  nao_bloquear_ate: string;
+  /** YYYY-MM-DD */
+  nao_susp_parc_ate: string;
+  /** YYYY-MM-DD */
+  dt_ult_bloq_auto: string;
+  /** YYYY-MM-DD */
+  dt_ult_bloq_manual: string;
+  /** YYYY-MM-DD */
+  dt_ult_desbloq_auto: string;
+  /** YYYY-MM-DD */
+  dt_ult_desbloq_manual: string;
+  /** YYYY-MM-DD */
+  dt_ult_des_bloq_conf: string;
+  /** YYYY-MM-DD */
+  dt_ult_ativacao: string;
+  /** YYYY-MM-DD */
+  dt_ult_finan_atraso: string;
+  /** YYYY-MM-DD */
+  dt_ult_liberacao_susp_parc: string;
+
+  // ── Suspensão ──
+  contrato_suspenso: IxcSimNao;
+  /** YYYY-MM-DD */
+  data_inicial_suspensao: string;
+  /** YYYY-MM-DD */
+  data_final_suspensao: string;
+  /** YYYY-MM-DD */
+  data_retomada_contrato: string;
+  tempo_permanencia: string;
+
+  // ── Cancelamento / Desistência / Negativação ──
+  /** FK → motivo de cancelamento */
+  motivo_cancelamento: string;
+  /** YYYY-MM-DD */
+  data_cancelamento: string;
+  obs_cancelamento: string;
+  /** M = Manual, A = Automático */
+  origem_cancelamento: IxcOrigemCancelamento | "";
+  /** FK → responsável pelo cancelamento */
+  id_responsavel_cancelamento: string;
+  /** YYYY-MM-DD */
+  data_desistencia: string;
+  /** FK → motivo de desistência */
+  motivo_desistencia: string;
+  obs_desistencia: string;
+  /** FK → responsável pela desistência */
+  id_responsavel_desistencia: string;
+  /** YYYY-MM-DD */
+  dt_ult_desiste: string;
+  /** YYYY-MM-DD */
+  data_negativacao: string;
+  protocolo_negativacao: string;
+  /** FK → motivo de negativação */
+  id_motivo_negativacao: string;
+  obs_negativacao: string;
+  /** FK → responsável pela negativação */
+  id_responsavel_negativacao: string;
+  /** YYYY-MM-DD */
+  dt_utl_negativacao: string;
+  /** YYYY-MM-DD — data de desativação do acesso */
+  data_acesso_desativado: string;
+
+  // ── Vendedor / Responsável ──
+  /** FK → vendedor */
+  id_vendedor: string;
+  /** FK → vendedor da ativação */
+  id_vendedor_ativ: string;
+  /** FK → instalador */
+  id_instalador: string;
+  /** FK → responsável */
+  id_responsavel: string;
+
+  // ── Motivo de inclusão ──
+  /** FK → motivo de inclusão */
+  id_motivo_inclusao: string;
+  /** I = Instalação, U = Upgrade, D = Downgrade, M = Mudança de Endereço, T = Mudança de Tecnologia, L = Mudança de titularidade, N = Negociação, R = Reativação */
+  motivo_inclusao: IxcMotivoInclusao;
+
+  // ── Renovação ──
+  renovacao_automatica: IxcSimNao;
+
+  // ── Assinatura digital ──
+  /** S = Sim, N = Não, P = Padrão */
+  assinatura_digital: IxcSimNaoPadrao;
+  /** P = Padrão — integração de assinatura digital */
+  integracao_assinatura_digital: string;
+  url_assinatura_digital: string;
+  token_assinatura_digital: string;
+  /** FK → testemunha da assinatura digital */
+  testemunha_assinatura_digital: string;
+  /** P = Padrão — gerar financeiro na assinatura digital do contrato */
+  gerar_finan_assin_digital_contrato: string;
+  /** P = Padrão — foto do documento */
+  document_photo: string;
+  /** P = Padrão — selfie */
+  selfie_photo: string;
+
+  // ── Cartão recorrente ──
+  credit_card_recorrente_token: string;
+  credit_card_recorrente_bandeira_cartao: string;
+  status_recorrencia: string;
+
+  // ── Contrato principal / indicação ──
+  /** FK → contrato principal (0 = nenhum) */
+  id_contrato_principal: string;
+  /** FK → contrato de indicação */
+  indicacao_contrato_id: string;
+  ids_contratos_recorrencia: string;
+
+  // ── Avalistas ──
+  /** FK → avalista 1 */
+  avalista_1: string;
+  /** FK → avalista 2 */
+  avalista_2: string;
+
+  // ── NF / Fiscal ──
+  nf_info_adicionais: string;
+  /** P = Padrão — base para geração de tipo de documento */
+  base_geracao_tipo_doc: string;
+
+  // ── Observações / Alertas ──
+  obs: string;
+  obs_contrato: string;
+  alerta_contrato: string;
+
+  // ── Importação (campos imp_*) ──
+  imp_carteira: string;
+  imp_importacao: string;
+  imp_rede: string;
+  imp_bkp: string;
+  imp_treinamento: string;
+  imp_status: string;
+  imp_obs: string;
+  imp_realizado: string;
+  imp_motivo: string;
+  /** YYYY-MM-DD */
+  imp_inicial: string;
+  /** YYYY-MM-DD */
+  imp_final: string;
+
+  // ── Diversos ──
+  /** Estrato social (Colômbia) */
+  estrato_social_col: string;
+}

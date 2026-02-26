@@ -1,57 +1,58 @@
 
 
-## Plano: Adicionar tipos enumerados do `/cliente_contrato` e interface `IxcClienteContrato`
+# Arquitetura ERP — 3 Camadas
 
-### Novos tipos enumerados a adicionar em `ixc-types.ts`
+## Regra de Equivalências
 
-```typescript
-/** I = Internet, T = Telefonia, S = Serviços, SVA = SVA */
-export type IxcTipoContrato = "I" | "T" | "S" | "SVA";
+> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
 
-/** P = Pré-contrato, A = Ativo, I = Inativo, N = Negativado, D = Desistiu */
-export type IxcStatusContrato = "P" | "A" | "I" | "N" | "D";
+## Fluxo por operação
 
-/** A = Ativo, D = Desativado, CM = Bloqueio Manual, CA = Bloqueio Automático, FA = Financeiro em atraso, AA = Aguardando Assinatura */
-export type IxcStatusInternet = "A" | "D" | "CM" | "CA" | "FA" | "AA";
+```text
+Camada 1 — Tool Handler (tool-handlers.ts)
+  Valida input, chama Driver, monta payload JSON para o modelo.
 
-/** N = Normal, R = Reduzida */
-export type IxcStatusVelocidade = "N" | "R";
+Camada 2 — Driver (erp-driver.ts)
+  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
 
-/** P = Configuração padrão (Parâmetros), N = Competência (Previsão não), S = Caixa (Previsão sim), M = Manual */
-export type IxcCcPrevisao = "P" | "N" | "S" | "M";
-
-/** S = Habilitado, N = Desabilitado, P = Padrão */
-export type IxcDesbloqueioConfianca = "S" | "N" | "P";
-
-/** H = Habilitado, D = Desabilitado, P = Padrão */
-export type IxcLiberacaoSuspensaoParcial = "H" | "D" | "P";
-
-/** P = Configuração padrão, I = Impresso, E = E-mail */
-export type IxcTipoCobranca = "P" | "I" | "E";
-
-/** I = Instalação, U = Upgrade, D = Downgrade, M = Mudança de Endereço, T = Mudança de Tecnologia, L = Mudança de titularidade, N = Negociação, R = Reativação */
-export type IxcMotivoInclusao = "I" | "U" | "D" | "M" | "T" | "L" | "N" | "R";
-
-/** M = Manual, A = Automático */
-export type IxcOrigemCancelamento = "M" | "A";
-
-/** R = Regular (inferido do JSON) — documentação pendente para demais valores */
-export type IxcSituacaoFinanceiraContrato = "R" | string;
+Camada 3 — Provider (erp-providers/*.ts)
+  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
 ```
 
-### Interface `IxcClienteContrato`
+## Equivalências de campos
 
-Todos os ~120 campos do JSON mapeados 1:1, usando os tipos enumerados acima, `IxcSimNao`, `IxcSimNaoPadrao` e `IxcTipoLocalidade` (reutilizados do `/cliente`). Campos FK comentados inline.
+### IXC → Tipos internos
 
-### Arquivo alterado
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
 
-Apenas `supabase/functions/_shared/erp-providers/ixc-types.ts` — append dos novos tipos e da interface.
+### MK → Tipos internos
 
-### Campo `situacao_financeira_contrato`
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
 
-O valor `"R"` aparece no JSON mas não foi documentado. Será tipado como `"R" | string` com JSDoc pedindo complemento. Se você tiver a documentação desse campo, cole antes de eu implementar.
+### SGP → Tipos internos
 
-### Campos `tipo_produtos_plano`
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` / `codigo` / `cd_cliente` | `id` |
+| `nome` / `razao_social` / `nm_cliente` | `nome` |
+| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
 
-Documentação indica valor padrão `"P"` mas sem lista de valores. Será tipado como `string` com comentário.
+## Responsabilidades
 
+- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
+- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
+- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
