@@ -1,58 +1,23 @@
 
 
-# Arquitetura ERP — 3 Camadas
+## Plano: Remover `ixc_contract_lookup_detailed` e `fetchContratosDetalhados`
 
-## Regra de Equivalências
+### Arquivos a editar
 
-> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
+1. **`supabase/functions/_shared/erp-providers/ixc.ts`**
+   - Remover função `ixc_contract_lookup_detailed` (~linhas 126-143)
+   - Remover `fetchContratosDetalhados: ixc_contract_lookup_detailed` do export do provider
 
-## Fluxo por operação
+2. **`supabase/functions/_shared/erp-types.ts`**
+   - Remover interface `RawContratoDetalhado` (~linhas 93-101)
+   - Remover `fetchContratosDetalhados?` do `ErpProviderDriver` (linhas 174-175)
 
-```text
-Camada 1 — Tool Handler (tool-handlers.ts)
-  Valida input, chama Driver, monta payload JSON para o modelo.
+3. **`supabase/functions/_shared/erp-driver.ts`**
+   - Remover import de `RawContratoDetalhado` (linha 16)
+   - Remover função `mapContratoDetalhadoFromProvider` (linhas 74-89)
+   - Refatorar `fetchClientContracts` (linhas 656-667): usar sempre `fetchContratos` com fallback para campos de endereço extraídos diretamente do raw (o endpoint `/cliente_contrato` já retorna endereço, número, bairro, etc.)
 
-Camada 2 — Driver (erp-driver.ts)
-  Resolve configs, chama Provider, MAPEIA campos crus → tipos internos, normaliza negócio.
+### Detalhe técnico
 
-Camada 3 — Provider (erp-providers/*.ts)
-  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
-```
+O endpoint `/cliente_contrato` já retorna os campos de endereço (`endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento`). A função "detalhada" era redundante — fazia a mesma chamada HTTP que `ixc_contract_lookup` mas com log extra. Após a remoção, `fetchClientContracts` usará `fetchContratos` e extrairá os campos de endereço diretamente do raw via `mapContratoFromProvider` expandido (ou inline no bloco existente).
 
-## Equivalências de campos
-
-### IXC → Tipos internos
-
-| Campo IXC | Campo normalizado | Tipo |
-|---|---|---|
-| `razao` / `fantasia` | `nome` | string |
-| `cnpj_cpf` | `cpf_cnpj` | string |
-| `contrato` / `id_vd_contrato` | `plano` | string |
-| `dia_vencimento` | `dia_vencimento` | string |
-| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
-| `online` (S/N) | `conectado` | boolean |
-| `sinal_rx` | `signal_db` | number |
-| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
-| `status` (A/etc) | filtro ativo/inativo | - |
-
-### MK → Tipos internos
-
-| Campo MK | Campo normalizado |
-|---|---|
-| `CodigoCliente` | `id` |
-| `NomeRazaoSocial` | `nome` |
-| `CpfCnpj` | `cpf_cnpj` |
-
-### SGP → Tipos internos
-
-| Campo SGP | Campo normalizado |
-|---|---|
-| `id` / `codigo` / `cd_cliente` | `id` |
-| `nome` / `razao_social` / `nm_cliente` | `nome` |
-| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
-
-## Responsabilidades
-
-- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
-- **Driver**: Mapeamento de campos por provider (`mapClienteFromProvider`, etc.), normalização de status, sanitização de endereço, orquestração de cadeias (ex: cliente → contrato → fatura).
-- **Tool Handler**: Validação de input, formatação de resposta para o modelo de IA.
