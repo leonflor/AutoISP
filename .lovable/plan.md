@@ -1,27 +1,106 @@
 
 
-## Investigation: `endereco_completo`
+# Arquitetura ERP — 3 Camadas
 
-**Origin:** The field is composed in `erp-driver.ts` by the function `buildEnderecoCompleto()` (line 120-134). It concatenates `endereco`, `numero`, `complemento`, and `bairro` from the mapped contract data, filtering out nulls, "0", and "SN" values. When all parts are null/empty, it returns `null` — which is exactly what happens for 5 of the 8 contracts in this CPF.
+## Regra de Equivalências
 
-**Full chain:**
-1. IXC API `/cliente_contrato` returns raw address fields
-2. `mapContrato.ixc()` in `field-maps.ts` maps them 1:1
-3. `buildEnderecoCompleto()` in `erp-driver.ts` composes them into a single string
-4. Result is included in `ContratoResponse` (defined in `response-models.ts`, line 20)
-5. The flow step instruction tells the AI to show *only* addresses — but many are `null`
+> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
 
-**The field is legitimate** — it's built in the Driver layer, included in the response model, and documented in the tool catalog. The problem is solely in the flow step instruction assuming every contract has an address.
+## Regras de Proteção
 
-## Plan: Update flow step instruction
+> **ALERTA OBRIGATÓRIO**: Os arquivos abaixo NÃO podem ser editados sem ordem expressa do usuário. Qualquer plano que preveja alteração neles deve alertar antes de implementar:
+> - `field-maps.ts` — mapeamento declarativo ERP → modelo
+> - `erp-providers/*.ts` — conectores HTTP dos ERPs
+> - `ixc-types.ts` — modelagem ORM dos campos IXC
 
-**Single database UPDATE** on table `ai_agent_flow_steps`, row `0c89d6bc-5504-4b12-9e10-e88fadb621df`:
+## Fluxo por operação
 
-Change `instruction` from:
-> Exiba apenas os endereços de instalação em lista numerada com duplo espaçamento entre itens. Não exiba plano, status ou vencimento nesta etapa. Pergunte qual contrato o cliente deseja tratar.
+```text
+Camada 1 — Tool Handler (tool-handlers.ts)
+  Valida input (CPF/CNPJ), chama Driver, retorna ToolResult<ToolEnvelope>.
 
-To:
-> Exiba os contratos em lista numerada usando o campo 'ordem' como número. Para cada item, mostre o endereco_completo se disponível; caso contrário, mostre o plano. Use duplo espaçamento entre itens. Não exiba status ou vencimento. Pergunte qual número o cliente deseja tratar.
+Camada 2 — Driver (erp-driver.ts)
+  Resolve configs ativos, chama Provider, aplica field-maps, retorna ToolEnvelope<ResponseModel>.
 
-No code changes required.
+Camada 3 — Provider (erp-providers/*.ts)
+  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+```
 
+## Estrutura de arquivos
+
+```text
+supabase/functions/_shared/
+├── response-models.ts     — Interfaces do JSON que a IA recebe (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)
+├── field-maps.ts          — Mapeamento declarativo ERP → modelo, por provider (mapCliente, mapContrato, mapFatura, etc.)
+├── erp-driver.ts          — Orquestrador: buscarCliente(), buscarContratos(), buscarFaturas() + funções de monitoramento em massa
+├── tool-handlers.ts       — Valida input + chama driver + retorna ToolResult
+├── tool-catalog.ts        — JSON Schema das ferramentas (function calling OpenAI)
+├── erp-types.ts           — Tipos compartilhados (ErpProvider, ErpClient, ErpCredentials, ErpProviderDriver)
+├── erp-providers/
+│   ├── index.ts           — Registry de providers
+│   ├── ixc.ts             — HTTP puro IXC
+│   ├── ixc-types.ts       — Modelagem ORM 1:1 dos campos IXC
+│   ├── sgp.ts             — HTTP puro SGP
+│   └── mk.ts              — HTTP puro MK-Solutions
+└── onu-signal-analyzer.ts — Classificação de sinal óptico
+```
+
+## Equivalências de campos
+
+### IXC → Tipos internos
+
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
+
+### MK → Tipos internos
+
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
+
+### SGP → Tipos internos
+
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` / `codigo` / `cd_cliente` | `id` |
+| `nome` / `razao_social` / `nm_cliente` | `nome` |
+| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
+
+## Responsabilidades
+
+- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
+- **Driver**: Orquestra configs ativos, aplica `field-maps` para mapeamento declarativo, normaliza status, sanitiza endereço. Retorna `ToolEnvelope<ResponseModel>`.
+- **Tool Handler**: Validação de input, encapsula resultado do driver em `ToolResult`.
+
+## Response Models (o que a IA recebe)
+
+### ClienteResponse (erp_client_lookup)
+```json
+{ "nome": "João Silva", "cpf_cnpj": "123.456.789-00", "erp": "IXC Soft" }
+```
+
+### ContratoResponse (erp_contract_lookup)
+```json
+{ "ordem": 1, "contrato_id": "123", "endereco": "Rua A", "numero": "100", "complemento": null, "bairro": "Centro", "endereco_completo": "Rua A, nº 100, Centro", "plano": "100MB", "status": "ativo", "dia_vencimento": "10", "erp": "IXC Soft" }
+```
+
+### FaturaResponse (erp_invoice_search)
+```json
+{ "id": "456", "contrato_id": "123", "endereco": "Rua A, nº 100, Centro", "valor": 99.90, "vencimento": "2025-01-10", "dias_atraso": 15, "linha_digitavel": "23793...", "gateway_link": "https://...", "erp": "IXC Soft" }
+```
+
+### Envelope padrão
+```json
+{ "encontrados": 2, "itens": [...], "mensagem": "...", "erros": [] }
+```
