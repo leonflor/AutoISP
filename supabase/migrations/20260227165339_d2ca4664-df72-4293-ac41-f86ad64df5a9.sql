@@ -1,0 +1,1 @@
+UPDATE ai_agent_flow_steps SET instruction = 'Exiba os contratos em lista numerada usando o campo ''ordem'' como número. Para cada item, mostre o endereco_completo se disponível; caso contrário, mostre o plano. Use duplo espaçamento entre itens. Não exiba status ou vencimento. Pergunte qual número o cliente deseja tratar.' WHERE id = '0c89d6bc-5504-4b12-9e10-e88fadb621df';
