@@ -1,43 +1,106 @@
 
 
-## Alerta: Arquivos Protegidos
+# Arquitetura ERP — 3 Camadas
 
-Os arquivos `response-models.ts` e `erp-driver.ts` fazem parte da camada protegida ERP. Prossigo com as alterações conforme sua ordem expressa.
+## Regra de Equivalências
 
-## Problema
+> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
 
-`buscarContratos` duplica a lógica de resolução de cliente (loop configs → fetchClientes → match CPF) que já existe em `buscarCliente`. Além disso, `buscarCliente` não retorna o `id` do cliente ERP, impossibilitando seu reuso direto.
+## Regras de Proteção
 
-## Plano
+> **ALERTA OBRIGATÓRIO**: Os arquivos abaixo NÃO podem ser editados sem ordem expressa do usuário. Qualquer plano que preveja alteração neles deve alertar antes de implementar:
+> - `field-maps.ts` — mapeamento declarativo ERP → modelo
+> - `erp-providers/*.ts` — conectores HTTP dos ERPs
+> - `ixc-types.ts` — modelagem ORM dos campos IXC
 
-### 1. Adicionar `id` a `ClienteResponse` em `response-models.ts`
+## Fluxo por operação
 
-Incluir campo `id: string` na interface para que `buscarCliente` retorne o ID ERP do cliente, permitindo reuso.
+```text
+Camada 1 — Tool Handler (tool-handlers.ts)
+  Valida input (CPF/CNPJ), chama Driver, retorna ToolResult<ToolEnvelope>.
 
-### 2. Atualizar `buscarCliente` em `erp-driver.ts`
+Camada 2 — Driver (erp-driver.ts)
+  Resolve configs ativos, chama Provider, aplica field-maps, retorna ToolEnvelope<ResponseModel>.
 
-Incluir `id: mapped.id` no `itens.push(...)`.
+Camada 3 — Provider (erp-providers/*.ts)
+  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+```
 
-### 3. Adicionar `opcao` a `ContratoResponse` em `response-models.ts`
+## Estrutura de arquivos
 
-Novo campo `opcao: number` — índice incremental a partir de 1.
+```text
+supabase/functions/_shared/
+├── response-models.ts     — Interfaces do JSON que a IA recebe (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)
+├── field-maps.ts          — Mapeamento declarativo ERP → modelo, por provider (mapCliente, mapContrato, mapFatura, etc.)
+├── erp-driver.ts          — Orquestrador: buscarCliente(), buscarContratos(), buscarFaturas() + funções de monitoramento em massa
+├── tool-handlers.ts       — Valida input + chama driver + retorna ToolResult
+├── tool-catalog.ts        — JSON Schema das ferramentas (function calling OpenAI)
+├── erp-types.ts           — Tipos compartilhados (ErpProvider, ErpClient, ErpCredentials, ErpProviderDriver)
+├── erp-providers/
+│   ├── index.ts           — Registry de providers
+│   ├── ixc.ts             — HTTP puro IXC
+│   ├── ixc-types.ts       — Modelagem ORM 1:1 dos campos IXC
+│   ├── sgp.ts             — HTTP puro SGP
+│   └── mk.ts              — HTTP puro MK-Solutions
+└── onu-signal-analyzer.ts — Classificação de sinal óptico
+```
 
-### 4. Refatorar `buscarContratos` em `erp-driver.ts`
+## Equivalências de campos
 
-- Remover a lógica interna de resolução de cliente (linhas 197-222)
-- Chamar `buscarCliente(supabaseAdmin, ispId, encryptionKey, cpfCnpj)` para obter os IDs
-- Iterar sobre os clientes retornados, usar `id` + `erp` para buscar contratos do provider correto
-- Adicionar `opcao` incremental no `itens.push`
-- Manter `ordem` existente (backward compat) com o mesmo valor de `opcao`
+### IXC → Tipos internos
 
-### Detalhe técnico: resolução de provider
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
 
-Ao chamar `buscarCliente`, o retorno traz `erp` (nome display) mas não o `providerKey`. Precisaremos também retornar `provider` (chave interna) em `ClienteResponse` para que `buscarContratos` saiba qual driver usar para `fetchContratos`.
+### MK → Tipos internos
 
-**Campos adicionados a `ClienteResponse`:** `id`, `provider` (chave interna tipo `"ixc"`)
-**Campos adicionados a `ContratoResponse`:** `opcao`
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
 
-### Impacto em `buscarFaturas`
+### SGP → Tipos internos
 
-`buscarFaturas` (linhas 269-390) também duplica a lógica de resolução de cliente. Não será alterada neste momento conforme escopo, mas fica como candidata futura.
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` / `codigo` / `cd_cliente` | `id` |
+| `nome` / `razao_social` / `nm_cliente` | `nome` |
+| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
 
+## Responsabilidades
+
+- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
+- **Driver**: Orquestra configs ativos, aplica `field-maps` para mapeamento declarativo, normaliza status, sanitiza endereço. Retorna `ToolEnvelope<ResponseModel>`.
+- **Tool Handler**: Validação de input, encapsula resultado do driver em `ToolResult`.
+
+## Response Models (o que a IA recebe)
+
+### ClienteResponse (erp_client_lookup)
+```json
+{ "nome": "João Silva", "cpf_cnpj": "123.456.789-00", "erp": "IXC Soft" }
+```
+
+### ContratoResponse (erp_contract_lookup)
+```json
+{ "ordem": 1, "contrato_id": "123", "endereco": "Rua A", "numero": "100", "complemento": null, "bairro": "Centro", "endereco_completo": "Rua A, nº 100, Centro", "plano": "100MB", "status": "ativo", "dia_vencimento": "10", "erp": "IXC Soft" }
+```
+
+### FaturaResponse (erp_invoice_search)
+```json
+{ "id": "456", "contrato_id": "123", "endereco": "Rua A, nº 100, Centro", "valor": 99.90, "vencimento": "2025-01-10", "dias_atraso": 15, "linha_digitavel": "23793...", "gateway_link": "https://...", "erp": "IXC Soft" }
+```
+
+### Envelope padrão
+```json
+{ "encontrados": 2, "itens": [...], "mensagem": "...", "erros": [] }
+```

@@ -165,8 +165,10 @@ export async function buscarCliente(
         const docClean = String(mapped.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
         if (docClean === cleanCpf) {
           itens.push({
+            id: mapped.id,
             nome: mapped.nome,
             cpf_cnpj: mapped.cpf_cnpj,
+            provider: providerKey,
             erp: providerName,
           });
         }
@@ -194,37 +196,36 @@ export async function buscarContratos(
   encryptionKey: string,
   cpfCnpj: string
 ): Promise<ToolEnvelope<ContratoResponse>> {
-  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
   const erros: string[] = [];
   const itens: ContratoResponse[] = [];
-  const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
 
-  for (const config of configs) {
+  // Passo 1: resolver clientes via buscarCliente
+  const clienteResult = await buscarCliente(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
+  erros.push(...clienteResult.erros);
+
+  if (clienteResult.itens.length === 0) {
+    return {
+      encontrados: 0,
+      itens,
+      mensagem: "Nenhum cliente encontrado com este CPF/CNPJ.",
+      erros,
+    };
+  }
+
+  // Passo 2: para cada cliente, buscar contratos usando id + provider
+  for (const cli of clienteResult.itens) {
     try {
-      const providerKey = config.provider as ErpProvider;
-      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const providerKey = cli.provider as ErpProvider;
       const driver = getProvider(providerKey);
+      if (!driver.fetchContratos) continue;
+
+      // Resolver credenciais para este provider
+      const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+      const config = configs.find(c => c.provider === providerKey);
+      if (!config) continue;
+
       const creds = await resolveCredentials(config, encryptionKey);
-
-      if (!driver.fetchClientes) continue;
-
-      // Passo 1: resolver cliente
-      const rawClientes = await driver.fetchClientes(creds, { cpf_cnpj: cpfCnpj });
-      let clienteId: string | null = null;
-
-      for (const raw of rawClientes) {
-        const mapped = mapCliente[providerKey](raw);
-        const docClean = String(mapped.cpf_cnpj || "").replace(/[\.\-\/]/g, "");
-        if (docClean === cleanCpf) {
-          clienteId = mapped.id;
-          break;
-        }
-      }
-
-      if (!clienteId || !driver.fetchContratos) continue;
-
-      // Passo 2: buscar contratos
-      const rawContratos = await driver.fetchContratos(creds, { id_cliente: clienteId });
+      const rawContratos = await driver.fetchContratos(creds, { id_cliente: cli.id });
 
       for (const raw of rawContratos) {
         const mapped = mapContrato[providerKey](raw);
@@ -233,6 +234,7 @@ export async function buscarContratos(
           ? mapped.numero : null;
 
         itens.push({
+          opcao: 0,
           ordem: 0,
           contrato_id: mapped.id,
           endereco: mapped.endereco ? String(mapped.endereco).trim().replace(/,\s*$/, "") : null,
@@ -243,16 +245,19 @@ export async function buscarContratos(
           plano: mapped.plano,
           status: normalizeInternetStatus(mapped.status_internet, providerKey),
           dia_vencimento: mapped.dia_vencimento,
-          erp: providerName,
+          erp: cli.erp,
         });
       }
     } catch (err) {
-      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+      erros.push(`${cli.erp}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
     }
   }
 
   // Numerar sequencialmente
-  itens.forEach((c, i) => { c.ordem = i + 1; });
+  itens.forEach((c, i) => {
+    c.opcao = i + 1;
+    c.ordem = i + 1;
+  });
 
   return {
     encontrados: itens.length,
