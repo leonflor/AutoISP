@@ -4,13 +4,16 @@
 
 /** Modelo: erp_client_lookup */
 export interface ClienteResponse {
+  id: string;
   nome: string;
   cpf_cnpj: string;
+  provider: string;
   erp: string;
 }
 
 /** Modelo: erp_contract_lookup */
 export interface ContratoResponse {
+  opcao: number;
   ordem: number;
   contrato_id: string;
   endereco: string | null;
