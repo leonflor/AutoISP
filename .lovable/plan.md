@@ -1,106 +1,44 @@
 
 
-# Arquitetura ERP — 3 Camadas
+## Problema
+O prompt completo enviado à OpenAI não é logado de forma inspecionável. Apenas o `system_prompt` é persistido em `ai_usage.metadata`, mas faltam: o array `messages` completo (com tool results), o `tools` JSON Schema, e a resposta não-streaming intermediária. Isso impede debug do comportamento "rebelde".
 
-## Regra de Equivalências
+## Plano: Adicionar log completo do payload enviado à OpenAI
 
-> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
+### 1. Em `ai-chat/index.ts`, adicionar `console.log` do system prompt completo
 
-## Regras de Proteção
-
-> **ALERTA OBRIGATÓRIO**: Os arquivos abaixo NÃO podem ser editados sem ordem expressa do usuário. Qualquer plano que preveja alteração neles deve alertar antes de implementar:
-> - `field-maps.ts` — mapeamento declarativo ERP → modelo
-> - `erp-providers/*.ts` — conectores HTTP dos ERPs
-> - `ixc-types.ts` — modelagem ORM dos campos IXC
-
-## Fluxo por operação
-
-```text
-Camada 1 — Tool Handler (tool-handlers.ts)
-  Valida input (CPF/CNPJ), chama Driver, retorna ToolResult<ToolEnvelope>.
-
-Camada 2 — Driver (erp-driver.ts)
-  Resolve configs ativos, chama Provider, aplica field-maps, retorna ToolEnvelope<ResponseModel>.
-
-Camada 3 — Provider (erp-providers/*.ts)
-  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+Após `buildSystemPrompt()` (linha 606), logar o prompt inteiro:
+```typescript
+console.log(`📋 SYSTEM PROMPT:\n${systemPrompt}`);
 ```
 
-## Estrutura de arquivos
+### 2. Logar o payload completo antes de cada chamada à OpenAI
 
-```text
-supabase/functions/_shared/
-├── response-models.ts     — Interfaces do JSON que a IA recebe (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)
-├── field-maps.ts          — Mapeamento declarativo ERP → modelo, por provider (mapCliente, mapContrato, mapFatura, etc.)
-├── erp-driver.ts          — Orquestrador: buscarCliente(), buscarContratos(), buscarFaturas() + funções de monitoramento em massa
-├── tool-handlers.ts       — Valida input + chama driver + retorna ToolResult
-├── tool-catalog.ts        — JSON Schema das ferramentas (function calling OpenAI)
-├── erp-types.ts           — Tipos compartilhados (ErpProvider, ErpClient, ErpCredentials, ErpProviderDriver)
-├── erp-providers/
-│   ├── index.ts           — Registry de providers
-│   ├── ixc.ts             — HTTP puro IXC
-│   ├── ixc-types.ts       — Modelagem ORM 1:1 dos campos IXC
-│   ├── sgp.ts             — HTTP puro SGP
-│   └── mk.ts              — HTTP puro MK-Solutions
-└── onu-signal-analyzer.ts — Classificação de sinal óptico
+Antes do `fetch` na linha 643 (loop de tools), logar:
+```typescript
+console.log(`📤 OpenAI request (iteration ${iteration}): messages=${messages.length}, tools=${openaiTools?.length || 0}`);
+console.log(`📤 Messages dump:\n${JSON.stringify(messages, null, 2)}`);
 ```
 
-## Equivalências de campos
+### 3. Logar o payload do streaming final
 
-### IXC → Tipos internos
-
-| Campo IXC | Campo normalizado | Tipo |
-|---|---|---|
-| `razao` / `fantasia` | `nome` | string |
-| `cnpj_cpf` | `cpf_cnpj` | string |
-| `contrato` / `id_vd_contrato` | `plano` | string |
-| `dia_vencimento` | `dia_vencimento` | string |
-| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
-| `online` (S/N) | `conectado` | boolean |
-| `sinal_rx` | `signal_db` | number |
-| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
-| `status` (A/etc) | filtro ativo/inativo | - |
-
-### MK → Tipos internos
-
-| Campo MK | Campo normalizado |
-|---|---|
-| `CodigoCliente` | `id` |
-| `NomeRazaoSocial` | `nome` |
-| `CpfCnpj` | `cpf_cnpj` |
-
-### SGP → Tipos internos
-
-| Campo SGP | Campo normalizado |
-|---|---|
-| `id` / `codigo` / `cd_cliente` | `id` |
-| `nome` / `razao_social` / `nm_cliente` | `nome` |
-| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
-
-## Responsabilidades
-
-- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
-- **Driver**: Orquestra configs ativos, aplica `field-maps` para mapeamento declarativo, normaliza status, sanitiza endereço. Retorna `ToolEnvelope<ResponseModel>`.
-- **Tool Handler**: Validação de input, encapsula resultado do driver em `ToolResult`.
-
-## Response Models (o que a IA recebe)
-
-### ClienteResponse (erp_client_lookup)
-```json
-{ "nome": "João Silva", "cpf_cnpj": "123.456.789-00", "erp": "IXC Soft" }
+Antes do `fetch` de streaming (linha 732), logar:
+```typescript
+console.log(`📤 Final streaming request: messages=${messages.length}`);
+console.log(`📤 Final messages dump:\n${JSON.stringify(messages, null, 2)}`);
 ```
 
-### ContratoResponse (erp_contract_lookup)
-```json
-{ "ordem": 1, "contrato_id": "123", "endereco": "Rua A", "numero": "100", "complemento": null, "bairro": "Centro", "endereco_completo": "Rua A, nº 100, Centro", "plano": "100MB", "status": "ativo", "dia_vencimento": "10", "erp": "IXC Soft" }
+### Resultado
+Após deploy, cada interação produzirá nos Edge Function logs:
+- O system prompt completo (8 camadas)
+- Todas as mensagens incluindo tool results
+- Quantidade de tools disponíveis
+
+Isso permitirá identificar exatamente o que a IA recebe e por que não segue as instruções.
+
+### Alternativa: consulta SQL imediata
+Sem alterar código, já é possível ver o system prompt atual via:
+```sql
+SELECT metadata->>'system_prompt' FROM ai_usage WHERE isp_id = '...' ORDER BY created_at DESC LIMIT 1;
 ```
 
-### FaturaResponse (erp_invoice_search)
-```json
-{ "id": "456", "contrato_id": "123", "endereco": "Rua A, nº 100, Centro", "valor": 99.90, "vencimento": "2025-01-10", "dias_atraso": 15, "linha_digitavel": "23793...", "gateway_link": "https://...", "erp": "IXC Soft" }
-```
-
-### Envelope padrão
-```json
-{ "encontrados": 2, "itens": [...], "mensagem": "...", "erros": [] }
-```
