@@ -624,6 +624,9 @@ Deno.serve(async (req) => {
 
     console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${filteredTools.length}/${Object.keys(TOOL_CATALOG).length}, Flows=${agentFlows.length}, FlowHandlers=[${[...flowToolHandlers].join(",")}]`);
 
+    // 🔍 DEBUG: Log system prompt completo (8 camadas)
+    console.log(`📋 SYSTEM PROMPT:\n${systemPrompt}`);
+
     // Tool execution context
     const encryptionKey = Deno.env.get("ENCRYPTION_KEY") || "";
     const toolCtx: ToolExecutionContext = {
@@ -639,6 +642,10 @@ Deno.serve(async (req) => {
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
       const shouldStream = (body.stream || false) && (iteration === 0 || isLastIteration);
+
+      // 🔍 DEBUG: Log payload completo antes de cada chamada à OpenAI
+      console.log(`📤 OpenAI request (iteration ${iteration}): messages=${messages.length}, tools=${openaiTools?.length || 0}`);
+      console.log(`📤 Messages dump:\n${JSON.stringify(messages, null, 2)}`);
 
       const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -729,6 +736,10 @@ Deno.serve(async (req) => {
     // Handle streaming response - re-call OpenAI with stream=true using enriched messages
     // (tool calls were already resolved in the loop above without streaming)
     if (body.stream) {
+      // 🔍 DEBUG: Log payload final do streaming
+      console.log(`📤 Final streaming request: messages=${messages.length}`);
+      console.log(`📤 Final messages dump:\n${JSON.stringify(messages, null, 2)}`);
+
       const streamResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
