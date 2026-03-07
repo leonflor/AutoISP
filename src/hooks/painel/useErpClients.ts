@@ -98,6 +98,7 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
     ativos: allClients.filter((c) => c.status_internet === "ativo").length,
     nao_ativos: allClients.filter((c) => c.status_internet !== "ativo").length,
     conectados: allClients.filter((c) => c.conectado).length,
+    desconectados: allClients.filter((c) => !c.conectado).length,
   };
 
   return {
