@@ -84,7 +84,7 @@ export default function SubscribersPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -119,6 +119,17 @@ export default function SubscribersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.conectados}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Desconectados</CardTitle>
+            <WifiOff className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.desconectados > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              {stats.desconectados}
+            </div>
           </CardContent>
         </Card>
         <Card>
