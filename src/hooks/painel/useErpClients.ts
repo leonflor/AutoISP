@@ -83,6 +83,8 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
     if (status && status !== "all") {
       if (status === "nao_ativo") {
         if (c.status_internet === "ativo") return false;
+      } else if (status === "offline") {
+        if (c.online_raw === null || c.conectado) return false;
       } else {
         if (c.status_internet !== status) return false;
       }
