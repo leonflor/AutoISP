@@ -17,6 +17,7 @@ export interface ErpClient {
   login: string | null;
   status_internet: string;
   conectado: boolean;
+  online_raw: string | null;
   signal_db: number | null;
   signal_quality: SignalQuality;
 }
@@ -82,6 +83,8 @@ export function useErpClients(options: UseErpClientsOptions = {}) {
     if (status && status !== "all") {
       if (status === "nao_ativo") {
         if (c.status_internet === "ativo") return false;
+      } else if (status === "offline") {
+        if (c.online_raw === null || c.conectado) return false;
       } else {
         if (c.status_internet !== status) return false;
       }

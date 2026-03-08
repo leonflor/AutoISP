@@ -34,6 +34,7 @@ export interface ErpClient {
   login: string | null;
   status_internet: InternetStatus;
   conectado: boolean;
+  online_raw: string | null;
   signal_db: number | null;
   signal_quality: SignalQuality;
   field_availability: Record<string, boolean>;

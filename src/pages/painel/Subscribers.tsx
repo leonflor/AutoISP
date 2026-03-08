@@ -10,6 +10,7 @@ import { Search, Users, UserCheck, UserX, Wifi, WifiOff, RefreshCw, AlertTriangl
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { SignalBadge } from '@/components/painel/subscribers/SignalBadge';
+import { ConnectionBadge } from '@/components/painel/subscribers/ConnectionBadge';
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
@@ -176,6 +177,7 @@ export default function SubscribersPage() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="nao_ativo">Não Ativos</SelectItem>
+                <SelectItem value="offline">Offline (sessão)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -248,11 +250,10 @@ export default function SubscribersPage() {
                           />
                         </TableCell>
                         <TableCell className="text-center">
-                          {client.conectado ? (
-                            <Wifi className="h-4 w-4 text-green-500 mx-auto" />
-                          ) : (
-                            <WifiOff className="h-4 w-4 text-muted-foreground mx-auto" />
-                          )}
+                          <ConnectionBadge
+                            conectado={client.conectado}
+                            onlineRaw={client.online_raw}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
