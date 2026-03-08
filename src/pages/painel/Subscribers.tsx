@@ -10,6 +10,7 @@ import { Search, Users, UserCheck, UserX, Wifi, WifiOff, RefreshCw, AlertTriangl
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { SignalBadge } from '@/components/painel/subscribers/SignalBadge';
+import { ConnectionBadge } from '@/components/painel/subscribers/ConnectionBadge';
 
 const statusColors: Record<string, string> = {
   ativo: 'bg-green-500/10 text-green-600 border-green-500/20',
