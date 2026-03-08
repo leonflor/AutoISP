@@ -448,6 +448,7 @@ async function composeIxcClients(
       login: rad.login || null,
       status_internet: normalizeInternetStatus(contrato.status_internet, "ixc"),
       conectado: rad.online === "S",
+      online_raw: rad.online || null,
       signal_db: fibraRec?.sinal_rx ?? null,
       signal_quality: classifySignalDb(fibraRec?.sinal_rx ?? null),
       field_availability: {
