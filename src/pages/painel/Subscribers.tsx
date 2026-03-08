@@ -177,6 +177,7 @@ export default function SubscribersPage() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="nao_ativo">Não Ativos</SelectItem>
+                <SelectItem value="offline">Offline (sessão)</SelectItem>
               </SelectContent>
             </Select>
           </div>
