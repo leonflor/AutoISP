@@ -250,11 +250,10 @@ export default function SubscribersPage() {
                           />
                         </TableCell>
                         <TableCell className="text-center">
-                          {client.conectado ? (
-                            <Wifi className="h-4 w-4 text-green-500 mx-auto" />
-                          ) : (
-                            <WifiOff className="h-4 w-4 text-muted-foreground mx-auto" />
-                          )}
+                          <ConnectionBadge
+                            conectado={client.conectado}
+                            onlineRaw={client.online_raw}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
