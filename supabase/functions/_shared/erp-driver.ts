@@ -426,14 +426,31 @@ async function composeIxcClients(
   const contratosById = new Map(contratos.map((ct) => [ct.id, ct]));
   const fibraByIdLogin = new Map(fibra.map((f) => [f.id_login, f]));
 
-  const results: ErpClient[] = [];
+  // Deduplicar radusuarios por contrato_id: priorizar online='S'
+  const bestRadByContrato = new Map<string, typeof rads[0]>();
 
   for (const rad of rads) {
-    const cliente = clientesById.get(rad.id_cliente);
-    const contrato = rad.id_contrato ? contratosById.get(rad.id_contrato) : null;
-    const fibraRec = fibraByIdLogin.get(rad.id);
+    const contratoId = rad.id_contrato;
+    if (!contratoId || !contratosById.has(contratoId)) continue;
 
-    if (!contrato) continue;
+    const existing = bestRadByContrato.get(contratoId);
+    if (!existing) {
+      bestRadByContrato.set(contratoId, rad);
+    } else {
+      // Prioridade: online='S' > online='N' > outros
+      const priority = (r: typeof rad) => r.online === "S" ? 2 : r.online === "N" ? 1 : 0;
+      if (priority(rad) > priority(existing)) {
+        bestRadByContrato.set(contratoId, rad);
+      }
+    }
+  }
+
+  const results: ErpClient[] = [];
+
+  for (const [contratoId, rad] of bestRadByContrato) {
+    const cliente = clientesById.get(rad.id_cliente);
+    const contrato = contratosById.get(contratoId)!;
+    const fibraRec = fibraByIdLogin.get(rad.id);
 
     results.push({
       erp_id: rad.id,
@@ -460,7 +477,7 @@ async function composeIxcClients(
     });
   }
 
-  console.log(`[IXC] Total records (radius-centric, contrato ativo): ${results.length}`);
+  console.log(`[IXC] Total records (dedup by contrato, ${rads.length} rads → ${results.length} unique): ${results.length}`);
   return results;
 }
 
