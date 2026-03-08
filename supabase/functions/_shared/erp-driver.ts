@@ -489,6 +489,7 @@ async function composeSimpleClients(
       login: null,
       status_internet: "ativo" as InternetStatus,
       conectado: false,
+      online_raw: null,
       signal_db: null,
       signal_quality: classifySignalDb(null),
       field_availability: {
