@@ -1,60 +1,157 @@
 
 
-# Avaliacao: Planner/Executor vs State Machine Aprovada
+# Montagem do Prompt do Agente — Estado Atual
 
-## O que a sugestao propoe de diferente
+O prompt do sistema é construído pela função `buildSystemPrompt()` em `supabase/functions/ai-chat/index.ts`, em **8 camadas sequenciais**:
 
-A principal novidade e a separacao em **Planner** (IA gera plano estruturado) e **Executor** (IA executa etapa). No modelo aprovado, os estados ja estao pre-definidos na tabela `flow_state_definitions` — nao ha necessidade de a IA "planejar".
+---
 
-## Analise ponto a ponto
+## Camada 1 — Prompt Base (Template)
+O `system_prompt` do template do agente (`ai_agents.system_prompt`). Define persona, regras gerais e comportamento base.
 
-| Aspecto | Sugestao | Plano aprovado | Veredicto |
-|---|---|---|---|
-| Planner (IA gera plano) | IA decide os steps | Steps pre-definidos no banco | **Plano aprovado e melhor** — se a IA gera o plano, ela pode inventar steps ou errar a ordem. Pre-definir no banco e mais previsivel. |
-| Executor separado | Papel explicito no prompt | Ja previsto — o prompt recebe apenas o objetivo do estado atual | Equivalente. A restricao ja esta no design. |
-| Tool Guardrails (validacao backend antes de executar) | Valida ferramenta + params + autorizacao no backend antes de executar | Filtra tools no payload da OpenAI (allowed_tools) mas nao valida no backend pos-resposta | **Sugestao e melhor** — adicionar validacao no backend antes de executar a tool e uma camada extra de seguranca. |
-| Max execucoes por etapa | 5 por etapa + bloquear repeticao de tool | `max_attempts` = 3, sem bloqueio de repeticao | **Sugestao agrega** — bloquear repeticao da mesma tool no mesmo estado evita loops. |
-| Historico de acoes por estado | Registrar acoes executadas | Nao previsto | **Sugestao agrega** — util para debug e auditoria. |
-| Persistencia (plan no banco) | Salvar o plano inteiro na sessao | Nao previsto (flow_id ja referencia os estados) | **Desnecessario** — os estados ja estao em `flow_state_definitions`. Salvar o plano seria redundante. |
-| 4 componentes (Orquestrador, Planner, Executor, Tools) | 4 chamadas/roles distintos | 1 chamada a OpenAI por turno | **Plano aprovado e melhor** — 2 chamadas a OpenAI (planner + executor) dobra latencia e custo. Com estados pre-definidos, o planner e desnecessario. |
+## Camada 2 — Tom de Voz (ISP)
+Se o ISP configurou um `voice_tone` no `isp_agents`, injeta:
+> "Adote o seguinte tom de voz em suas respostas: {voice_tone}"
 
-## O que vale incorporar ao plano aprovado
+## Camada 3 — Documentos RAG (pgvector)
+Busca semântica nos chunks de documentos do agente usando embedding da última mensagem do usuário (modelo `text-embedding-3-small`, 768 dimensões). Até 5 chunks com similaridade >= 0.7. Exibe relevância percentual.
 
-### 1. Tool Guardrails no backend (validacao pos-resposta da IA)
+## Camada 4 — FAQ (Q&A manual)
+Itens da tabela `agent_knowledge_base` ativos, ordenados por `sort_order`. Formato pergunta/resposta.
 
-Antes de executar qualquer tool call retornada pela OpenAI, o backend valida:
-- Tool esta em `allowed_tools` do estado atual (redundante com o filtro no payload, mas defesa em profundidade)
-- Parametros obrigatorios estao presentes
-- Se a tool `requires_erp`, o ISP tem ERP ativo
+## Camada 5 — Cláusulas de Segurança
+Cláusulas ativas da tabela `ai_security_clauses` com `applies_to` = "all" ou "tenant". Injetadas como regras obrigatórias.
 
-Adicionar isso em `state-machine.ts` como funcao `validateToolCall()`.
+## Camada 5.5 — Ferramentas (Tools)
+Lista apenas as tools cujos `handler` estão referenciados nos fluxos vinculados ao agente. Se a tool requer ERP (`requires_erp`), só aparece se o ISP tem ERP ativo. Usa o catálogo hardcoded `TOOL_CATALOG`.
 
-### 2. Bloqueio de repeticao de tool no mesmo estado
+## Camada 5.6 — Fluxos Conversacionais
+Fluxos vinculados via `ai_agent_flow_links`. Para cada fluxo:
+- Tipo: "roteiro fixo" ou "guia flexível"
+- Keywords/prompt de gatilho
+- Etapas numeradas com: instrução, ferramenta, input esperado, condição de avanço, fallback, rotas condicionais (saltos)
 
-No `conversation_sessions.context`, manter um array `executed_tools` por estado. Se a mesma tool ja foi executada com sucesso naquele estado, bloquear re-execucao.
+## Camada 6 — Ancoragem de Contexto
+Metadados dinâmicos para evitar vazamento cross-tenant:
+- Nome do provedor (ISP)
+- Data atual
+- Nome do agente (display_name do ISP ou nome do template)
 
-### 3. Historico de acoes por estado
+---
 
-Adicionar campo `action_log` (jsonb array) em `conversation_sessions` para registrar cada acao executada com timestamp, tool, resultado. Util para debug sem consultar `ai_usage`.
+## Payload final enviado à OpenAI
+- `model`: do template (default `gpt-4o-mini`)
+- `messages`: [system_prompt, ...mensagens_do_usuário]
+- `tools`: apenas as tools filtradas pelos fluxos (formato function calling)
+- `temperature`: do template (default 0.7)
+- `max_tokens`: do template (default 1000)
+- Loop de até 3 iterações para tool calls
 
-### 4. Max attempts aumentado
+O `system_prompt` completo é persistido no campo `metadata` da tabela `ai_usage` em cada interação para auditoria.
 
-Manter `max_attempts` = 5 (em vez de 3) como sugerido, para dar mais margem em estados que dependem de input do usuario.
+---
 
-## O que NAO vale incorporar
+# Arquitetura ERP — 3 Camadas
 
-- **Planner como chamada separada a IA**: Adiciona latencia, custo, e o plano ja esta pre-definido no banco. A previsibilidade vem de estados fixos, nao de pedir a IA para planejar.
-- **Salvar plano na sessao**: Redundante com `flow_id` + `flow_state_definitions`.
-- **Separacao explicita Planner/Executor**: Com estados pre-definidos, basta 1 chamada a IA com o objetivo do estado. Duas chamadas sao desnecessarias.
+## Regra de Equivalências
 
-## Plano atualizado (diferencas vs versao anterior)
+> **Sempre que houver tipos em qualquer camada, as equivalências entre campos do ERP e campos normalizados devem ser documentadas/perguntadas antes de implementar.**
 
-Apenas 3 adicoes ao plano aprovado:
+## Regras de Proteção
 
-1. **`validateToolCall()`** em `state-machine.ts` — valida tool + params antes de executar
-2. **`context.executed_tools`** — array de tools ja executadas no estado, bloqueia repeticao
-3. **`context.action_log`** — historico de acoes por estado para auditoria
-4. **`max_attempts` = 5** em vez de 3
+> **ALERTA OBRIGATÓRIO**: Os arquivos abaixo NÃO podem ser editados sem ordem expressa do usuário. Qualquer plano que preveja alteração neles deve alertar antes de implementar:
+> - `field-maps.ts` — mapeamento declarativo ERP → modelo
+> - `erp-providers/*.ts` — conectores HTTP dos ERPs
+> - `ixc-types.ts` — modelagem ORM dos campos IXC
 
-Nenhuma mudanca estrutural no schema, nenhuma tabela nova, nenhum componente novo. Apenas logica adicional no `state-machine.ts` e campo extra no `context` jsonb.
+## Fluxo por operação
 
+```text
+Camada 1 — Tool Handler (tool-handlers.ts)
+  Valida input (CPF/CNPJ), chama Driver, retorna ToolResult<ToolEnvelope>.
+
+Camada 2 — Driver (erp-driver.ts)
+  Resolve configs ativos, chama Provider, aplica field-maps, retorna ToolEnvelope<ResponseModel>.
+
+Camada 3 — Provider (erp-providers/*.ts)
+  HTTP puro. Retorna any[] cru da API do ERP. Sem mapeamento de campos.
+```
+
+## Estrutura de arquivos
+
+```text
+supabase/functions/_shared/
+├── response-models.ts     — Interfaces do JSON que a IA recebe (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)
+├── field-maps.ts          — Mapeamento declarativo ERP → modelo, por provider (mapCliente, mapContrato, mapFatura, etc.)
+├── erp-driver.ts          — Orquestrador: buscarCliente(), buscarContratos(), buscarFaturas() + funções de monitoramento em massa
+├── tool-handlers.ts       — Valida input + chama driver + retorna ToolResult
+├── tool-catalog.ts        — JSON Schema das ferramentas (function calling OpenAI)
+├── erp-types.ts           — Tipos compartilhados (ErpProvider, ErpClient, ErpCredentials, ErpProviderDriver)
+├── erp-providers/
+│   ├── index.ts           — Registry de providers
+│   ├── ixc.ts             — HTTP puro IXC
+│   ├── ixc-types.ts       — Modelagem ORM 1:1 dos campos IXC
+│   ├── sgp.ts             — HTTP puro SGP
+│   └── mk.ts              — HTTP puro MK-Solutions
+└── onu-signal-analyzer.ts — Classificação de sinal óptico
+```
+
+## Equivalências de campos
+
+### IXC → Tipos internos
+
+| Campo IXC | Campo normalizado | Tipo |
+|---|---|---|
+| `razao` / `fantasia` | `nome` | string |
+| `cnpj_cpf` | `cpf_cnpj` | string |
+| `contrato` / `id_vd_contrato` | `plano` | string |
+| `dia_vencimento` | `dia_vencimento` | string |
+| `status_internet` | → `normalizeInternetStatus()` | InternetStatus |
+| `online` (S/N) | `conectado` | boolean |
+| `sinal_rx` | `signal_db` | number |
+| `endereco`, `numero`, `bairro`, `cidade`, `estado`, `cep`, `complemento` | mesmos nomes | string |
+| `status` (A/etc) | filtro ativo/inativo | - |
+
+### MK → Tipos internos
+
+| Campo MK | Campo normalizado |
+|---|---|
+| `CodigoCliente` | `id` |
+| `NomeRazaoSocial` | `nome` |
+| `CpfCnpj` | `cpf_cnpj` |
+
+### SGP → Tipos internos
+
+| Campo SGP | Campo normalizado |
+|---|---|
+| `id` / `codigo` / `cd_cliente` | `id` |
+| `nome` / `razao_social` / `nm_cliente` | `nome` |
+| `cpf_cnpj` / `cpf` / `cnpj` | `cpf_cnpj` |
+
+## Responsabilidades
+
+- **Provider**: HTTP + filtros HTTP (ex: `status === "A"` pós-fetch). Retorna `any[]`.
+- **Driver**: Orquestra configs ativos, aplica `field-maps` para mapeamento declarativo, normaliza status, sanitiza endereço. Retorna `ToolEnvelope<ResponseModel>`.
+- **Tool Handler**: Validação de input, encapsula resultado do driver em `ToolResult`.
+
+## Response Models (o que a IA recebe)
+
+### ClienteResponse (erp_client_lookup)
+```json
+{ "nome": "João Silva", "cpf_cnpj": "123.456.789-00", "erp": "IXC Soft" }
+```
+
+### ContratoResponse (erp_contract_lookup)
+```json
+{ "ordem": 1, "contrato_id": "123", "endereco": "Rua A", "numero": "100", "complemento": null, "bairro": "Centro", "endereco_completo": "Rua A, nº 100, Centro", "plano": "100MB", "status": "ativo", "dia_vencimento": "10", "erp": "IXC Soft" }
+```
+
+### FaturaResponse (erp_invoice_search)
+```json
+{ "id": "456", "contrato_id": "123", "endereco": "Rua A, nº 100, Centro", "valor": 99.90, "vencimento": "2025-01-10", "dias_atraso": 15, "linha_digitavel": "23793...", "gateway_link": "https://...", "erp": "IXC Soft" }
+```
+
+### Envelope padrão
+```json
+{ "encontrados": 2, "itens": [...], "mensagem": "...", "erros": [] }
+```

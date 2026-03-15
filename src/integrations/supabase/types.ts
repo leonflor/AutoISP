@@ -148,65 +148,6 @@ export type Database = {
           },
         ]
       }
-      ai_agent_flow_steps: {
-        Row: {
-          condition_to_advance: string | null
-          conditional_routes: Json
-          created_at: string
-          expected_input: string | null
-          fallback_instruction: string | null
-          flow_id: string
-          id: string
-          instruction: string
-          is_active: boolean
-          name: string
-          step_order: number
-          tool_auto_execute: boolean
-          tool_handler: string | null
-          updated_at: string
-        }
-        Insert: {
-          condition_to_advance?: string | null
-          conditional_routes?: Json
-          created_at?: string
-          expected_input?: string | null
-          fallback_instruction?: string | null
-          flow_id: string
-          id?: string
-          instruction: string
-          is_active?: boolean
-          name: string
-          step_order?: number
-          tool_auto_execute?: boolean
-          tool_handler?: string | null
-          updated_at?: string
-        }
-        Update: {
-          condition_to_advance?: string | null
-          conditional_routes?: Json
-          created_at?: string
-          expected_input?: string | null
-          fallback_instruction?: string | null
-          flow_id?: string
-          id?: string
-          instruction?: string
-          is_active?: boolean
-          name?: string
-          step_order?: number
-          tool_auto_execute?: boolean
-          tool_handler?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_agent_flow_steps_flow_id_fkey"
-            columns: ["flow_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agent_flows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ai_agent_flows: {
         Row: {
           agent_id: string | null
@@ -636,6 +577,73 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_sessions: {
+        Row: {
+          attempts: number
+          context: Json
+          created_at: string
+          current_state: string
+          flow_id: string | null
+          id: string
+          isp_agent_id: string
+          isp_id: string
+          status: string
+          step: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          context?: Json
+          created_at?: string
+          current_state?: string
+          flow_id?: string | null
+          id?: string
+          isp_agent_id: string
+          isp_id: string
+          status?: string
+          step?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          context?: Json
+          created_at?: string
+          current_state?: string
+          flow_id?: string | null
+          id?: string
+          isp_agent_id?: string
+          isp_id?: string
+          status?: string
+          step?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_sessions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_sessions_isp_agent_id_fkey"
+            columns: ["isp_agent_id"]
+            isOneToOne: false
+            referencedRelation: "isp_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_sessions_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           agent_id: string | null
@@ -872,6 +880,59 @@ export type Database = {
             columns: ["isp_id"]
             isOneToOne: true
             referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_state_definitions: {
+        Row: {
+          allowed_tools: string[]
+          created_at: string
+          fallback_message: string | null
+          flow_id: string
+          id: string
+          is_active: boolean
+          max_attempts: number
+          objective: string
+          state_key: string
+          step_order: number
+          transition_rules: Json
+          updated_at: string
+        }
+        Insert: {
+          allowed_tools?: string[]
+          created_at?: string
+          fallback_message?: string | null
+          flow_id: string
+          id?: string
+          is_active?: boolean
+          max_attempts?: number
+          objective: string
+          state_key: string
+          step_order?: number
+          transition_rules?: Json
+          updated_at?: string
+        }
+        Update: {
+          allowed_tools?: string[]
+          created_at?: string
+          fallback_message?: string | null
+          flow_id?: string
+          id?: string
+          is_active?: boolean
+          max_attempts?: number
+          objective?: string
+          state_key?: string
+          step_order?: number
+          transition_rules?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_state_definitions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_flows"
             referencedColumns: ["id"]
           },
         ]

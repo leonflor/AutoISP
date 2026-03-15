@@ -121,6 +121,8 @@ export function AgentTestDialog({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentState, setCurrentState] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const focusTimeoutRef = useRef<number | null>(null);
@@ -172,6 +174,8 @@ export function AgentTestDialog({
     setMessages([]);
     setTokensUsed(0);
     setInputMessage("");
+    setConversationId(null);
+    setCurrentState(null);
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -181,6 +185,8 @@ export function AgentTestDialog({
       setInputMessage("");
       setTokensUsed(0);
       setSelectedAgentId("");
+      setConversationId(null);
+      setCurrentState(null);
       hasInitializedRef.current = false;
     }
     onOpenChange(newOpen);
@@ -214,6 +220,7 @@ export function AgentTestDialog({
         isp_agent_id: currentAgent.id,
         messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
         stream: true,
+        ...(conversationId ? { conversation_id: conversationId } : {}),
       };
 
       const resp = await fetch(chatUrl, {
@@ -265,6 +272,8 @@ export function AgentTestDialog({
             // Check if this is the sources+usage event
             if (parsed.sources) {
               messageSources = parsed.sources;
+              if (parsed.conversation_id) setConversationId(parsed.conversation_id);
+              if (parsed.state) setCurrentState(parsed.state);
               if (parsed.usage?.total_tokens) {
                 setTokensUsed(prev => prev + parsed.usage.total_tokens);
               }

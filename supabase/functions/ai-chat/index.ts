@@ -1,6 +1,21 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { executeToolHandler, type ToolExecutionContext } from "../_shared/tool-handlers.ts";
 import { TOOL_CATALOG, buildOpenAITools } from "../_shared/tool-catalog.ts";
+import {
+  getOrCreateSession,
+  getCurrentStateDefinition,
+  evaluateTransition,
+  advanceState,
+  completeSession,
+  validateToolCall,
+  incrementAttempts,
+  logAction,
+  recordToolExecution,
+  getAllStatesForFlow,
+  type ConversationSession,
+  type StateDefinition,
+  type SessionContext,
+} from "../_shared/state-machine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +32,7 @@ interface ChatRequest {
   isp_agent_id: string;
   messages: ChatMessage[];
   stream?: boolean;
+  conversation_id?: string;
 }
 
 interface IspAgentWithTemplate {
@@ -89,12 +105,9 @@ async function decrypt(ciphertext: string, iv: string, masterKey: string): Promi
   return new TextDecoder().decode(decrypted);
 }
 
-// Get OpenAI API key from platform config (encrypted)
 async function getOpenAIKey(supabaseAdmin: SupabaseClient): Promise<string> {
   const masterKey = Deno.env.get("ENCRYPTION_KEY");
-  if (!masterKey) {
-    throw new Error("ENCRYPTION_KEY not configured");
-  }
+  if (!masterKey) throw new Error("ENCRYPTION_KEY not configured");
 
   const { data: config, error } = await supabaseAdmin
     .from("platform_config")
@@ -102,79 +115,33 @@ async function getOpenAIKey(supabaseAdmin: SupabaseClient): Promise<string> {
     .eq("key", "integration_openai")
     .single();
 
-  if (error || !config) {
-    console.error("Failed to fetch OpenAI config:", error);
-    throw new Error("OpenAI config not found");
-  }
+  if (error || !config) throw new Error("OpenAI config not found");
 
   const value = config.value as OpenAIConfigValue;
-  
   if (!value?.api_key_encrypted || !value?.encryption_iv) {
     throw new Error("OpenAI not configured. Configure via admin panel.");
   }
 
   try {
     return await decrypt(value.api_key_encrypted, value.encryption_iv, masterKey);
-  } catch (decryptError) {
-    console.error("Failed to decrypt OpenAI key:", decryptError);
+  } catch {
     throw new Error("Failed to decrypt OpenAI key");
   }
 }
 
-// Generate embedding for RAG query using OpenAI API
 async function generateQueryEmbedding(query: string, apiKey: string): Promise<number[]> {
   const response = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: query.slice(0, 2000),
-      dimensions: 768
-    })
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: "text-embedding-3-small", input: query.slice(0, 2000), dimensions: 768 }),
   });
-  
-  if (!response.ok) {
-    console.warn("Failed to generate embedding for RAG");
-    return [];
-  }
-  
+  if (!response.ok) { console.warn("Failed to generate embedding for RAG"); return []; }
   const data = await response.json();
   return data.data[0].embedding;
 }
 
-// Interfaces for flows (tools now come from hardcoded catalog)
-interface ConditionalRouteRecord {
-  condition: string;
-  goto_step: number | null;
-  label: string;
-}
+// ============= SYSTEM PROMPT BUILDER (State Machine version) =============
 
-interface FlowStepRecord {
-  name: string;
-  instruction: string;
-  expected_input: string | null;
-  tool_handler: string | null;
-  tool_auto_execute: boolean;
-  condition_to_advance: string | null;
-  fallback_instruction: string | null;
-  conditional_routes: ConditionalRouteRecord[];
-}
-
-interface AgentFlowRecord {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  trigger_keywords: string[];
-  trigger_prompt: string | null;
-  is_fixed: boolean;
-  steps: FlowStepRecord[];
-}
-
-// Build the final system prompt with all layers
 function buildSystemPrompt(
   template: IspAgentWithTemplate["ai_agents"],
   ispAgent: IspAgentWithTemplate,
@@ -183,8 +150,9 @@ function buildSystemPrompt(
   documentChunks: DocumentChunk[],
   ispName: string,
   hasErp: boolean,
-  agentFlows: AgentFlowRecord[],
-  flowToolHandlers: Set<string>
+  currentState: StateDefinition | null,
+  allStates: StateDefinition[],
+  session: ConversationSession | null,
 ): string {
   const parts: string[] = [];
 
@@ -193,17 +161,16 @@ function buildSystemPrompt(
     parts.push(template.system_prompt);
   }
 
-  // 2. Voice tone injection (if configured by ISP)
+  // 2. Voice tone injection
   if (ispAgent.voice_tone) {
     parts.push(`\nAdote o seguinte tom de voz em suas respostas: ${ispAgent.voice_tone}`);
   }
 
-  // 3. Document chunks context (RAG - higher priority)
+  // 3. Document chunks context (RAG)
   if (documentChunks.length > 0) {
     const chunksSection = documentChunks
       .map((chunk, i) => `[Trecho ${i + 1} - relevância ${(chunk.similarity * 100).toFixed(0)}%]\n${chunk.content}`)
       .join("\n\n");
-    
     parts.push(`\n## Documentos Relevantes\nUse estes trechos de documentos para responder:\n\n${chunksSection}`);
   }
 
@@ -212,147 +179,132 @@ function buildSystemPrompt(
     const kbSection = knowledgeBase
       .map((item) => `P: ${item.question}\nR: ${item.answer}`)
       .join("\n\n");
-    
     parts.push(`\n## Perguntas Frequentes\n${kbSection}`);
   }
 
-  // 5. Security clauses (always injected)
+  // 5. Security clauses
   if (securityClauses.length > 0) {
-    const clausesText = securityClauses
-      .map((c) => `- ${c.content}`)
-      .join("\n");
-    
+    const clausesText = securityClauses.map((c) => `- ${c.content}`).join("\n");
     parts.push(`\n## REGRAS OBRIGATÓRIAS DE SEGURANÇA\nVocê DEVE seguir estas regras em todas as interações:\n${clausesText}`);
   }
 
-  // 5.5 Tools section (only tools referenced by linked flows)
-  const availableTools = Object.values(TOOL_CATALOG).filter(t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasErp));
-  if (availableTools.length > 0) {
-    const toolsList = availableTools
-      .map((t) => `- ${t.handler}: ${t.description}`)
-      .join("\n");
-    parts.push(`\n## Ferramentas Disponíveis\nVocê tem acesso às seguintes funções. Use-as quando necessário:\n${toolsList}`);
+  // 6. State Machine — current state objective & tools
+  if (currentState) {
+    const allowedToolsDefs = currentState.allowed_tools
+      .map(h => TOOL_CATALOG[h])
+      .filter(Boolean)
+      .filter(t => !t.requires_erp || hasErp);
+
+    parts.push(`\n## ESTADO ATUAL: ${currentState.state_key.toUpperCase()}`);
+    parts.push(`Objetivo: ${currentState.objective}`);
+
+    if (currentState.fallback_message) {
+      parts.push(`Se não conseguir cumprir o objetivo, responda: "${currentState.fallback_message}"`);
+    }
+
+    if (allowedToolsDefs.length > 0) {
+      const toolsList = allowedToolsDefs.map(t => `- ${t.handler}: ${t.description}`).join("\n");
+      parts.push(`\nFerramentas disponíveis neste estado:\n${toolsList}`);
+    }
+
+    // Show flow overview (all states) for context
+    if (allStates.length > 1) {
+      const overview = allStates.map((s, i) => {
+        const marker = s.state_key === currentState.state_key ? "→" : " ";
+        return `${marker} ${i + 1}. ${s.state_key}: ${s.objective.slice(0, 80)}`;
+      }).join("\n");
+      parts.push(`\nVisão geral do fluxo (você está no estado marcado com →):\n${overview}`);
+    }
+
+    // Context from session
+    if (session?.context) {
+      const { executed_tools, action_log, ...userContext } = session.context;
+      const contextEntries = Object.entries(userContext).filter(([_, v]) => v !== null && v !== undefined);
+      if (contextEntries.length > 0) {
+        const contextText = contextEntries.map(([k, v]) => `- ${k}: ${JSON.stringify(v)}`).join("\n");
+        parts.push(`\nContexto coletado:\n${contextText}`);
+      }
+    }
+
+    // Behavioral constraints
+    parts.push(`\n## REGRAS DE COMPORTAMENTO`);
+    parts.push(`- Execute APENAS o objetivo do estado atual`);
+    parts.push(`- NÃO invente dados — use apenas informações do contexto e ferramentas`);
+    parts.push(`- NÃO pule estados ou execute ações de outros estados`);
+    parts.push(`- Use APENAS as ferramentas listadas acima (se houver)`);
+  } else if (allStates.length === 0) {
+    // No flow configured — free-form mode with all available tools
+    const availableTools = Object.values(TOOL_CATALOG).filter(t => !t.requires_erp || hasErp);
+    if (availableTools.length > 0) {
+      const toolsList = availableTools.map(t => `- ${t.handler}: ${t.description}`).join("\n");
+      parts.push(`\n## Ferramentas Disponíveis\n${toolsList}`);
+    }
   }
 
-  // 5.6 Flows section
-  if (agentFlows.length > 0) {
-    const flowsSections = agentFlows.map((flow) => {
-      const typeLabel = flow.is_fixed ? "roteiro fixo" : "guia flexível";
-      const triggerLine = flow.trigger_keywords.length > 0
-        ? `Ative quando: ${flow.trigger_keywords.join(", ")}`
-        : flow.trigger_prompt || "";
-      
-      const stepsText = flow.steps.map((step, i) => {
-        let line = `${i + 1}. ${step.name.toUpperCase()}\n   Instrução: ${step.instruction}`;
-        if (step.tool_handler) {
-          const tool = TOOL_CATALOG[step.tool_handler];
-          if (tool) line += `\n   Ferramenta: ${tool.display_name}`;
-        }
-        if (step.expected_input) line += `\n   Input esperado: ${step.expected_input}`;
-        if (step.condition_to_advance) line += `\n   Avance quando: ${step.condition_to_advance}`;
-        if (step.fallback_instruction) line += `\n   Fallback: ${step.fallback_instruction}`;
-        if (step.conditional_routes && step.conditional_routes.length > 0) {
-          const routesLines = step.conditional_routes.map(r => {
-            const dest = r.goto_step ? `Vá para etapa ${r.goto_step} (${r.label})` : `Siga para a próxima etapa`;
-            return `   - Se ${r.condition} → ${dest}`;
-          }).join("\n");
-          line += `\n   Rotas:\n${routesLines}`;
-        }
-        return line;
-      }).join("\n\n");
-
-      const hasConditionalRoutes = flow.steps.some(s => s.conditional_routes && s.conditional_routes.length > 0);
-      const instructions = flow.is_fixed
-        ? hasConditionalRoutes
-          ? "Siga as etapas na ordem. Não pule etapas, exceto quando uma rota condicional indicar explicitamente um salto."
-          : "Siga as etapas na ordem. Não pule etapas."
-        : hasConditionalRoutes
-          ? "Use as etapas como guia, adaptando conforme a conversa. As rotas condicionais são sugestões fortes de navegação."
-          : "Use as etapas como guia, adaptando conforme a conversa.";
-
-      return `### Fluxo: ${flow.name} (${typeLabel})\n${triggerLine}\n${instructions}\n\n${stepsText}`;
-    }).join("\n\n");
-
-    parts.push(`\n## Fluxos Conversacionais\n\n${flowsSections}`);
-  }
-
-  // 6. Context anchoring (prevent cross-tenant data leakage)
-  const contextAnchor = `\n## Contexto Atual\n- Provedor: ${ispName}\n- Data: ${new Date().toLocaleDateString("pt-BR")}\n- Agente: ${ispAgent.display_name || template.name}`;
-  parts.push(contextAnchor);
+  // 7. Context anchoring
+  parts.push(`\n## Contexto Atual\n- Provedor: ${ispName}\n- Data: ${new Date().toLocaleDateString("pt-BR")}\n- Agente: ${ispAgent.display_name || template.name}`);
 
   return parts.join("\n");
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Only accept POST
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
-  // Validate JWT
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized", message: "Token não fornecido" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Unauthorized", message: "Token não fornecido" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
-    // Validate user token
+
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { Authorization: authHeader } },
     });
-    
+
     const token = authHeader.replace("Bearer ", "");
     const { data: claims, error: authError } = await supabaseAuth.auth.getClaims(token);
-    
+
     if (authError || !claims?.claims) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized", message: "Token inválido" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized", message: "Token inválido" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const userId = claims.claims.sub;
 
-    // Parse request body
     const body: ChatRequest = await req.json();
-    
+
     if (!body.isp_id || !body.isp_agent_id || !body.messages?.length) {
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: "Campos obrigatórios: isp_id, isp_agent_id, messages" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Validation error", message: "Campos obrigatórios: isp_id, isp_agent_id, messages" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get OpenAI API key from platform_config (encrypted)
+    // Get OpenAI API key
     let openAIKey: string;
     try {
       openAIKey = await getOpenAIKey(supabaseAdmin);
     } catch (keyError) {
       console.warn("⚠️ OpenAI API key not configured:", keyError);
-      return new Response(
-        JSON.stringify({
-          error: "SERVICE_NOT_CONFIGURED",
-          message: "Integração OpenAI não configurada. Configure a chave da API no painel Admin → Configurações → Integrações.",
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({
+        error: "SERVICE_NOT_CONFIGURED",
+        message: "Integração OpenAI não configurada. Configure a chave da API no painel Admin → Configurações → Integrações.",
+      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Verify user belongs to ISP
@@ -365,76 +317,47 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden", message: "Usuário não pertence a este ISP" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden", message: "Usuário não pertence a este ISP" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Get ISP agent with template data via JOIN
+    // Get ISP agent with template
     const { data: ispAgent, error: agentError } = await supabaseAdmin
       .from("isp_agents")
       .select(`
-        id,
-        isp_id,
-        agent_id,
-        display_name,
-        avatar_url,
-        voice_tone,
-        escalation_config,
-        is_enabled,
-        ai_agents (
-          id,
-          name,
-          slug,
-          system_prompt,
-          model,
-          temperature,
-          max_tokens,
-          is_active,
-          uses_knowledge_base,
-          scope
-        )
+        id, isp_id, agent_id, display_name, avatar_url, voice_tone, escalation_config, is_enabled,
+        ai_agents (id, name, slug, system_prompt, model, temperature, max_tokens, is_active, uses_knowledge_base, scope)
       `)
       .eq("id", body.isp_agent_id)
       .eq("isp_id", body.isp_id)
       .single() as { data: IspAgentWithTemplate | null; error: unknown };
 
     if (agentError || !ispAgent) {
-      return new Response(
-        JSON.stringify({ error: "Not found", message: "Agente de IA não encontrado para este ISP" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Not found", message: "Agente de IA não encontrado para este ISP" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const template = ispAgent.ai_agents;
     const model = template.model || "gpt-4o-mini";
 
-    // Validate agent is enabled and active
     if (!ispAgent.is_enabled) {
-      return new Response(
-        JSON.stringify({ error: "Unavailable", message: "Este agente está desativado pelo ISP" }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unavailable", message: "Este agente está desativado pelo ISP" }), {
+        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
     if (!template.is_active) {
-      return new Response(
-        JSON.stringify({ error: "Unavailable", message: "Este template de agente foi desativado pelo administrador" }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unavailable", message: "Este template de agente foi desativado pelo administrador" }), {
+        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Get ISP name for context anchoring
-    const { data: isp } = await supabaseAdmin
-      .from("isps")
-      .select("name")
-      .eq("id", body.isp_id)
-      .single();
-
+    // ISP name
+    const { data: isp } = await supabaseAdmin.from("isps").select("name").eq("id", body.isp_id).single();
     const ispName = isp?.name || "ISP";
 
-    // Fetch active security clauses (applies to 'all' or 'tenant')
+    // Security clauses
     const { data: securityClauses } = await supabaseAdmin
       .from("ai_security_clauses")
       .select("id, name, content, applies_to")
@@ -442,37 +365,32 @@ Deno.serve(async (req) => {
       .in("applies_to", ["all", "tenant"])
       .order("sort_order");
 
-    // Fetch knowledge base if enabled for this agent
+    // Knowledge base & RAG
     let knowledgeBase: KnowledgeItem[] = [];
     let documentChunks: DocumentChunk[] = [];
-    
+
     if (template.uses_knowledge_base) {
-      // Fetch Q&A knowledge base
       const { data: kbItems } = await supabaseAdmin
         .from("agent_knowledge_base")
         .select("question, answer, category")
         .eq("isp_agent_id", ispAgent.id)
         .eq("is_active", true)
         .order("sort_order");
-      
       knowledgeBase = kbItems || [];
-      
-      // RAG: Search document chunks if available
+
       const lastUserMessage = body.messages.filter(m => m.role === "user").pop();
       if (lastUserMessage) {
         try {
           const queryEmbedding = await generateQueryEmbedding(lastUserMessage.content, openAIKey);
-          
           if (queryEmbedding.length > 0) {
             const { data: chunks } = await supabaseAdmin.rpc("match_document_chunks", {
               query_embedding: `[${queryEmbedding.join(",")}]`,
               match_isp_agent_id: ispAgent.id,
               match_threshold: 0.7,
-              match_count: 5
+              match_count: 5,
             });
-            
-            if (chunks && chunks.length > 0) {
-              documentChunks = chunks.map((c: { content: string; similarity: number; document_title?: string }) => ({
+            if (chunks?.length > 0) {
+              documentChunks = chunks.map((c: any) => ({
                 content: c.content,
                 similarity: c.similarity,
                 document_title: c.document_title || undefined,
@@ -485,7 +403,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check AI usage limits
+    // AI usage limits
     const { data: subscription } = await supabaseAdmin
       .from("subscriptions")
       .select("plan_id")
@@ -511,109 +429,105 @@ Deno.serve(async (req) => {
           .lt("created_at", `${currentMonth}-32`);
 
         const totalTokens = usage?.reduce((sum, u) => sum + (u.tokens_total || 0), 0) || 0;
-
         if (totalTokens >= limits.monthly_limit) {
-          return new Response(
-            JSON.stringify({ 
-              error: "Limit exceeded", 
-              message: `Limite mensal de ${limits.monthly_limit.toLocaleString()} tokens atingido.`,
-              usage: { current: totalTokens, limit: limits.monthly_limit }
-            }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return new Response(JSON.stringify({
+            error: "Limit exceeded",
+            message: `Limite mensal de ${limits.monthly_limit.toLocaleString()} tokens atingido.`,
+            usage: { current: totalTokens, limit: limits.monthly_limit },
+          }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       }
     }
 
-    // ── Load flows via flow_links + tools from hardcoded catalog ──
-    let agentFlows: AgentFlowRecord[] = [];
+    // ── State Machine: get or create session ──
+    let session: ConversationSession | null = null;
+    let currentState: StateDefinition | null = null;
+    let allStates: StateDefinition[] = [];
     let hasActiveErp = false;
 
-    // 1. Get flow links for this agent
-    const { data: flowLinks } = await supabaseAdmin
-      .from("ai_agent_flow_links")
-      .select("flow_id")
-      .eq("agent_id", template.id)
-      .eq("is_active", true);
+    // Check ERP
+    const { data: erpConfig } = await supabaseAdmin
+      .from("erp_configs")
+      .select("id")
+      .eq("isp_id", body.isp_id)
+      .eq("is_active", true)
+      .eq("is_connected", true)
+      .limit(1)
+      .single();
+    hasActiveErp = !!erpConfig;
 
-    const flowIds = (flowLinks || []).map((fl: any) => fl.flow_id);
+    try {
+      session = await getOrCreateSession(
+        supabaseAdmin, body.isp_id, body.isp_agent_id, userId as string, template.id, body.conversation_id,
+      );
 
-    // Check if any tool requires ERP
-    const anyToolRequiresErp = Object.values(TOOL_CATALOG).some(t => t.requires_erp);
-    if (anyToolRequiresErp) {
-      const { data: erpConfig } = await supabaseAdmin
-        .from("erp_configs")
-        .select("id")
-        .eq("isp_id", body.isp_id)
-        .eq("is_active", true)
-        .eq("is_connected", true)
-        .limit(1)
-        .single();
-      hasActiveErp = !!erpConfig;
+      if (session.flow_id) {
+        currentState = await getCurrentStateDefinition(supabaseAdmin, session.flow_id, session.current_state);
+        allStates = await getAllStatesForFlow(supabaseAdmin, session.flow_id);
+      }
+    } catch (sessionError) {
+      console.warn("Session creation failed, proceeding without state machine:", sessionError);
     }
 
-    if (flowIds.length > 0) {
-      const { data: flowsData } = await supabaseAdmin
-        .from("ai_agent_flows")
-        .select("id, name, slug, description, trigger_keywords, trigger_prompt, is_fixed")
-        .in("id", flowIds)
-        .eq("is_active", true)
-        .order("sort_order");
+    // Check max_attempts
+    if (session && currentState && session.attempts >= currentState.max_attempts) {
+      const fallback = currentState.fallback_message || "Desculpe, não consegui avançar. Vou encaminhar para um atendente humano.";
+      await completeSession(supabaseAdmin, session.id, "escalated");
+      return new Response(JSON.stringify({
+        success: true,
+        message: fallback,
+        conversation_id: session.id,
+        state: "escalated",
+        sources: { documents: [], knowledge: [] },
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-      if (flowsData && flowsData.length > 0) {
-        const activeFlowIds = flowsData.map((f: any) => f.id);
-        const { data: stepsData } = await supabaseAdmin
-          .from("ai_agent_flow_steps")
-          .select("flow_id, name, instruction, expected_input, tool_handler, tool_auto_execute, condition_to_advance")
-          .in("flow_id", activeFlowIds)
-          .eq("is_active", true)
-          .order("step_order");
+    // Determine allowed tools for current state
+    let allowedToolHandlers: Set<string>;
+    if (currentState && currentState.allowed_tools.length > 0) {
+      allowedToolHandlers = new Set(currentState.allowed_tools);
+    } else if (allStates.length > 0) {
+      // In a flow but no tools for this state
+      allowedToolHandlers = new Set<string>();
+    } else {
+      // No flow — allow all tools from linked flows (backward compat for agents without states)
+      const { data: flowLinks } = await supabaseAdmin
+        .from("ai_agent_flow_links")
+        .select("flow_id")
+        .eq("agent_id", template.id)
+        .eq("is_active", true);
+      const flowIds = (flowLinks || []).map((fl: any) => fl.flow_id);
 
-        const stepsMap: Record<string, FlowStepRecord[]> = {};
-        for (const s of (stepsData || []) as any[]) {
-          // Skip steps with ERP tools if ISP has no ERP
-          if (s.tool_handler && TOOL_CATALOG[s.tool_handler]?.requires_erp && !hasActiveErp) continue;
-          if (!stepsMap[s.flow_id]) stepsMap[s.flow_id] = [];
-          stepsMap[s.flow_id].push(s);
+      if (flowIds.length > 0) {
+        const { data: statesDefs } = await supabaseAdmin
+          .from("flow_state_definitions")
+          .select("allowed_tools")
+          .in("flow_id", flowIds)
+          .eq("is_active", true);
+        const allTools = new Set<string>();
+        for (const s of statesDefs || []) {
+          for (const t of (s.allowed_tools || [])) allTools.add(t);
         }
-
-        agentFlows = (flowsData as any[]).map((f) => ({
-          ...f,
-          steps: stepsMap[f.id] || [],
-        }));
+        allowedToolHandlers = allTools;
+      } else {
+        allowedToolHandlers = new Set<string>();
       }
     }
 
-    // Collect tool_handlers from active flow steps
-    const flowToolHandlers = new Set<string>();
-    for (const flow of agentFlows) {
-      for (const step of flow.steps) {
-        if (step.tool_handler) flowToolHandlers.add(step.tool_handler);
-      }
-    }
-
-    // Build complete system prompt with all layers (hybrid RAG + tools + flows)
+    // Build system prompt
     const systemPrompt = buildSystemPrompt(
-      template,
-      ispAgent,
-      securityClauses || [],
-      knowledgeBase,
-      documentChunks,
-      ispName,
-      hasActiveErp,
-      agentFlows,
-      flowToolHandlers
+      template, ispAgent, securityClauses || [], knowledgeBase, documentChunks,
+      ispName, hasActiveErp, currentState, allStates, session,
     );
 
-    // Combine system prompt + user messages into the messages array
     const messages: any[] = [
       { role: "system", content: systemPrompt },
       ...body.messages,
     ];
 
-    // Build OpenAI tools filtered by flow handlers
+    // Build OpenAI tools filtered by state's allowed_tools
     const filteredTools = Object.values(TOOL_CATALOG).filter(
-      t => flowToolHandlers.has(t.handler) && (!t.requires_erp || hasActiveErp)
+      t => allowedToolHandlers.has(t.handler) && (!t.requires_erp || hasActiveErp),
     );
     const openaiTools = filteredTools.length > 0
       ? filteredTools.map(t => ({
@@ -622,80 +536,93 @@ Deno.serve(async (req) => {
         }))
       : undefined;
 
-    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${filteredTools.length}/${Object.keys(TOOL_CATALOG).length}, Flows=${agentFlows.length}, FlowHandlers=[${[...flowToolHandlers].join(",")}]`);
-
-    // 🔍 DEBUG: Log system prompt completo (8 camadas)
-    console.log(`📋 SYSTEM PROMPT:\n${systemPrompt}`);
+    console.log(`🤖 AI Chat: ISP=${ispName}, Agent=${template.name}, State=${currentState?.state_key || "free"}, KB=${knowledgeBase.length}, Docs=${documentChunks.length}, Tools=${filteredTools.length}, Session=${session?.id || "none"}`);
 
     // Tool execution context
     const encryptionKey = Deno.env.get("ENCRYPTION_KEY") || "";
-    const toolCtx: ToolExecutionContext = {
-      supabaseAdmin,
-      ispId: body.isp_id,
-      encryptionKey,
-    };
+    const toolCtx: ToolExecutionContext = { supabaseAdmin, ispId: body.isp_id, encryptionKey };
 
     // ── Tool call loop (max 3 iterations) ──
     const MAX_TOOL_ITERATIONS = 3;
     let finalResponse: any = null;
+    let sessionContext = session?.context || {};
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
-      const shouldStream = (body.stream || false) && (iteration === 0 || isLastIteration);
-
-      // 🔍 DEBUG: Log payload completo antes de cada chamada à OpenAI
-      console.log(`📤 OpenAI request (iteration ${iteration}): messages=${messages.length}, tools=${openaiTools?.length || 0}`);
-      console.log(`📤 Messages dump:\n${JSON.stringify(messages, null, 2)}`);
-
       const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openAIKey}`
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openAIKey}` },
         body: JSON.stringify({
-          model,
-          messages,
+          model, messages,
           temperature: template.temperature || 0.7,
           max_tokens: template.max_tokens || 1000,
           ...(openaiTools ? { tools: openaiTools } : {}),
-          // Only stream on the final response (no tool calls expected)
-          stream: false, // We'll handle streaming separately after the loop
-          ...(false ? { stream_options: { include_usage: true } } : {})
-        })
+          stream: false,
+        }),
       });
 
       if (!aiResponse.ok) {
         const errorData = await aiResponse.json();
         console.error("❌ OpenAI API error:", errorData);
-        return new Response(
-          JSON.stringify({ 
-            error: "OpenAI API error", 
-            message: errorData.error?.message || "Erro ao processar requisição de IA"
-          }),
-          { status: aiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({
+          error: "OpenAI API error",
+          message: errorData.error?.message || "Erro ao processar requisição de IA",
+        }), { status: aiResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const aiData = await aiResponse.json();
       const choice = aiData.choices?.[0];
 
-      // Check if the model wants to call tools
-      if (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && !isLastIteration) {
-        // Add assistant message with tool_calls
+      if (choice?.message?.tool_calls?.length > 0 && iteration < MAX_TOOL_ITERATIONS - 1) {
         messages.push(choice.message);
 
-        // Execute each tool call
         for (const toolCall of choice.message.tool_calls) {
           const fnName = toolCall.function.name;
           const fnArgs = JSON.parse(toolCall.function.arguments || "{}");
 
           console.log(`🔧 Tool call: ${fnName}(${JSON.stringify(fnArgs)})`);
 
-          // Tools are now resolved by handler name directly (fnName === handler_type)
-          const result = await executeToolHandler(fnName, toolCtx, fnArgs);
+          // ── Tool Guardrail: validate before execution ──
+          const validation = validateToolCall(
+            fnName,
+            currentState?.allowed_tools || [],
+            (sessionContext as SessionContext).executed_tools || [],
+            hasActiveErp,
+          );
 
-          console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`, JSON.stringify(result));
+          let result;
+          if (!validation.valid) {
+            console.warn(`🚫 Tool blocked: ${validation.reason}`);
+            result = { success: false, error: validation.reason };
+            sessionContext = logAction(sessionContext as SessionContext, "tool_blocked", currentState?.state_key || "free", fnName, validation.reason);
+          } else {
+            result = await executeToolHandler(fnName, toolCtx, fnArgs);
+            console.log(`🔧 Tool result: ${fnName} -> success=${result.success}`);
+
+            // Record execution
+            sessionContext = recordToolExecution(sessionContext as SessionContext, fnName, currentState?.state_key || "free", result.success);
+            sessionContext = logAction(sessionContext as SessionContext, "tool_executed", currentState?.state_key || "free", fnName, result.success ? "success" : "error");
+
+            // Evaluate transition after successful tool call
+            if (result.success && currentState && session) {
+              const nextState = evaluateTransition(currentState.transition_rules, {
+                type: "tool_success",
+                tool_name: fnName,
+              });
+
+              if (nextState) {
+                const targetDef = allStates.find(s => s.state_key === nextState);
+                if (targetDef) {
+                  // Store tool result in context
+                  (sessionContext as any)[`${fnName}_result`] = result.data;
+                  await advanceState(supabaseAdmin, session.id, nextState, targetDef.step_order, sessionContext as SessionContext);
+                  session.current_state = nextState;
+                  session.step = targetDef.step_order;
+                  session.context = sessionContext as SessionContext;
+                  currentState = targetDef;
+                }
+              }
+            }
+          }
 
           messages.push({
             role: "tool",
@@ -704,72 +631,71 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Continue loop to get next response from model
         continue;
       }
 
-      // No tool calls - this is the final response
       finalResponse = aiData;
       break;
     }
 
     if (!finalResponse) {
-      return new Response(
-        JSON.stringify({ error: "Max tool iterations exceeded" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Max tool iterations exceeded" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Increment attempts for current state
+    if (session && currentState) {
+      await incrementAttempts(supabaseAdmin, session.id, session.attempts, sessionContext as SessionContext);
+    }
+
+    // Evaluate user_input transition
+    const lastUserMsg = body.messages.filter(m => m.role === "user").pop();
+    if (lastUserMsg && currentState && session) {
+      const nextState = evaluateTransition(currentState.transition_rules, {
+        type: "user_input",
+        user_message: lastUserMsg.content,
+      });
+      if (nextState) {
+        const targetDef = allStates.find(s => s.state_key === nextState);
+        if (targetDef) {
+          await advanceState(supabaseAdmin, session.id, nextState, targetDef.step_order, sessionContext as SessionContext);
+          session.current_state = nextState;
+        }
+      }
     }
 
     // Build sources payload
     const sources: SourcesPayload = {
-      documents: documentChunks.map(d => ({
-        content: d.content.slice(0, 200),
-        similarity: d.similarity,
-        document_title: d.document_title,
-      })),
-      knowledge: knowledgeBase.map(k => ({
-        question: k.question,
-        category: k.category || undefined,
-      })),
+      documents: documentChunks.map(d => ({ content: d.content.slice(0, 200), similarity: d.similarity, document_title: d.document_title })),
+      knowledge: knowledgeBase.map(k => ({ question: k.question, category: k.category || undefined })),
     };
 
-    // Handle streaming response - re-call OpenAI with stream=true using enriched messages
-    // (tool calls were already resolved in the loop above without streaming)
+    // Handle streaming
     if (body.stream) {
-      // 🔍 DEBUG: Log payload final do streaming
-      console.log(`📤 Final streaming request: messages=${messages.length}`);
-      console.log(`📤 Final messages dump:\n${JSON.stringify(messages, null, 2)}`);
-
       const streamResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openAIKey}`
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openAIKey}` },
         body: JSON.stringify({
-          model,
-          messages,
+          model, messages,
           temperature: template.temperature || 0.7,
           max_tokens: template.max_tokens || 1000,
           stream: true,
-          stream_options: { include_usage: true }
-          // No tools here - tool calls already resolved
-        })
+          stream_options: { include_usage: true },
+        }),
       });
 
       if (!streamResponse.ok) {
         const errorData = await streamResponse.json();
-        console.error("❌ OpenAI streaming error:", errorData);
-        return new Response(
-          JSON.stringify({ error: "OpenAI API error", message: errorData.error?.message || "Erro ao processar streaming" }),
-          { status: streamResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "OpenAI API error", message: errorData.error?.message || "Erro ao processar streaming" }), {
+          status: streamResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const openaiBody = streamResponse.body;
       if (!openaiBody) {
         return new Response(JSON.stringify({ error: "No stream body" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -808,19 +734,24 @@ Deno.serve(async (req) => {
                     promptTokens = parsed.usage.prompt_tokens || 0;
                     completionTokens = parsed.usage.completion_tokens || 0;
                   }
-                } catch { /* partial JSON, just forward */ }
+                } catch { /* partial JSON */ }
 
                 controller.enqueue(encoder.encode(trimmed + "\n\n"));
               }
             }
 
-            // Send sources + usage event before DONE
-            const sourcesEvent = `data: ${JSON.stringify({ sources, usage: { total_tokens: totalTokens, prompt_tokens: promptTokens, completion_tokens: completionTokens } })}\n\n`;
+            // Send sources + usage + state event
+            const sourcesEvent = `data: ${JSON.stringify({
+              sources,
+              usage: { total_tokens: totalTokens, prompt_tokens: promptTokens, completion_tokens: completionTokens },
+              conversation_id: session?.id,
+              state: session?.current_state,
+            })}\n\n`;
             controller.enqueue(encoder.encode(sourcesEvent));
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
 
-            // Log usage async
+            // Log usage
             supabaseAdmin.from("ai_usage").insert({
               isp_id: body.isp_id,
               agent_id: template.id,
@@ -829,40 +760,28 @@ Deno.serve(async (req) => {
               tokens_input: promptTokens,
               tokens_output: completionTokens,
               metadata: {
-                model,
-                isp_agent_id: ispAgent.id,
-                system_prompt: systemPrompt,
-                knowledge_items: knowledgeBase.length,
-                document_chunks: documentChunks.length,
-                security_clauses: securityClauses?.length || 0
-              }
-            }).then(() => {
-              console.log(`✅ Streaming usage logged: ${totalTokens} tokens`);
-            });
+                model, isp_agent_id: ispAgent.id, system_prompt: systemPrompt,
+                knowledge_items: knowledgeBase.length, document_chunks: documentChunks.length,
+                security_clauses: securityClauses?.length || 0,
+                state: session?.current_state, session_id: session?.id,
+              },
+            }).then(() => console.log(`✅ Streaming usage logged: ${totalTokens} tokens`));
           } catch (err) {
             console.error("Stream error:", err);
             controller.error(err);
           }
-        }
+        },
       });
 
       return new Response(stream, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive"
-        }
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
       });
     }
 
-    // Non-streaming response - use finalResponse already parsed in the loop
+    // Non-streaming response
     const assistantMessage = finalResponse.choices?.[0]?.message?.content || "";
     const tokensUsed = finalResponse.usage?.total_tokens || 0;
 
-    console.log(`✅ AI response generated, tokens: ${tokensUsed}`);
-
-    // Log usage
     await supabaseAdmin.from("ai_usage").insert({
       isp_id: body.isp_id,
       agent_id: template.id,
@@ -871,34 +790,28 @@ Deno.serve(async (req) => {
       tokens_input: finalResponse.usage?.prompt_tokens || 0,
       tokens_output: finalResponse.usage?.completion_tokens || 0,
       metadata: {
-        model,
-        isp_agent_id: ispAgent.id,
-        system_prompt: systemPrompt,
-        knowledge_items: knowledgeBase.length,
-        security_clauses: securityClauses?.length || 0
-      }
+        model, isp_agent_id: ispAgent.id, system_prompt: systemPrompt,
+        knowledge_items: knowledgeBase.length, security_clauses: securityClauses?.length || 0,
+        state: session?.current_state, session_id: session?.id,
+      },
     });
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: assistantMessage,
-        sources,
-        usage: {
-          tokens_used: tokensUsed,
-          prompt_tokens: finalResponse.usage?.prompt_tokens || 0,
-          completion_tokens: finalResponse.usage?.completion_tokens || 0
-        }
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({
+      success: true, message: assistantMessage, sources,
+      conversation_id: session?.id,
+      state: session?.current_state,
+      usage: {
+        tokens_used: tokensUsed,
+        prompt_tokens: finalResponse.usage?.prompt_tokens || 0,
+        completion_tokens: finalResponse.usage?.completion_tokens || 0,
+      },
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error: unknown) {
     console.error("❌ Error in AI chat:", error);
     const message = error instanceof Error ? error.message : "Erro desconhecido";
-    return new Response(
-      JSON.stringify({ error: "Internal error", message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal error", message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

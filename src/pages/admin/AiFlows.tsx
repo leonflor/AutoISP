@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useGlobalFlows, useDeleteGlobalFlow, useUpdateGlobalFlow } from '@/hooks/admin/useGlobalFlows';
 import { GlobalFlowForm } from '@/components/admin/ai-agents/GlobalFlowForm';
-import { GlobalFlowStepsEditor } from '@/components/admin/ai-agents/GlobalFlowStepsEditor';
+import { GlobalFlowStateEditor } from '@/components/admin/ai-agents/GlobalFlowStateEditor';
 import type { AgentFlow } from '@/hooks/admin/useAgentFlows';
 
 export default function AiFlows() {
@@ -24,7 +24,7 @@ export default function AiFlows() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Fluxos Conversacionais</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Gerencie roteiros conversacionais reutilizáveis que podem ser vinculados a procedimentos
+            Gerencie estados e transições dos fluxos conversacionais (State Machine)
           </p>
         </div>
         <Button onClick={() => { setEditingFlow(null); setShowForm(true); }}>
@@ -60,9 +60,9 @@ export default function AiFlows() {
                         <Badge variant={flow.is_fixed ? 'default' : 'secondary'} className="text-xs">
                           {flow.is_fixed ? 'Fixo' : 'Flexível'}
                         </Badge>
-                        {flow.steps && (
+                        {flow.states && (
                           <span className="text-xs text-muted-foreground">
-                            {flow.steps.length} etapa{flow.steps.length !== 1 ? 's' : ''}
+                            {flow.states.length} estado{flow.states.length !== 1 ? 's' : ''}
                           </span>
                         )}
                       </button>
@@ -89,7 +89,7 @@ export default function AiFlows() {
                 </CardHeader>
                 <CollapsibleContent>
                   <CardContent className="pt-0 px-4 pb-4 overflow-hidden">
-                    <GlobalFlowStepsEditor flow={flow} />
+                    <GlobalFlowStateEditor flow={flow} />
                   </CardContent>
                 </CollapsibleContent>
               </Card>

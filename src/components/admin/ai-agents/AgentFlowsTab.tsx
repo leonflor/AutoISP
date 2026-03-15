@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAgentFlows, useDeleteAgentFlow, useUpdateAgentFlow, type AgentFlow } from '@/hooks/admin/useAgentFlows';
 import { AgentFlowForm } from './AgentFlowForm';
-import { AgentFlowStepsEditor } from './AgentFlowStepsEditor';
+import { FlowStateEditor } from './FlowStateEditor';
 
 interface AgentFlowsTabProps {
   agentId: string;
@@ -31,7 +31,7 @@ export function AgentFlowsTab({ agentId }: AgentFlowsTabProps) {
         <div>
           <h3 className="text-sm font-medium">Fluxos Conversacionais</h3>
           <p className="text-xs text-muted-foreground">
-            Roteiros que o agente segue durante interações
+            Roteiros que o agente segue durante interações (State Machine)
           </p>
         </div>
         <Button size="sm" onClick={() => { setEditingFlow(null); setShowForm(true); }}>
@@ -71,9 +71,9 @@ export function AgentFlowsTab({ agentId }: AgentFlowsTabProps) {
                         <Badge variant={flow.is_fixed ? 'default' : 'secondary'} className="text-xs">
                           {flow.is_fixed ? 'Fixo' : 'Flexível'}
                         </Badge>
-                        {flow.steps && (
+                        {flow.states && (
                           <span className="text-xs text-muted-foreground">
-                            {flow.steps.length} etapa{flow.steps.length !== 1 ? 's' : ''}
+                            {flow.states.length} estado{flow.states.length !== 1 ? 's' : ''}
                           </span>
                         )}
                       </button>
@@ -119,10 +119,7 @@ export function AgentFlowsTab({ agentId }: AgentFlowsTabProps) {
 
                 <CollapsibleContent>
                   <CardContent className="pt-0 px-4 pb-4">
-                    <AgentFlowStepsEditor
-                      flow={flow}
-                      agentId={agentId}
-                    />
+                    <FlowStateEditor flow={flow} agentId={agentId} />
                   </CardContent>
                 </CollapsibleContent>
               </Card>
