@@ -185,6 +185,8 @@ export function AgentTestDialog({
       setInputMessage("");
       setTokensUsed(0);
       setSelectedAgentId("");
+      setConversationId(null);
+      setCurrentState(null);
       hasInitializedRef.current = false;
     }
     onOpenChange(newOpen);
