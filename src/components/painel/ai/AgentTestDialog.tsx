@@ -272,6 +272,8 @@ export function AgentTestDialog({
             // Check if this is the sources+usage event
             if (parsed.sources) {
               messageSources = parsed.sources;
+              if (parsed.conversation_id) setConversationId(parsed.conversation_id);
+              if (parsed.state) setCurrentState(parsed.state);
               if (parsed.usage?.total_tokens) {
                 setTokensUsed(prev => prev + parsed.usage.total_tokens);
               }
