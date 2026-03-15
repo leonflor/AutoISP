@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { FlowStep, AgentFlow, FlowStepInsert } from './useAgentFlows';
+import type { FlowState, AgentFlow, FlowStateInsert } from './useAgentFlows';
 
 export function useGlobalFlows() {
   return useQuery({
@@ -14,24 +14,24 @@ export function useGlobalFlows() {
       if (error) throw error;
 
       const flowIds = (flows || []).map((f: any) => f.id);
-      let stepsMap: Record<string, FlowStep[]> = {};
+      let statesMap: Record<string, FlowState[]> = {};
 
       if (flowIds.length > 0) {
-        const { data: steps } = await supabase
-          .from('ai_agent_flow_steps' as any)
+        const { data: states } = await supabase
+          .from('flow_state_definitions' as any)
           .select('*')
           .in('flow_id', flowIds)
           .order('step_order');
 
-        for (const step of (steps || []) as unknown as FlowStep[]) {
-          if (!stepsMap[step.flow_id]) stepsMap[step.flow_id] = [];
-          stepsMap[step.flow_id].push(step);
+        for (const state of (states || []) as unknown as FlowState[]) {
+          if (!statesMap[state.flow_id]) statesMap[state.flow_id] = [];
+          statesMap[state.flow_id].push(state);
         }
       }
 
       return ((flows || []) as unknown as AgentFlow[]).map(f => ({
         ...f,
-        steps: stepsMap[f.id] || [],
+        states: statesMap[f.id] || [],
       }));
     },
   });
@@ -76,7 +76,7 @@ export function useUpdateGlobalFlow() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<AgentFlow> & { id: string }) => {
-      const { steps, ...flowData } = data as any;
+      const { states, ...flowData } = data as any;
       const { error } = await supabase
         .from('ai_agent_flows' as any)
         .update(flowData)
@@ -114,22 +114,22 @@ export function useDeleteGlobalFlow() {
   });
 }
 
-export function useSaveGlobalFlowSteps() {
+export function useSaveGlobalFlowStates() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ flowId, steps }: { flowId: string; steps: FlowStepInsert[] }) => {
-      await supabase.from('ai_agent_flow_steps' as any).delete().eq('flow_id', flowId);
-      if (steps.length > 0) {
+    mutationFn: async ({ flowId, states }: { flowId: string; states: FlowStateInsert[] }) => {
+      await supabase.from('flow_state_definitions' as any).delete().eq('flow_id', flowId);
+      if (states.length > 0) {
         const { error } = await supabase
-          .from('ai_agent_flow_steps' as any)
-          .insert(steps.map((s, i) => ({ ...s, flow_id: flowId, step_order: i + 1 })) as any);
+          .from('flow_state_definitions' as any)
+          .insert(states.map((s, i) => ({ ...s, flow_id: flowId, step_order: i + 1 })) as any);
         if (error) throw error;
       }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['global-flows'] });
-      toast({ title: 'Etapas salvas' });
+      toast({ title: 'Estados salvos' });
     },
     onError: (e: Error) => {
       toast({ title: 'Erro', description: e.message, variant: 'destructive' });

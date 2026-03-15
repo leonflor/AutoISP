@@ -2,25 +2,27 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-export interface ConditionalRoute {
-  condition: string;
-  goto_step: number | null;
-  label: string;
+// ── Types ──
+
+export interface TransitionRule {
+  type: 'tool_success' | 'user_input' | 'option_selected' | 'switch_flow' | 'auto';
+  tool_name?: string;
+  pattern?: string;
+  options?: string[];
+  target_flow_slug?: string;
+  goto_state: string;
 }
 
-export interface FlowStep {
+export interface FlowState {
   id: string;
   flow_id: string;
+  state_key: string;
   step_order: number;
-  name: string;
-  instruction: string;
-  expected_input: string | null;
-  tool_id: string | null;
-  tool_handler: string | null;
-  tool_auto_execute: boolean;
-  condition_to_advance: string | null;
-  fallback_instruction: string | null;
-  conditional_routes: ConditionalRoute[];
+  objective: string;
+  allowed_tools: string[];
+  transition_rules: TransitionRule[];
+  fallback_message: string | null;
+  max_attempts: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -39,7 +41,7 @@ export interface AgentFlow {
   sort_order: number;
   created_at: string;
   updated_at: string;
-  steps?: FlowStep[];
+  states?: FlowState[];
 }
 
 export interface AgentFlowInsert {
@@ -54,20 +56,19 @@ export interface AgentFlowInsert {
   sort_order?: number;
 }
 
-export interface FlowStepInsert {
+export interface FlowStateInsert {
   flow_id: string;
+  state_key: string;
   step_order: number;
-  name: string;
-  instruction: string;
-  expected_input?: string;
-  tool_id?: string | null;
-  tool_handler?: string | null;
-  tool_auto_execute?: boolean;
-  condition_to_advance?: string;
-  fallback_instruction?: string;
-  conditional_routes?: ConditionalRoute[];
+  objective: string;
+  allowed_tools?: string[];
+  transition_rules?: TransitionRule[];
+  fallback_message?: string;
+  max_attempts?: number;
   is_active?: boolean;
 }
+
+// ── Hooks ──
 
 export function useAgentFlows(agentId: string | undefined) {
   return useQuery({
@@ -81,26 +82,25 @@ export function useAgentFlows(agentId: string | undefined) {
         .order('sort_order');
       if (error) throw error;
 
-      // Load steps for each flow
       const flowIds = (flows || []).map((f: any) => f.id);
-      let stepsMap: Record<string, FlowStep[]> = {};
+      let statesMap: Record<string, FlowState[]> = {};
 
       if (flowIds.length > 0) {
-        const { data: steps } = await supabase
-          .from('ai_agent_flow_steps' as any)
+        const { data: states } = await supabase
+          .from('flow_state_definitions' as any)
           .select('*')
           .in('flow_id', flowIds)
           .order('step_order');
 
-        for (const step of (steps || []) as unknown as FlowStep[]) {
-          if (!stepsMap[step.flow_id]) stepsMap[step.flow_id] = [];
-          stepsMap[step.flow_id].push(step);
+        for (const state of (states || []) as unknown as FlowState[]) {
+          if (!statesMap[state.flow_id]) statesMap[state.flow_id] = [];
+          statesMap[state.flow_id].push(state);
         }
       }
 
       return ((flows || []) as unknown as AgentFlow[]).map(f => ({
         ...f,
-        steps: stepsMap[f.id] || [],
+        states: statesMap[f.id] || [],
       }));
     },
     enabled: !!agentId,
@@ -137,7 +137,7 @@ export function useUpdateAgentFlow() {
 
   return useMutation({
     mutationFn: async ({ id, agent_id, ...data }: Partial<AgentFlow> & { id: string; agent_id: string }) => {
-      const { steps, ...flowData } = data as any;
+      const { states, ...flowData } = data as any;
       const { error } = await supabase
         .from('ai_agent_flows' as any)
         .update(flowData)
@@ -176,30 +176,30 @@ export function useDeleteAgentFlow() {
   });
 }
 
-// ── Flow Steps ──
+// ── Flow States ──
 
-export function useSaveFlowSteps() {
+export function useSaveFlowStates() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ flowId, agentId, steps }: { flowId: string; agentId: string; steps: FlowStepInsert[] }) => {
-      // Delete existing steps, then insert new ones
-      await supabase.from('ai_agent_flow_steps' as any).delete().eq('flow_id', flowId);
+    mutationFn: async ({ flowId, agentId, states }: { flowId: string; agentId: string; states: FlowStateInsert[] }) => {
+      // Delete existing states, then insert new ones
+      await supabase.from('flow_state_definitions' as any).delete().eq('flow_id', flowId);
 
-      if (steps.length > 0) {
+      if (states.length > 0) {
         const { error } = await supabase
-          .from('ai_agent_flow_steps' as any)
-          .insert(steps.map((s, i) => ({ ...s, flow_id: flowId, step_order: i + 1 })) as any);
+          .from('flow_state_definitions' as any)
+          .insert(states.map((s, i) => ({ ...s, flow_id: flowId, step_order: i + 1 })) as any);
         if (error) throw error;
       }
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['agent-flows', vars.agentId] });
-      toast({ title: 'Etapas salvas' });
+      toast({ title: 'Estados salvos' });
     },
     onError: (e: Error) => {
-      toast({ title: 'Erro ao salvar etapas', description: e.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar estados', description: e.message, variant: 'destructive' });
     },
   });
 }
