@@ -216,6 +216,7 @@ export function AgentTestDialog({
         isp_agent_id: currentAgent.id,
         messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
         stream: true,
+        ...(conversationId ? { conversation_id: conversationId } : {}),
       };
 
       const resp = await fetch(chatUrl, {
