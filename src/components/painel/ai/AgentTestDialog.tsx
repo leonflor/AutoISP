@@ -121,6 +121,8 @@ export function AgentTestDialog({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentState, setCurrentState] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const focusTimeoutRef = useRef<number | null>(null);
