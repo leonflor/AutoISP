@@ -174,6 +174,8 @@ export function AgentTestDialog({
     setMessages([]);
     setTokensUsed(0);
     setInputMessage("");
+    setConversationId(null);
+    setCurrentState(null);
   };
 
   const handleOpenChange = (newOpen: boolean) => {
