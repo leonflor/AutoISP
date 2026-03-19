@@ -75,20 +75,7 @@ const AdminReportsPage = () => {
     },
   });
 
-  // Fetch AI usage
-  const { data: aiUsageData, isLoading: aiLoading } = useQuery({
-    queryKey: ["admin-ai-usage"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ai_usage")
-        .select("tokens_total, cost_usd, created_at");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const isLoading = ispsLoading || subsLoading || invoicesLoading || aiLoading;
+  const isLoading = ispsLoading || subsLoading || invoicesLoading;
 
   // Calculate metrics
   const totalRevenue = invoicesData?.reduce((acc, inv) => acc + Number(inv.amount), 0) || 0;
