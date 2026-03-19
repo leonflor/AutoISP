@@ -37,8 +37,6 @@ const PainelCommunication = lazy(() => import("./pages/painel/Communication"));
 const PainelUsers = lazy(() => import("./pages/painel/Users"));
 const PainelReports = lazy(() => import("./pages/painel/Reports"));
 const PainelSettings = lazy(() => import("./pages/painel/Settings"));
-const PainelAiAgents = lazy(() => import("./pages/painel/AiAgents"));
-const PainelAgentKnowledge = lazy(() => import("./pages/painel/AiAgentKnowledge"));
 const PainelInvoices = lazy(() => import("./pages/painel/Invoices"));
 const PainelWhatsApp = lazy(() => import("./pages/painel/WhatsAppConfig"));
 const PainelErpIntegrations = lazy(() => import("./pages/painel/ErpIntegrations"));
@@ -47,11 +45,6 @@ const PainelErpIntegrations = lazy(() => import("./pages/painel/ErpIntegrations"
 const AdminSupport = lazy(() => import("./pages/admin/Support"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
-const AiAgentsPage = lazy(() => import("./pages/admin/AiAgents"));
-const AiAgentDetail = lazy(() => import("./pages/admin/AiAgentDetail"));
-const AiSecurityPage = lazy(() => import("./pages/admin/AiSecurity"));
-const AiProcessingLogsPage = lazy(() => import("./pages/admin/AiProcessingLogs"));
-const AiFlowsPage = lazy(() => import("./pages/admin/AiFlows"));
 const AiToolCatalogPage = lazy(() => import("./pages/admin/AiToolCatalog"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
@@ -100,13 +93,7 @@ const App = () => (
                 <Route path="suporte" element={<AdminSupport />} />
                 <Route path="tickets" element={<SupportTickets />} />
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
-                <Route path="ai-agents" element={<AiAgentsPage />} />
-                <Route path="ai-agents/novo" element={<AiAgentDetail />} />
-                <Route path="ai-agents/:id" element={<AiAgentDetail />} />
                 <Route path="ai-tools" element={<AiToolCatalogPage />} />
-                <Route path="ai-flows" element={<AiFlowsPage />} />
-                <Route path="ai-logs" element={<AiProcessingLogsPage />} />
-                <Route path="ai-security" element={<AiSecurityPage />} />
                 <Route path="whatsapp" element={<AdminWhatsApp />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
@@ -120,8 +107,6 @@ const App = () => (
                 <Route path="whatsapp" element={<PainelWhatsApp />} />
                 <Route path="comunicacao" element={<PainelCommunication />} />
                 <Route path="usuarios" element={<PainelUsers />} />
-                <Route path="agentes" element={<PainelAiAgents />} />
-                <Route path="agentes/:agentId/conhecimento" element={<PainelAgentKnowledge />} />
                 <Route path="faturas" element={<PainelInvoices />} />
                 <Route path="relatorios" element={<PainelReports />} />
                 <Route path="configuracoes" element={<PainelSettings />} />

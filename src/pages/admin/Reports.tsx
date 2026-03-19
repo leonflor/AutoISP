@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, TrendingUp, TrendingDown, Users, DollarSign, Bot, Calendar } from "lucide-react";
+import { BarChart3, TrendingUp, TrendingDown, Users, DollarSign, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,27 +75,12 @@ const AdminReportsPage = () => {
     },
   });
 
-  // Fetch AI usage
-  const { data: aiUsageData, isLoading: aiLoading } = useQuery({
-    queryKey: ["admin-ai-usage"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ai_usage")
-        .select("tokens_total, cost_usd, created_at");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const isLoading = ispsLoading || subsLoading || invoicesLoading || aiLoading;
+  const isLoading = ispsLoading || subsLoading || invoicesLoading;
 
   // Calculate metrics
   const totalRevenue = invoicesData?.reduce((acc, inv) => acc + Number(inv.amount), 0) || 0;
   const activeSubscriptions = subscriptionsData?.filter((s) => s.status === "ativa").length || 0;
   const trialSubscriptions = subscriptionsData?.filter((s) => s.status === "trial").length || 0;
-  const totalTokens = aiUsageData?.reduce((acc, u) => acc + (u.tokens_total || 0), 0) || 0;
-  const totalAiCost = aiUsageData?.reduce((acc, u) => acc + Number(u.cost_usd || 0), 0) || 0;
 
   // Generate monthly revenue data for chart
   const generateMonthlyData = () => {
@@ -114,17 +99,9 @@ const AdminReportsPage = () => {
         })
         .reduce((acc, inv) => acc + Number(inv.amount), 0) || 0;
 
-      const monthTokens = aiUsageData
-        ?.filter((u) => {
-          const createdDate = u.created_at ? new Date(u.created_at) : null;
-          return createdDate && createdDate >= start && createdDate <= end;
-        })
-        .reduce((acc, u) => acc + (u.tokens_total || 0), 0) || 0;
-
       data.push({
         month: format(date, "MMM", { locale: ptBR }),
         revenue: monthRevenue,
-        tokens: monthTokens,
       });
     }
 
@@ -220,20 +197,6 @@ const AdminReportsPage = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription>Tokens IA Usados</CardDescription>
-            <Bot className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(totalTokens / 1000000).toFixed(2)}M
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Custo: ${totalAiCost.toFixed(2)} USD
-            </p>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

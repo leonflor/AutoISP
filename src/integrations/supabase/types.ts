@@ -62,373 +62,6 @@ export type Database = {
         }
         Relationships: []
       }
-      agent_knowledge_base: {
-        Row: {
-          answer: string
-          category: string | null
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          isp_agent_id: string
-          question: string
-          sort_order: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          answer: string
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          isp_agent_id: string
-          question: string
-          sort_order?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          answer?: string
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          isp_agent_id?: string
-          question?: string
-          sort_order?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_knowledge_base_isp_agent_id_fkey"
-            columns: ["isp_agent_id"]
-            isOneToOne: false
-            referencedRelation: "isp_agents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ai_agent_flow_links: {
-        Row: {
-          agent_id: string
-          created_at: string
-          flow_id: string
-          id: string
-          is_active: boolean
-          sort_order: number
-        }
-        Insert: {
-          agent_id: string
-          created_at?: string
-          flow_id: string
-          id?: string
-          is_active?: boolean
-          sort_order?: number
-        }
-        Update: {
-          agent_id?: string
-          created_at?: string
-          flow_id?: string
-          id?: string
-          is_active?: boolean
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_agent_flow_links_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_flow_links_flow_id_fkey"
-            columns: ["flow_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agent_flows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ai_agent_flows: {
-        Row: {
-          agent_id: string | null
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean
-          is_fixed: boolean
-          name: string
-          slug: string
-          sort_order: number
-          trigger_keywords: string[] | null
-          trigger_prompt: string | null
-          updated_at: string
-        }
-        Insert: {
-          agent_id?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_fixed?: boolean
-          name: string
-          slug: string
-          sort_order?: number
-          trigger_keywords?: string[] | null
-          trigger_prompt?: string | null
-          updated_at?: string
-        }
-        Update: {
-          agent_id?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_fixed?: boolean
-          name?: string
-          slug?: string
-          sort_order?: number
-          trigger_keywords?: string[] | null
-          trigger_prompt?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_agent_flows_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ai_agents: {
-        Row: {
-          allowed_data_access: Json | null
-          avatar_url: string | null
-          created_at: string | null
-          description: string | null
-          escalation_options: Json | null
-          feature_custom: Json | null
-          feature_tags: Json | null
-          features: Json | null
-          id: string
-          is_active: boolean | null
-          max_tokens: number | null
-          model: string | null
-          name: string
-          scope: Database["public"]["Enums"]["ai_agent_scope"] | null
-          slug: string
-          sort_order: number | null
-          system_prompt: string | null
-          temperature: number | null
-          type: Database["public"]["Enums"]["tipo_agente"]
-          updated_at: string | null
-          uses_knowledge_base: boolean | null
-          voice_tones: Json | null
-        }
-        Insert: {
-          allowed_data_access?: Json | null
-          avatar_url?: string | null
-          created_at?: string | null
-          description?: string | null
-          escalation_options?: Json | null
-          feature_custom?: Json | null
-          feature_tags?: Json | null
-          features?: Json | null
-          id?: string
-          is_active?: boolean | null
-          max_tokens?: number | null
-          model?: string | null
-          name: string
-          scope?: Database["public"]["Enums"]["ai_agent_scope"] | null
-          slug: string
-          sort_order?: number | null
-          system_prompt?: string | null
-          temperature?: number | null
-          type: Database["public"]["Enums"]["tipo_agente"]
-          updated_at?: string | null
-          uses_knowledge_base?: boolean | null
-          voice_tones?: Json | null
-        }
-        Update: {
-          allowed_data_access?: Json | null
-          avatar_url?: string | null
-          created_at?: string | null
-          description?: string | null
-          escalation_options?: Json | null
-          feature_custom?: Json | null
-          feature_tags?: Json | null
-          features?: Json | null
-          id?: string
-          is_active?: boolean | null
-          max_tokens?: number | null
-          model?: string | null
-          name?: string
-          scope?: Database["public"]["Enums"]["ai_agent_scope"] | null
-          slug?: string
-          sort_order?: number | null
-          system_prompt?: string | null
-          temperature?: number | null
-          type?: Database["public"]["Enums"]["tipo_agente"]
-          updated_at?: string | null
-          uses_knowledge_base?: boolean | null
-          voice_tones?: Json | null
-        }
-        Relationships: []
-      }
-      ai_limits: {
-        Row: {
-          agent_id: string
-          created_at: string | null
-          daily_limit: number | null
-          id: string
-          is_enabled: boolean | null
-          max_agents_active: number | null
-          max_documents_per_agent: number | null
-          monthly_limit: number | null
-          plan_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          agent_id: string
-          created_at?: string | null
-          daily_limit?: number | null
-          id?: string
-          is_enabled?: boolean | null
-          max_agents_active?: number | null
-          max_documents_per_agent?: number | null
-          monthly_limit?: number | null
-          plan_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          agent_id?: string
-          created_at?: string | null
-          daily_limit?: number | null
-          id?: string
-          is_enabled?: boolean | null
-          max_agents_active?: number | null
-          max_documents_per_agent?: number | null
-          monthly_limit?: number | null
-          plan_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_limits_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_limits_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ai_security_clauses: {
-        Row: {
-          applies_to:
-            | Database["public"]["Enums"]["security_clause_applies"]
-            | null
-          content: string
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          sort_order: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          applies_to?:
-            | Database["public"]["Enums"]["security_clause_applies"]
-            | null
-          content: string
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          sort_order?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          applies_to?:
-            | Database["public"]["Enums"]["security_clause_applies"]
-            | null
-          content?: string
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          sort_order?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      ai_usage: {
-        Row: {
-          agent_id: string
-          cost_usd: number | null
-          created_at: string | null
-          duration_ms: number | null
-          id: string
-          isp_id: string
-          metadata: Json | null
-          request_type: string | null
-          tokens_input: number | null
-          tokens_output: number | null
-          tokens_total: number | null
-          user_id: string
-        }
-        Insert: {
-          agent_id: string
-          cost_usd?: number | null
-          created_at?: string | null
-          duration_ms?: number | null
-          id?: string
-          isp_id: string
-          metadata?: Json | null
-          request_type?: string | null
-          tokens_input?: number | null
-          tokens_output?: number | null
-          tokens_total?: number | null
-          user_id: string
-        }
-        Update: {
-          agent_id?: string
-          cost_usd?: number | null
-          created_at?: string | null
-          duration_ms?: number | null
-          id?: string
-          isp_id?: string
-          metadata?: Json | null
-          request_type?: string | null
-          tokens_input?: number | null
-          tokens_output?: number | null
-          tokens_total?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_usage_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_usage_isp_id_fkey"
-            columns: ["isp_id"]
-            isOneToOne: false
-            referencedRelation: "isps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       audit_logs: {
         Row: {
           action: string
@@ -577,73 +210,6 @@ export type Database = {
         }
         Relationships: []
       }
-      conversation_sessions: {
-        Row: {
-          attempts: number
-          context: Json
-          created_at: string
-          current_state: string
-          flow_id: string | null
-          id: string
-          isp_agent_id: string
-          isp_id: string
-          status: string
-          step: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          attempts?: number
-          context?: Json
-          created_at?: string
-          current_state?: string
-          flow_id?: string | null
-          id?: string
-          isp_agent_id: string
-          isp_id: string
-          status?: string
-          step?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          attempts?: number
-          context?: Json
-          created_at?: string
-          current_state?: string
-          flow_id?: string | null
-          id?: string
-          isp_agent_id?: string
-          isp_id?: string
-          status?: string
-          step?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_sessions_flow_id_fkey"
-            columns: ["flow_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agent_flows"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_sessions_isp_agent_id_fkey"
-            columns: ["isp_agent_id"]
-            isOneToOne: false
-            referencedRelation: "isp_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_sessions_isp_id_fkey"
-            columns: ["isp_id"]
-            isOneToOne: false
-            referencedRelation: "isps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       conversations: {
         Row: {
           agent_id: string | null
@@ -689,13 +255,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agents"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "conversations_isp_id_fkey"
             columns: ["isp_id"]
             isOneToOne: false
@@ -707,108 +266,6 @@ export type Database = {
             columns: ["subscriber_id"]
             isOneToOne: false
             referencedRelation: "subscribers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      document_chunks: {
-        Row: {
-          chunk_index: number
-          content: string
-          created_at: string | null
-          document_id: string
-          embedding: string | null
-          id: string
-          isp_agent_id: string
-          isp_id: string
-          metadata: Json | null
-        }
-        Insert: {
-          chunk_index: number
-          content: string
-          created_at?: string | null
-          document_id: string
-          embedding?: string | null
-          id?: string
-          isp_agent_id: string
-          isp_id: string
-          metadata?: Json | null
-        }
-        Update: {
-          chunk_index?: number
-          content?: string
-          created_at?: string | null
-          document_id?: string
-          embedding?: string | null
-          id?: string
-          isp_agent_id?: string
-          isp_id?: string
-          metadata?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_chunks_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "knowledge_documents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      document_processing_logs: {
-        Row: {
-          created_at: string | null
-          document_id: string | null
-          error_code: string
-          error_details: Json | null
-          error_message: string
-          id: string
-          isp_agent_id: string | null
-          isp_id: string
-          processing_step: string
-        }
-        Insert: {
-          created_at?: string | null
-          document_id?: string | null
-          error_code: string
-          error_details?: Json | null
-          error_message: string
-          id?: string
-          isp_agent_id?: string | null
-          isp_id: string
-          processing_step: string
-        }
-        Update: {
-          created_at?: string | null
-          document_id?: string | null
-          error_code?: string
-          error_details?: Json | null
-          error_message?: string
-          id?: string
-          isp_agent_id?: string | null
-          isp_id?: string
-          processing_step?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_processing_logs_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "knowledge_documents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "document_processing_logs_isp_agent_id_fkey"
-            columns: ["isp_agent_id"]
-            isOneToOne: false
-            referencedRelation: "isp_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "document_processing_logs_isp_id_fkey"
-            columns: ["isp_id"]
-            isOneToOne: false
-            referencedRelation: "isps"
             referencedColumns: ["id"]
           },
         ]
@@ -880,59 +337,6 @@ export type Database = {
             columns: ["isp_id"]
             isOneToOne: true
             referencedRelation: "isps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      flow_state_definitions: {
-        Row: {
-          allowed_tools: string[]
-          created_at: string
-          fallback_message: string | null
-          flow_id: string
-          id: string
-          is_active: boolean
-          max_attempts: number
-          objective: string
-          state_key: string
-          step_order: number
-          transition_rules: Json
-          updated_at: string
-        }
-        Insert: {
-          allowed_tools?: string[]
-          created_at?: string
-          fallback_message?: string | null
-          flow_id: string
-          id?: string
-          is_active?: boolean
-          max_attempts?: number
-          objective: string
-          state_key: string
-          step_order?: number
-          transition_rules?: Json
-          updated_at?: string
-        }
-        Update: {
-          allowed_tools?: string[]
-          created_at?: string
-          fallback_message?: string | null
-          flow_id?: string
-          id?: string
-          is_active?: boolean
-          max_attempts?: number
-          objective?: string
-          state_key?: string
-          step_order?: number
-          transition_rules?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "flow_state_definitions_flow_id_fkey"
-            columns: ["flow_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agent_flows"
             referencedColumns: ["id"]
           },
         ]
@@ -1171,66 +575,6 @@ export type Database = {
           },
         ]
       }
-      isp_agents: {
-        Row: {
-          additional_prompt: string | null
-          agent_id: string
-          avatar_url: string | null
-          chunk_size: number | null
-          created_at: string | null
-          display_name: string | null
-          escalation_config: Json | null
-          id: string
-          is_enabled: boolean | null
-          isp_id: string
-          updated_at: string | null
-          voice_tone: string | null
-        }
-        Insert: {
-          additional_prompt?: string | null
-          agent_id: string
-          avatar_url?: string | null
-          chunk_size?: number | null
-          created_at?: string | null
-          display_name?: string | null
-          escalation_config?: Json | null
-          id?: string
-          is_enabled?: boolean | null
-          isp_id: string
-          updated_at?: string | null
-          voice_tone?: string | null
-        }
-        Update: {
-          additional_prompt?: string | null
-          agent_id?: string
-          avatar_url?: string | null
-          chunk_size?: number | null
-          created_at?: string | null
-          display_name?: string | null
-          escalation_config?: Json | null
-          id?: string
-          is_enabled?: boolean | null
-          isp_id?: string
-          updated_at?: string | null
-          voice_tone?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "isp_agents_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "ai_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "isp_agents_isp_id_fkey"
-            columns: ["isp_id"]
-            isOneToOne: false
-            referencedRelation: "isps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       isp_users: {
         Row: {
           created_at: string | null
@@ -1316,72 +660,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      knowledge_documents: {
-        Row: {
-          chunk_count: number | null
-          created_at: string | null
-          error_message: string | null
-          id: string
-          indexed_at: string | null
-          isp_agent_id: string
-          isp_id: string
-          mime_type: string
-          name: string
-          original_filename: string
-          size_bytes: number
-          status: string | null
-          storage_path: string
-          updated_at: string | null
-        }
-        Insert: {
-          chunk_count?: number | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          indexed_at?: string | null
-          isp_agent_id: string
-          isp_id: string
-          mime_type: string
-          name: string
-          original_filename: string
-          size_bytes: number
-          status?: string | null
-          storage_path: string
-          updated_at?: string | null
-        }
-        Update: {
-          chunk_count?: number | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          indexed_at?: string | null
-          isp_agent_id?: string
-          isp_id?: string
-          mime_type?: string
-          name?: string
-          original_filename?: string
-          size_bytes?: number
-          status?: string | null
-          storage_path?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "knowledge_documents_isp_agent_id_fkey"
-            columns: ["isp_agent_id"]
-            isOneToOne: false
-            referencedRelation: "isp_agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "knowledge_documents_isp_id_fkey"
-            columns: ["isp_id"]
-            isOneToOne: false
-            referencedRelation: "isps"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       leads: {
         Row: {
@@ -2155,25 +1433,10 @@ export type Database = {
         Args: { _isp_id: string; _user_id: string }
         Returns: boolean
       }
-      match_document_chunks: {
-        Args: {
-          match_count?: number
-          match_isp_agent_id: string
-          match_threshold?: number
-          query_embedding: string
-        }
-        Returns: {
-          content: string
-          id: string
-          similarity: number
-        }[]
-      }
     }
     Enums: {
-      ai_agent_scope: "tenant" | "platform"
       app_role: "super_admin" | "admin" | "support"
       isp_member_role: "owner" | "admin" | "operator" | "viewer"
-      security_clause_applies: "all" | "tenant" | "platform"
       status_assinatura:
         | "trial"
         | "ativa"
@@ -2182,12 +1445,6 @@ export type Database = {
         | "expirada"
       status_cliente: "ativo" | "suspenso" | "cancelado" | "pendente"
       status_fatura: "pendente" | "pago" | "vencido" | "cancelado"
-      tipo_agente:
-        | "atendente"
-        | "cobrador"
-        | "vendedor"
-        | "analista"
-        | "suporte"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2315,10 +1572,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      ai_agent_scope: ["tenant", "platform"],
       app_role: ["super_admin", "admin", "support"],
       isp_member_role: ["owner", "admin", "operator", "viewer"],
-      security_clause_applies: ["all", "tenant", "platform"],
       status_assinatura: [
         "trial",
         "ativa",
@@ -2328,7 +1583,6 @@ export const Constants = {
       ],
       status_cliente: ["ativo", "suspenso", "cancelado", "pendente"],
       status_fatura: ["pendente", "pago", "vencido", "cancelado"],
-      tipo_agente: ["atendente", "cobrador", "vendedor", "analista", "suporte"],
     },
   },
 } as const
