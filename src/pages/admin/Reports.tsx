@@ -99,17 +99,9 @@ const AdminReportsPage = () => {
         })
         .reduce((acc, inv) => acc + Number(inv.amount), 0) || 0;
 
-      const monthTokens = aiUsageData
-        ?.filter((u) => {
-          const createdDate = u.created_at ? new Date(u.created_at) : null;
-          return createdDate && createdDate >= start && createdDate <= end;
-        })
-        .reduce((acc, u) => acc + (u.tokens_total || 0), 0) || 0;
-
       data.push({
         month: format(date, "MMM", { locale: ptBR }),
         revenue: monthRevenue,
-        tokens: monthTokens,
       });
     }
 
