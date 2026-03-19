@@ -81,8 +81,6 @@ const AdminReportsPage = () => {
   const totalRevenue = invoicesData?.reduce((acc, inv) => acc + Number(inv.amount), 0) || 0;
   const activeSubscriptions = subscriptionsData?.filter((s) => s.status === "ativa").length || 0;
   const trialSubscriptions = subscriptionsData?.filter((s) => s.status === "trial").length || 0;
-  const totalTokens = aiUsageData?.reduce((acc, u) => acc + (u.tokens_total || 0), 0) || 0;
-  const totalAiCost = aiUsageData?.reduce((acc, u) => acc + Number(u.cost_usd || 0), 0) || 0;
 
   // Generate monthly revenue data for chart
   const generateMonthlyData = () => {
