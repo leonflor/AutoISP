@@ -8,7 +8,6 @@ import {
   Wifi,
   Send,
   UserCog,
-  Bot,
   Receipt
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
