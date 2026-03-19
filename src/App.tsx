@@ -93,13 +93,7 @@ const App = () => (
                 <Route path="suporte" element={<AdminSupport />} />
                 <Route path="tickets" element={<SupportTickets />} />
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
-                <Route path="ai-agents" element={<AiAgentsPage />} />
-                <Route path="ai-agents/novo" element={<AiAgentDetail />} />
-                <Route path="ai-agents/:id" element={<AiAgentDetail />} />
                 <Route path="ai-tools" element={<AiToolCatalogPage />} />
-                <Route path="ai-flows" element={<AiFlowsPage />} />
-                <Route path="ai-logs" element={<AiProcessingLogsPage />} />
-                <Route path="ai-security" element={<AiSecurityPage />} />
                 <Route path="whatsapp" element={<AdminWhatsApp />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
