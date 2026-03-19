@@ -33,8 +33,6 @@ const menuItems = [
   { title: 'Dashboard', url: '/painel', icon: LayoutDashboard },
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
-  
-  { title: 'Agentes IA', url: '/painel/agentes', icon: Bot },
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
   { title: 'Faturas', url: '/painel/faturas', icon: Receipt },

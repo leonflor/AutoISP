@@ -50,17 +50,7 @@ const menuItems: MenuItem[] = [
       { title: 'Conversas', url: '/admin/suporte', icon: MessageSquare },
     ]
   },
-  { 
-    title: 'IA', 
-    icon: Bot,
-    submenu: [
-      { title: 'Templates de Agentes', url: '/admin/ai-agents', icon: Bot },
-      { title: 'Ferramentas', url: '/admin/ai-tools', icon: Wrench },
-      { title: 'Fluxos', url: '/admin/ai-flows', icon: GitBranch },
-      { title: 'Logs de Processamento', url: '/admin/ai-logs', icon: FileWarning },
-      { title: 'Cláusulas LGPD', url: '/admin/ai-security', icon: Shield },
-    ]
-  },
+  { title: 'Ferramentas IA', url: '/admin/ai-tools', icon: Wrench },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
 ];

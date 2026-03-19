@@ -107,8 +107,6 @@ const App = () => (
                 <Route path="whatsapp" element={<PainelWhatsApp />} />
                 <Route path="comunicacao" element={<PainelCommunication />} />
                 <Route path="usuarios" element={<PainelUsers />} />
-                <Route path="agentes" element={<PainelAiAgents />} />
-                <Route path="agentes/:agentId/conhecimento" element={<PainelAgentKnowledge />} />
                 <Route path="faturas" element={<PainelInvoices />} />
                 <Route path="relatorios" element={<PainelReports />} />
                 <Route path="configuracoes" element={<PainelSettings />} />
