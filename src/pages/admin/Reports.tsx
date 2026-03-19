@@ -197,20 +197,6 @@ const AdminReportsPage = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription>Tokens IA Usados</CardDescription>
-            <Bot className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(totalTokens / 1000000).toFixed(2)}M
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Custo: ${totalAiCost.toFixed(2)} USD
-            </p>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

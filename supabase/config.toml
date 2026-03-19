@@ -12,12 +12,6 @@ verify_jwt = false
 [functions.save-integration]
 verify_jwt = false
 
-[functions.process-document]
-verify_jwt = false
-
-[functions.ai-chat]
-verify_jwt = false
-
 [functions.fetch-erp-clients]
 verify_jwt = false
 
