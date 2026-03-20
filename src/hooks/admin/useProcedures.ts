@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert, Json } from '@/integrations/supabase/types';
 import { toast } from '@/hooks/use-toast';
 
 export type ProcedureDefinition = {
