@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Wrench, Bot } from 'lucide-react';
+import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Wrench, Bot, GitBranch } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
