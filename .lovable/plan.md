@@ -1,56 +1,37 @@
 
 
-# Plano: Criar tabelas do sistema de Agentes de IA
+# Plano: Corrigir Support.tsx + Seed SQL
 
-## Decisoes aplicadas
+## 1. Corrigir `src/pages/admin/Support.tsx`
 
-| Conflito | Resolucao |
-|----------|-----------|
-| `tenants` | Nao criar. Usar `isps` como tenant — `tenant_id` vira `isp_id` |
-| `tenant_erp_config` | Nao criar. Reutilizar `erp_configs` existente |
-| WhatsApp em `tenant_agents` | Remover campos WhatsApp. Reutilizar `whatsapp_configs` |
-| `conversations` existente | DROP CASCADE e recriar com novo schema |
-| `human_agents.user_id` FK | Referenciar `profiles(id)` em vez de `auth.users(id)` |
+A tabela `conversations` foi recriada com schema diferente. Os campos antigos nao existem mais:
 
-## Tabelas a criar (1 migration SQL)
+| Campo antigo | Campo novo |
+|---|---|
+| `status` | `mode` (bot/human/paused) + `resolved_at` (null = aberto) |
+| `subject` | Nao existe. Usar `user_phone` como identificador |
+| `started_at` | `created_at` |
+| `closed_at` | `resolved_at` |
+| `subscriber_id` | Nao existe |
+| `agent_id` | `tenant_agent_id` |
 
-| # | Tabela | FK principal | RLS |
-|---|--------|-------------|-----|
-| 1 | `agent_templates` | — | Somente service_role escreve; authenticated le |
-| 2 | `tenant_agents` | `isp_id → isps(id)`, `template_id → agent_templates(id)` | ISP member le, ISP admin escreve |
-| 3 | `procedures` | `template_id → agent_templates(id)` | Somente service_role escreve; authenticated le |
-| 4 | `conversations` (DROP+recreate) | `isp_id → isps(id)`, `tenant_agent_id → tenant_agents(id)`, `active_procedure_id → procedures(id)` | Isolado por isp_id |
-| 5 | `messages` | `conversation_id → conversations(id)` | Isolado por tenant via JOIN conversation |
-| 6 | `human_agents` | `isp_id → isps(id)`, `user_id → profiles(id)` | Isolado por isp_id |
-| 7 | `quick_replies` | `template_id → agent_templates(id)`, `isp_id → isps(id)` | Template-level: authenticated le; ISP-level: isolado |
-| 8 | `knowledge_bases` | `tenant_agent_id → tenant_agents(id)` | Isolado por isp_id via JOIN |
+**Alteracoes**:
+- Atualizar a query para usar os novos campos e joins (`tenant_agents:tenant_agent_id` em vez de `ai_agents:agent_id`)
+- Substituir filtros de status por `mode` e `resolved_at IS NULL`
+- Substituir `subject` por `user_phone`
+- Substituir `started_at` por `created_at`
+- Stats: "Abertos" = mode != paused e resolved_at IS NULL; "Em atendimento humano" = mode = 'human'; "Resolvidos hoje" = resolved_at de hoje
 
-## Impacto em codigo existente
+## 2. Seed SQL via insert tool
 
-A tabela `conversations` atual e usada por hooks do painel. Ao dropar, estes arquivos quebrarao e precisarao ser atualizados na proxima fase:
-- `src/hooks/painel/useCommunications.ts`
-- `src/pages/painel/Communication.tsx`
+Inserir 1 registro em `agent_templates` e 1 registro em `procedures` com os dados especificados pelo usuario. Usar o insert tool (nao migration) pois e insercao de dados.
 
-## Extensoes
+**agent_templates**: name='Atendente Geral', type='atendente_geral', system_prompt completo, temperature=0.4, tone='professional', default_name='Sofia', max_intent_attempts=3, intent_failure_message conforme especificado.
 
-- `CREATE EXTENSION IF NOT EXISTS vector` (para embeddings)
+**procedures**: name='Cobranca de boleto', template_id = id do template inserido acima, definition JSONB contendo triggers (keywords + min_confidence) e 3 steps com instructions, available_functions, advance_condition, stuck_after_turns, stuck_action e on_complete conforme especificado.
 
-## Indices
-
-- `conversations(isp_id, mode) WHERE mode = 'human'`
-- `conversations(user_phone, tenant_agent_id)`
-- `messages(conversation_id, created_at)`
-- `knowledge_bases` — ivfflat em `embedding` (criado apos ter >= 1000 rows, senao usa btree placeholder)
-
-## RLS — Funcoes helper reutilizadas
-
-Reutilizar `is_isp_member()`, `is_isp_admin()`, `has_role()` existentes. Para `messages` (que nao tem `isp_id` direto), criar funcao `get_conversation_isp_id(conversation_id)` SECURITY DEFINER.
-
-## Constraint especial
-
-`procedures`: UNIQUE parcial `(template_id, name) WHERE is_current = true`
+Apos inserir, executar SELECT para exibir os registros ao usuario.
 
 ## Arquivos alterados
-
-- **1 nova migration SQL** com DROP conversations + CREATE de 8 tabelas + extensao vector + indices + RLS policies + helper function
+- `src/pages/admin/Support.tsx` — adaptar ao novo schema de conversations
 
