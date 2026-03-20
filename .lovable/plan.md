@@ -1,52 +1,80 @@
 
 
-# Plano: Context Builder — Estado da Conversa para o LLM
+# Plano: Área Admin — Gerenciamento de Templates
 
-## Status: ✅ Concluído
+## Resumo
 
-## Arquivos Criados
+Adicionar página `/admin/templates` com CRUD completo de `agent_templates`, integrando-se ao layout admin existente (`AdminLayout` + `AdminSidebar`). Inclui sidebar atualizada, página de listagem com cards, e formulário em drawer com todos os campos solicitados.
 
-1. **Migration SQL** — `match_knowledge` function criada via migration tool
-2. **`supabase/functions/_shared/crypto.ts`** — `deriveKey`, `encrypt`, `decrypt` (AES-GCM) compartilhados
-3. **`supabase/functions/_shared/context-builder.ts`** — `buildRuntimeContext` + `buildSystemPrompt`
+## 1. Migration SQL — RLS para agent_templates
 
----
+A tabela `agent_templates` existe mas **não tem policies de INSERT/UPDATE/DELETE para super_admin**. Adicionar:
 
-# Plano: Procedure Runner — Step Executor + Condition Evaluator
+```sql
+CREATE POLICY "Super admins can manage agent templates"
+ON public.agent_templates FOR ALL TO authenticated
+USING (has_role(auth.uid(), 'super_admin'))
+WITH CHECK (has_role(auth.uid(), 'super_admin'));
+```
 
-## Status: ✅ Concluído
+## 2. Atualizar AdminSidebar
 
-## Arquivos Criados / Alterados
+Adicionar item "Templates" (icon `Bot`) no menu, apontando para `/admin/templates`, entre "Ferramentas IA" e "Relatórios".
 
-1. **`supabase/functions/_shared/procedure-runner.ts`** — `runProcedureStep`, `evaluateAdvanceCondition`, `resolveStepOutcome`, `detectProcedure`
-2. **`supabase/functions/_shared/context-builder.ts`** — `getOpenAIKey` exportada (era privada)
+## 3. Criar hook `useAgentTemplates`
 
----
+**`src/hooks/admin/useAgentTemplates.ts`**
 
-# Plano: Webhook WhatsApp — Integrar com Motor Existente
+- `useQuery` para listar todos os templates (sem filtro `is_active`, admin vê tudo)
+- Para cada template, fazer count de `procedures` e `tenant_agents` vinculados (usar subquery ou queries separadas)
+- `useMutation` para insert/update em `agent_templates`
+- Invalidar query após mutação
 
-## Status: ✅ Concluído
+## 4. Criar página `/admin/templates`
 
-## Arquivos Alterados
+**`src/pages/admin/Templates.tsx`**
 
-1. **`supabase/functions/whatsapp-webhook/index.ts`** — reescrita do fluxo de processamento
+- Grid de cards (responsive: 1-3 colunas)
+- Cada card mostra: nome, tipo (badge), temperatura, tom, nº procedures, nº tenants usando, toggle ativo/inativo
+- Botão "Novo Template" no header
+- Botão editar em cada card
+- Ao desativar template em uso: dialog de confirmação mostrando quantos tenants serão afetados
 
-## O que foi feito
+## 5. Criar formulário de template
 
-- Conversation lookup migrado para novo schema (`user_phone`, `tenant_agent_id`, `resolved_at IS NULL`)
-- Resolução de `tenant_agent_id` via `tenant_agents` + `agent_templates.type = 'atendente'`
-- Controle de modo: `human` (broadcast Realtime + save only), `paused` (save only), `bot` (motor IA)
-- `processWithAI` removida, substituída por `runProcedureStep` do procedure-runner
-- `escalateToHuman` implementada: atualiza modo, gera summary via gpt-4o-mini, envia mensagem de fallback, broadcast Realtime
-- Suporte a test mode via header `X-Test-Mode: true` (retorna JSON sem enviar WhatsApp)
-- `detectProcedure` integrado para ativação automática de procedures
-- Controle de `intent_attempts` com escalação automática
-- `sendWhatsAppMessage` mantida idêntica (tipagem melhorada)
+**`src/components/admin/templates/TemplateFormDrawer.tsx`**
 
-## Camadas já implementadas
+Drawer (Sheet) com campos:
+- Nome (input)
+- Tipo (select: atendente_geral, suporte_n2, financeiro, comercial)
+- System prompt base (textarea grande) + chips clicáveis para variáveis (`{agent_name}`, `{tenant_name}`, `{current_date}`, `{current_time}`)
+- Temperatura (Slider 0.0–1.0 + valor numérico)
+- Tom de voz (select: profissional, amigável, formal, descontraído)
+- Nome padrão do agente (input)
+- URL avatar padrão (input) + preview circular (Avatar)
+- Máx tentativas de intenção (input number 1–10)
+- Mensagem de falha de intenção (textarea)
+- Toggle ativo/inativo
 
-- ✅ Schema multi-tenant (agent_templates, tenant_agents, procedures, conversations, messages, knowledge_bases)
-- ✅ LLM Tool Layer (tool-catalog.ts, tool-handlers.ts, erp-driver.ts)
-- ✅ Context Builder (context-builder.ts + crypto.ts + match_knowledge SQL)
-- ✅ Procedure Runner (procedure-runner.ts — state machine + tool loop + advance conditions)
-- ✅ Webhook WhatsApp (integrado com motor, controle de modo, escalação)
+## 6. Registrar rota no App.tsx
+
+Adicionar lazy import de `Templates` e rota `<Route path="templates" element={<TemplatesPage />} />` dentro do bloco `/admin`.
+
+## Detalhes Técnicos
+
+- **Proteção de rota**: já existe via `AdminLayout` que verifica `super_admin` — não precisa de novo hook
+- **Chips de variáveis**: ao clicar, inserir texto na posição do cursor do textarea usando `useRef` + `selectionStart`
+- **Contagem de tenants/procedures**: queries paralelas com `.select('id', { count: 'exact', head: true }).eq('template_id', id)` para cada template, ou uma query agregada
+- **Supabase types**: `agent_templates` já existe no schema gerado, pode usar diretamente via `supabase.from('agent_templates')`
+
+## Arquivos
+
+| Ação | Arquivo |
+|------|---------|
+| Migration | RLS policies para `agent_templates` |
+| Criar | `src/hooks/admin/useAgentTemplates.ts` |
+| Criar | `src/pages/admin/Templates.tsx` |
+| Criar | `src/components/admin/templates/TemplateFormDrawer.tsx` |
+| Editar | `src/components/admin/AdminSidebar.tsx` — adicionar item Templates |
+| Editar | `src/App.tsx` — adicionar rota `/admin/templates` |
+
