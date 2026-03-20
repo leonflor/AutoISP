@@ -37,7 +37,7 @@ export interface RuntimeContext {
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-async function getOpenAIKey(
+export async function getOpenAIKey(
   supabaseAdmin: SupabaseClient
 ): Promise<string | null> {
   const masterKey = Deno.env.get("ENCRYPTION_KEY");
