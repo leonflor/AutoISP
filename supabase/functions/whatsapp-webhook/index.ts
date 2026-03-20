@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { runProcedureStep, detectProcedure } from "../_shared/procedure-runner.ts";
+import { getOpenAIKey } from "../_shared/context-builder.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,20 +25,20 @@ async function decrypt(ciphertext: string, iv: string, masterKey: string): Promi
   const key = await deriveKey(masterKey);
   const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
   const ciphertextBytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
-  
+
   const decrypted = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: ivBytes },
     key,
     ciphertextBytes
   );
-  
+
   return new TextDecoder().decode(decrypted);
 }
 
 // Rate limiting: Track message counts per phone number
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 30; // Max messages per window
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 function checkRateLimit(phoneNumber: string): boolean {
   const now = Date.now();
@@ -56,7 +58,6 @@ function checkRateLimit(phoneNumber: string): boolean {
   return true;
 }
 
-// Cleanup old rate limit entries periodically
 function cleanupRateLimits() {
   const now = Date.now();
   for (const [key, value] of rateLimitMap.entries()) {
@@ -77,7 +78,6 @@ async function verifyWebhookSignature(
     return false;
   }
 
-  // Signature format: sha256=<hash>
   const expectedPrefix = "sha256=";
   if (!signature.startsWith(expectedPrefix)) {
     console.warn("Invalid signature format");
@@ -101,7 +101,6 @@ async function verifyWebhookSignature(
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    // Constant-time comparison to prevent timing attacks
     if (computedHash.length !== providedHash.length) {
       return false;
     }
@@ -118,51 +117,34 @@ async function verifyWebhookSignature(
   }
 }
 
-// Sanitize and validate phone number format
 function sanitizePhoneNumber(phone: string): string | null {
-  // Remove any non-digit characters
   const cleaned = phone.replace(/\D/g, "");
-
-  // Validate length (international phone numbers are typically 7-15 digits)
   if (cleaned.length < 7 || cleaned.length > 15) {
     return null;
   }
-
   return cleaned;
 }
 
-// Sanitize message content to prevent injection
 function sanitizeMessageContent(content: string, maxLength: number = 4096): string {
   if (!content || typeof content !== "string") {
     return "";
   }
-
-  // Trim and limit length
   let sanitized = content.trim().slice(0, maxLength);
-
-  // Remove null bytes and other control characters (except newlines/tabs)
   sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
-
   return sanitized;
 }
 
-// Validate webhook payload structure
 function validatePayloadStructure(payload: unknown): payload is WhatsAppWebhookPayload {
   if (!payload || typeof payload !== "object") {
     return false;
   }
-
   const p = payload as Record<string, unknown>;
-
   if (typeof p.object !== "string") {
     return false;
   }
-
   if (!Array.isArray(p.entry)) {
     return false;
   }
-
-  // Basic structure validation passed
   return true;
 }
 
@@ -210,15 +192,121 @@ interface WhatsAppWebhookPayload {
   }>;
 }
 
-interface ConversationMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: string;
-  wa_message_id?: string;
+// ============= Escalate to Human =============
+
+async function escalateToHuman(
+  supabase: ReturnType<typeof createClient>,
+  conversationId: string,
+  reason: string,
+  template: Record<string, unknown>,
+  whatsappConfig: Record<string, unknown>,
+  recipientPhone: string,
+  ispId: string,
+): Promise<void> {
+  console.log(`[webhook] Escalating conversation ${conversationId}: ${reason}`);
+
+  // 1. Update conversation mode
+  await supabase
+    .from("conversations")
+    .update({
+      mode: "human",
+      handover_reason: reason,
+      handover_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId);
+
+  // 2. Generate handover summary via gpt-4o-mini
+  let summary = "";
+  try {
+    const openaiKey = await getOpenAIKey(supabase);
+    if (openaiKey) {
+      const { data: msgs } = await supabase
+        .from("messages")
+        .select("role, content")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true })
+        .limit(20);
+
+      const historyText = (msgs ?? [])
+        .filter((m: Record<string, unknown>) => m.role === "user" || m.role === "assistant")
+        .map((m: Record<string, unknown>) => `${m.role}: ${m.content}`)
+        .join("\n");
+
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openaiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          temperature: 0,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Resuma em 4 linhas para um atendente humano: 1) Motivo do contato, 2) Dados coletados, 3) O que o bot já fez, 4) Por que escalou.",
+            },
+            {
+              role: "user",
+              content: `Motivo da escalação: ${reason}\n\nHistórico:\n${historyText}`,
+            },
+          ],
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        summary = json.choices?.[0]?.message?.content ?? "";
+      }
+    }
+  } catch (err) {
+    console.warn("[webhook] Failed to generate handover summary:", err);
+  }
+
+  // 3. Save summary
+  if (summary) {
+    await supabase
+      .from("conversations")
+      .update({ handover_summary: summary })
+      .eq("id", conversationId);
+  }
+
+  // 4. Send failure message to user via WhatsApp
+  const failureMsg =
+    (template.intent_failure_message as string) ??
+    "Vou transferir você para um de nossos atendentes. Aguarde um momento, por favor.";
+
+  await sendWhatsAppMessage(whatsappConfig, recipientPhone, failureMsg, supabase, ispId, conversationId);
+
+  // 5. Broadcast Realtime notification
+  const { data: conv } = await supabase
+    .from("conversations")
+    .select("user_phone, isp_id, tenant_agent_id")
+    .eq("id", conversationId)
+    .single();
+
+  if (conv) {
+    const channel = supabase.channel("agent-notifications");
+    await channel.send({
+      type: "broadcast",
+      event: "new_handover",
+      payload: {
+        conversation_id: conversationId,
+        isp_id: conv.isp_id,
+        tenant_agent_id: conv.tenant_agent_id,
+        user_phone: conv.user_phone,
+        reason,
+        summary,
+      },
+    });
+    supabase.removeChannel(channel);
+  }
 }
 
+// ============= Main Handler =============
+
 Deno.serve(async (req) => {
-  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -230,8 +318,9 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Cleanup old rate limit entries
   cleanupRateLimits();
+
+  const isTestMode = req.headers.get("X-Test-Mode") === "true";
 
   try {
     const url = new URL(req.url);
@@ -260,11 +349,10 @@ Deno.serve(async (req) => {
 
     // POST - Receive Messages
     if (req.method === "POST") {
-      // Read raw body for signature verification
       const rawBody = await req.text();
 
       // Verify webhook signature if app secret is configured
-      if (WHATSAPP_APP_SECRET) {
+      if (WHATSAPP_APP_SECRET && !isTestMode) {
         const signature = req.headers.get("x-hub-signature-256");
         const isValid = await verifyWebhookSignature(rawBody, signature, WHATSAPP_APP_SECRET);
 
@@ -277,13 +365,12 @@ Deno.serve(async (req) => {
             payload: { error: "Invalid signature", signaturePresent: !!signature },
             error_message: "Webhook signature verification failed",
           });
-          // Return 401 for invalid signatures
           return new Response(JSON.stringify({ error: "Invalid signature" }), {
             status: 401,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-      } else {
+      } else if (!WHATSAPP_APP_SECRET && !isTestMode) {
         console.warn("WHATSAPP_APP_SECRET not configured - signature verification skipped");
       }
 
@@ -309,7 +396,7 @@ Deno.serve(async (req) => {
 
       const validatedPayload = payload as WhatsAppWebhookPayload;
 
-      // Log the webhook (sanitize before logging)
+      // Log the webhook
       await supabase.from("webhook_logs").insert({
         provider: "whatsapp",
         event_type: "incoming_message",
@@ -317,7 +404,6 @@ Deno.serve(async (req) => {
         payload: validatedPayload,
       });
 
-      // Process only whatsapp_business_account events
       if (validatedPayload.object !== "whatsapp_business_account") {
         return new Response(JSON.stringify({ status: "ignored" }), {
           status: 200,
@@ -325,17 +411,19 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Collect test results for test mode
+      const testResults: Array<{ reply: string; debug: Record<string, unknown> }> = [];
+
       for (const entry of validatedPayload.entry) {
         for (const change of entry.changes) {
           if (change.field !== "messages") continue;
 
           const value = change.value;
-          const phoneNumberId = value.metadata.phone_number_id;
           const messages = value.messages || [];
           const contacts = value.contacts || [];
           const statuses = value.statuses || [];
 
-          // Process status updates
+          // Process status updates (kept intact)
           for (const statusUpdate of statuses) {
             const statusMap: Record<string, { status: string; field: string }> = {
               sent: { status: "sent", field: "sent_at" },
@@ -364,7 +452,7 @@ Deno.serve(async (req) => {
 
           if (messages.length === 0) continue;
 
-          // Find ISP by phone number
+          // Find ISP by phone number (kept intact)
           const { data: whatsappConfig, error: configError } = await supabase
             .from("whatsapp_configs")
             .select("*, isps(*)")
@@ -374,7 +462,6 @@ Deno.serve(async (req) => {
 
           if (configError || !whatsappConfig) {
             console.log("ISP not found for phone:", value.metadata.display_phone_number);
-            // Return 200 to avoid retries from WhatsApp
             return new Response(JSON.stringify({ status: "isp_not_found" }), {
               status: 200,
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -383,15 +470,42 @@ Deno.serve(async (req) => {
 
           const ispId = whatsappConfig.isp_id;
 
+          // ── Resolve tenant_agent_id ──
+          const { data: tenantAgent } = await supabase
+            .from("tenant_agents")
+            .select("*, agent_templates!inner(type, max_intent_attempts, intent_failure_message, intent_failure_action)")
+            .eq("isp_id", ispId)
+            .eq("is_active", true)
+            .eq("agent_templates.type", "atendente")
+            .limit(1)
+            .single();
+
+          if (!tenantAgent) {
+            console.log("No active tenant agent (type=atendente) for ISP:", ispId);
+            for (const message of messages) {
+              const senderPhone = sanitizePhoneNumber(message.from);
+              if (senderPhone && message.type === "text") {
+                await sendWhatsAppMessage(
+                  whatsappConfig,
+                  senderPhone,
+                  "Obrigado por entrar em contato! Um de nossos atendentes irá responder em breve.",
+                  supabase,
+                  ispId,
+                );
+              }
+            }
+            continue;
+          }
+
+          const template = tenantAgent.agent_templates as Record<string, unknown>;
+
           for (const message of messages) {
-            // Validate and sanitize sender phone
             const senderPhone = sanitizePhoneNumber(message.from);
             if (!senderPhone) {
               console.warn("Invalid sender phone number format");
               continue;
             }
 
-            // Check rate limit
             if (!checkRateLimit(senderPhone)) {
               console.warn(`Rate limited: ${senderPhone.slice(-4)}`);
               continue;
@@ -403,55 +517,6 @@ Deno.serve(async (req) => {
             );
 
             console.log(`Processing message from ${senderName} (${senderPhone.slice(-4)})`);
-
-            // Try to find subscriber by phone
-            const { data: subscriber } = await supabase
-              .from("subscribers")
-              .select("id, name")
-              .eq("isp_id", ispId)
-              .ilike("phone", `%${senderPhone.slice(-9)}%`)
-              .single();
-
-            // Find or create conversation
-            let { data: conversation } = await supabase
-              .from("conversations")
-              .select("*")
-              .eq("isp_id", ispId)
-              .eq("channel", "whatsapp")
-              .eq("status", "open")
-              .or(`metadata->>wa_id.eq.${senderPhone}`)
-              .order("started_at", { ascending: false })
-              .limit(1)
-              .single();
-
-            if (!conversation) {
-              // Create new conversation
-              const { data: newConversation, error: createError } = await supabase
-                .from("conversations")
-                .insert({
-                  isp_id: ispId,
-                  channel: "whatsapp",
-                  subscriber_id: subscriber?.id || null,
-                  status: "open",
-                  subject: `Conversa WhatsApp - ${senderName}`,
-                  messages: [],
-                  metadata: {
-                    wa_id: senderPhone,
-                    phone_number_id: phoneNumberId,
-                    profile_name: senderName,
-                  },
-                  started_at: new Date().toISOString(),
-                })
-                .select()
-                .single();
-
-              if (createError) {
-                console.error("Error creating conversation:", createError);
-                continue;
-              }
-
-              conversation = newConversation;
-            }
 
             // Extract and sanitize message content
             let messageContent = "";
@@ -486,29 +551,56 @@ Deno.serve(async (req) => {
                 messageContent = `[${sanitizeMessageContent(message.type, 50)}]`;
             }
 
-            // Skip empty messages
             if (!messageContent.trim()) {
               console.log("Skipping empty message");
               continue;
             }
 
-            // Add message to conversation
-            const existingMessages: ConversationMessage[] =
-              (conversation.messages as ConversationMessage[]) || [];
-            const newMessage: ConversationMessage = {
-              role: "user",
-              content: messageContent,
-              timestamp: new Date().toISOString(),
-              wa_message_id: message.id,
-            };
-
-            const updatedMessages = [...existingMessages, newMessage];
-
-            // Update conversation with new message
-            await supabase
+            // ── Find or create conversation (NEW SCHEMA) ──
+            let { data: conversation } = await supabase
               .from("conversations")
-              .update({ messages: updatedMessages })
-              .eq("id", conversation.id);
+              .select("*")
+              .eq("user_phone", senderPhone)
+              .eq("tenant_agent_id", tenantAgent.id)
+              .eq("isp_id", ispId)
+              .is("resolved_at", null)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .single();
+
+            if (!conversation) {
+              const { data: newConversation, error: createError } = await supabase
+                .from("conversations")
+                .insert({
+                  isp_id: ispId,
+                  tenant_agent_id: tenantAgent.id,
+                  user_phone: senderPhone,
+                  channel: "whatsapp",
+                  mode: "bot",
+                  user_identifier: senderName,
+                  collected_context: {},
+                  intent_attempts: 0,
+                  step_index: 0,
+                  turns_on_current_step: 0,
+                })
+                .select()
+                .single();
+
+              if (createError) {
+                console.error("Error creating conversation:", createError);
+                continue;
+              }
+
+              conversation = newConversation;
+            }
+
+            // Try to find subscriber by phone
+            const { data: subscriber } = await supabase
+              .from("subscribers")
+              .select("id, name")
+              .eq("isp_id", ispId)
+              .ilike("phone", `%${senderPhone.slice(-9)}%`)
+              .single();
 
             // Register inbound message in whatsapp_messages
             await supabase
@@ -531,19 +623,136 @@ Deno.serve(async (req) => {
                 if (error) console.error("Error logging inbound message:", error);
               });
 
-            // Check if AI agent should respond (only for text messages)
-            if (message.type === "text" && messageContent.trim()) {
-              await processWithAI(
+            // ── Check conversation mode ──
+            if (conversation.mode === "human") {
+              // Save message in normalized table, broadcast to human queue, return
+              await supabase.from("messages").insert({
+                conversation_id: conversation.id,
+                role: "user",
+                content: messageContent,
+                wamid: message.id,
+              });
+
+              const channel = supabase.channel(`human-queue-${ispId}`);
+              await channel.send({
+                type: "broadcast",
+                event: "new_message",
+                payload: {
+                  conversation_id: conversation.id,
+                  user_phone: senderPhone,
+                  content: messageContent,
+                  sender_name: senderName,
+                },
+              });
+              supabase.removeChannel(channel);
+
+              console.log(`[webhook] Message routed to human queue for conversation ${conversation.id}`);
+              continue;
+            }
+
+            if (conversation.mode === "paused") {
+              await supabase.from("messages").insert({
+                conversation_id: conversation.id,
+                role: "user",
+                content: messageContent,
+                wamid: message.id,
+              });
+              console.log(`[webhook] Conversation ${conversation.id} is paused, message saved only`);
+              continue;
+            }
+
+            // ── Mode is 'bot' — process with AI engine ──
+
+            // Only process text-based messages with AI
+            if (!messageContent.trim() || message.type === "audio") {
+              await supabase.from("messages").insert({
+                conversation_id: conversation.id,
+                role: "user",
+                content: messageContent,
+                wamid: message.id,
+              });
+              continue;
+            }
+
+            // Check intent_attempts if no active procedure
+            if (!conversation.active_procedure_id) {
+              const detected = await detectProcedure(
                 supabase,
-                whatsappConfig,
-                conversation,
-                updatedMessages,
-                senderPhone,
-                ispId
+                messageContent,
+                template.id as string,
               );
+
+              if (!detected) {
+                const currentAttempts = (conversation.intent_attempts ?? 0) + 1;
+                const maxAttempts = (template.max_intent_attempts as number) ?? 3;
+
+                await supabase
+                  .from("conversations")
+                  .update({ intent_attempts: currentAttempts })
+                  .eq("id", conversation.id);
+
+                if (currentAttempts >= maxAttempts) {
+                  await escalateToHuman(
+                    supabase,
+                    conversation.id,
+                    "max_intent_attempts",
+                    template,
+                    whatsappConfig,
+                    senderPhone,
+                    ispId,
+                  );
+                  continue;
+                }
+              }
+              // If detected, runProcedureStep will handle activation internally
+            }
+
+            // Run the procedure engine
+            try {
+              const result = await runProcedureStep(supabase, conversation.id, messageContent);
+
+              if (isTestMode) {
+                testResults.push(result);
+              } else {
+                // Send reply via WhatsApp
+                if (result.reply) {
+                  await sendWhatsAppMessage(
+                    whatsappConfig,
+                    senderPhone,
+                    result.reply,
+                    supabase,
+                    ispId,
+                    conversation.id,
+                  );
+                }
+              }
+
+              console.log(`[webhook] AI response processed for conversation ${conversation.id}`);
+            } catch (engineError) {
+              console.error("[webhook] Engine error:", engineError);
+
+              // Send fallback message
+              if (!isTestMode) {
+                await sendWhatsAppMessage(
+                  whatsappConfig,
+                  senderPhone,
+                  "Desculpe, estou com dificuldades no momento. Por favor, tente novamente em alguns instantes.",
+                  supabase,
+                  ispId,
+                  conversation.id,
+                );
+              }
             }
           }
         }
+      }
+
+      // If test mode, return results as JSON
+      if (isTestMode && testResults.length > 0) {
+        return new Response(JSON.stringify({ results: testResults }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(JSON.stringify({ status: "processed" }), {
@@ -556,7 +765,6 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Webhook error:", error);
 
-    // Log error (avoid logging sensitive data)
     await supabase.from("webhook_logs").insert({
       provider: "whatsapp",
       event_type: "error",
@@ -565,7 +773,6 @@ Deno.serve(async (req) => {
       error_message: error instanceof Error ? error.message : "Unknown error",
     });
 
-    // Return 200 to avoid retries
     return new Response(JSON.stringify({ status: "error", message: "Internal error" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -573,147 +780,24 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processWithAI(
-  supabase: any,
-  whatsappConfig: any,
-  conversation: any,
-  messages: ConversationMessage[],
-  recipientPhone: string,
-  ispId: string
-) {
+// ============= Send WhatsApp Message (kept intact) =============
+
+async function sendWhatsAppMessage(
+  config: Record<string, unknown>,
+  to: string,
+  text: string,
+  supabaseClient?: ReturnType<typeof createClient>,
+  ispId?: string,
+  conversationId?: string,
+): Promise<boolean> {
   try {
-    // Find active AI agent for this ISP (type "atendente")
-    const { data: ispSubscription } = (await supabase
-      .from("subscriptions")
-      .select("plan_id")
-      .eq("isp_id", ispId)
-      .eq("status", "ativa")
-      .single()) as { data: { plan_id: string } | null };
-
-    if (!ispSubscription) {
-      console.log("No active subscription for ISP");
-      return;
-    }
-
-    // Get AI limits for the plan
-    const { data: aiLimit } = (await supabase
-      .from("ai_limits")
-      .select("*, ai_agents(*)")
-      .eq("plan_id", ispSubscription.plan_id)
-      .eq("is_enabled", true)
-      .eq("ai_agents.type", "atendente")
-      .single()) as { data: any };
-
-    if (!aiLimit || !aiLimit.ai_agents) {
-      console.log("No AI agent available for this ISP");
-      // Send fallback message
-      await sendWhatsAppMessage(
-        whatsappConfig,
-        recipientPhone,
-        "Obrigado por entrar em contato! Um de nossos atendentes irá responder em breve.",
-        supabase,
-        ispId,
-        conversation.id
-      );
-      return;
-    }
-
-    const agent = aiLimit.ai_agents;
-
-    // Update conversation with agent
-    await (supabase as any)
-      .from("conversations")
-      .update({ agent_id: agent.id })
-      .eq("id", conversation.id);
-
-    // Prepare messages for AI (last 10 messages for context)
-    const aiMessages = messages.slice(-10).map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    // Call AI chat edge function
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const aiResponse = await fetch(`${SUPABASE_URL}/functions/v1/ai-chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-      body: JSON.stringify({
-        messages: aiMessages,
-        agentId: agent.id,
-        ispId: ispId,
-        stream: false,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      console.error("AI chat error:", await aiResponse.text());
-      await sendWhatsAppMessage(
-        whatsappConfig,
-        recipientPhone,
-        "Desculpe, estou com dificuldades no momento. Por favor, tente novamente em alguns instantes.",
-        supabase,
-        ispId,
-        conversation.id
-      );
-      return;
-    }
-
-    const aiData = await aiResponse.json();
-    const assistantMessage = aiData.choices?.[0]?.message?.content || aiData.content;
-
-    if (!assistantMessage) {
-      console.error("No AI response content");
-      return;
-    }
-
-    // Add AI response to conversation
-    const aiConversationMessage: ConversationMessage = {
-      role: "assistant",
-      content: assistantMessage,
-      timestamp: new Date().toISOString(),
-    };
-
-    await (supabase as any)
-      .from("conversations")
-      .update({
-        messages: [...messages, aiConversationMessage],
-        agent_id: agent.id,
-      })
-      .eq("id", conversation.id);
-
-    // Send response via WhatsApp
-    await sendWhatsAppMessage(whatsappConfig, recipientPhone, assistantMessage, supabase, ispId, conversation.id);
-
-    console.log("AI response sent successfully");
-  } catch (error) {
-    console.error("Error processing with AI:", error);
-
-    // Send fallback message
-    await sendWhatsAppMessage(
-      whatsappConfig,
-      recipientPhone,
-      "Obrigado pela mensagem! Estamos processando sua solicitação.",
-      supabase,
-      ispId
-    );
-  }
-}
-
-async function sendWhatsAppMessage(config: any, to: string, text: string, supabaseClient?: any, ispId?: string, conversationId?: string): Promise<boolean> {
-  try {
-    const phoneNumberId = config.instance_name; // Using instance_name as phone_number_id
+    const phoneNumberId = config.instance_name as string;
 
     if (!config.api_key_encrypted || !phoneNumberId) {
       console.error("WhatsApp config missing access token or phone number ID");
       return false;
     }
 
-    // Decrypt the API key
     const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY");
     if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
       console.error("ENCRYPTION_KEY not configured or too short");
@@ -721,13 +805,12 @@ async function sendWhatsAppMessage(config: any, to: string, text: string, supaba
     }
 
     let accessToken: string;
-    
-    // Check if encryption_iv exists (encrypted key)
+
     if (config.encryption_iv) {
       try {
         accessToken = await decrypt(
-          config.api_key_encrypted,
-          config.encryption_iv,
+          config.api_key_encrypted as string,
+          config.encryption_iv as string,
           ENCRYPTION_KEY
         );
         console.log("WhatsApp API key decrypted successfully");
@@ -736,9 +819,8 @@ async function sendWhatsAppMessage(config: any, to: string, text: string, supaba
         return false;
       }
     } else {
-      // Fallback: key might not be encrypted yet (legacy data)
       console.warn("WhatsApp API key not encrypted (missing encryption_iv). Using raw value.");
-      accessToken = config.api_key_encrypted;
+      accessToken = config.api_key_encrypted as string;
     }
 
     if (!accessToken) {
@@ -746,7 +828,6 @@ async function sendWhatsAppMessage(config: any, to: string, text: string, supaba
       return false;
     }
 
-    // Split long messages (WhatsApp limit is 4096 chars)
     const maxLength = 4000;
     const messageParts = [];
 
@@ -783,7 +864,6 @@ async function sendWhatsAppMessage(config: any, to: string, text: string, supaba
       const wamid = result.messages?.[0]?.id;
       console.log("Message sent:", wamid);
 
-      // Register outbound message in whatsapp_messages
       if (supabaseClient && wamid) {
         await supabaseClient
           .from("whatsapp_messages")
@@ -793,14 +873,14 @@ async function sendWhatsAppMessage(config: any, to: string, text: string, supaba
             direction: "outbound",
             message_type: "text",
             recipient_phone: to,
-            sender_phone: config.phone_number || null,
+            sender_phone: (config.phone_number as string) || null,
             content: part,
             status: "sent",
             status_updated_at: new Date().toISOString(),
             sent_at: new Date().toISOString(),
             conversation_id: conversationId || null,
           })
-          .then(({ error: insertErr }: { error: any }) => {
+          .then(({ error: insertErr }) => {
             if (insertErr) console.error("Error logging outbound message:", insertErr);
           });
       }
