@@ -46,6 +46,7 @@ const AdminSupport = lazy(() => import("./pages/admin/Support"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
 const AiToolCatalogPage = lazy(() => import("./pages/admin/AiToolCatalog"));
+const TemplatesPage = lazy(() => import("./pages/admin/Templates"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
 
