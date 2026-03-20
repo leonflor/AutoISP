@@ -1,80 +1,88 @@
 
 
-# Plano: Área Admin — Gerenciamento de Templates
+# Plano: Editor de Procedimentos com Versionamento
 
 ## Resumo
 
-Adicionar página `/admin/templates` com CRUD completo de `agent_templates`, integrando-se ao layout admin existente (`AdminLayout` + `AdminSidebar`). Inclui sidebar atualizada, página de listagem com cards, e formulário em drawer com todos os campos solicitados.
+Criar página `/admin/procedures` com listagem filtrada por template e editor completo de procedimentos (triggers, steps com function calls, condições de avanço, on_complete). Salvar sempre como nova versão (imutável).
 
-## 1. Migration SQL — RLS para agent_templates
+## 1. Migration SQL — RLS para procedures (INSERT/UPDATE)
 
-A tabela `agent_templates` existe mas **não tem policies de INSERT/UPDATE/DELETE para super_admin**. Adicionar:
+A tabela `procedures` atualmente **só permite SELECT** para authenticated. Precisa de policies para super_admin fazer INSERT e UPDATE (necessário para versionamento):
 
 ```sql
-CREATE POLICY "Super admins can manage agent templates"
-ON public.agent_templates FOR ALL TO authenticated
-USING (has_role(auth.uid(), 'super_admin'))
-WITH CHECK (has_role(auth.uid(), 'super_admin'));
+CREATE POLICY "Super admins can insert procedures"
+ON public.procedures FOR INSERT TO authenticated
+WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
+
+CREATE POLICY "Super admins can update procedures"
+ON public.procedures FOR UPDATE TO authenticated
+USING (has_role(auth.uid(), 'super_admin'::app_role));
 ```
 
-## 2. Atualizar AdminSidebar
+## 2. Criar hook `useProcedures`
 
-Adicionar item "Templates" (icon `Bot`) no menu, apontando para `/admin/templates`, entre "Ferramentas IA" e "Relatórios".
+**`src/hooks/admin/useProcedures.ts`**
 
-## 3. Criar hook `useAgentTemplates`
+- `useQuery` para listar procedures com `is_current = true`, join com `agent_templates` (nome do template)
+- Filtro opcional por `template_id`
+- Count de `conversations` ativas por procedure (`active_procedure_id = procedure.id`)
+- Mutation para criar nova versão:
+  1. UPDATE `is_current = false` WHERE `name = X` AND `template_id = Y` AND `is_current = true`
+  2. INSERT novo registro com `version = old.version + 1`, `is_current = true`
+- Mutation para criar procedure novo (INSERT com version 1)
 
-**`src/hooks/admin/useAgentTemplates.ts`**
+## 3. Criar página `/admin/procedures`
 
-- `useQuery` para listar todos os templates (sem filtro `is_active`, admin vê tudo)
-- Para cada template, fazer count de `procedures` e `tenant_agents` vinculados (usar subquery ou queries separadas)
-- `useMutation` para insert/update em `agent_templates`
-- Invalidar query após mutação
+**`src/pages/admin/Procedures.tsx`**
 
-## 4. Criar página `/admin/templates`
+- Filtro por template (select com templates do `useAgentTemplates`)
+- Grid de cards: nome, template badge, nº de steps, versão atual, conversas ativas
+- Botão "Novo Procedimento"
+- Botão editar em cada card → abre editor
 
-**`src/pages/admin/Templates.tsx`**
+## 4. Criar editor de procedimento
 
-- Grid de cards (responsive: 1-3 colunas)
-- Cada card mostra: nome, tipo (badge), temperatura, tom, nº procedures, nº tenants usando, toggle ativo/inativo
-- Botão "Novo Template" no header
-- Botão editar em cada card
-- Ao desativar template em uso: dialog de confirmação mostrando quantos tenants serão afetados
+**`src/components/admin/procedures/ProcedureEditor.tsx`** — modal fullscreen (Dialog)
 
-## 5. Criar formulário de template
+### Seção 1 — Geral
+- Nome, descrição, template vinculado (select), status toggle
 
-**`src/components/admin/templates/TemplateFormDrawer.tsx`**
+### Seção 2 — Triggers
+- Chips de keywords (input + Enter para adicionar, × para remover)
+- Slider confiança mínima (50%–95%, default 70%)
 
-Drawer (Sheet) com campos:
-- Nome (input)
-- Tipo (select: atendente_geral, suporte_n2, financeiro, comercial)
-- System prompt base (textarea grande) + chips clicáveis para variáveis (`{agent_name}`, `{tenant_name}`, `{current_date}`, `{current_time}`)
-- Temperatura (Slider 0.0–1.0 + valor numérico)
-- Tom de voz (select: profissional, amigável, formal, descontraído)
-- Nome padrão do agente (input)
-- URL avatar padrão (input) + preview circular (Avatar)
-- Máx tentativas de intenção (input number 1–10)
-- Mensagem de falha de intenção (textarea)
-- Toggle ativo/inativo
+### Seção 3 — Steps (lista vertical de cards expansíveis via Collapsible)
+Cada step:
+- Nome do step (input)
+- Instrução (textarea)
+- Function calls disponíveis: checkboxes usando items do `TOOL_CATALOG` (display_name) + handlers mapeados no user request
+- Condição de avanço (select): `function_success` (+ qual function), `data_collected` (+ chips de fields), `user_confirmation`, `llm_judge`, `always`
+- Ao concluir (select): `next_step`, `end_procedure` (resolved/unresolved), `handover_agent` (select tipo), `handover_human`, `conditional` (lista if/then)
+- Se travar: nº de msgs (input number) + ação (select: escalate_human/repeat/skip/nunca)
+- Botão "+" para novo step
+- Drag handle para reordenar (opcional, pode ser setas up/down)
 
-## 6. Registrar rota no App.tsx
+### Seção 4 — Salvar (versionamento imutável)
+Ao salvar procedimento existente:
+1. SET `is_current = false` no registro atual
+2. INSERT novo com `version + 1`, `is_current = true`
+3. Toast com versão
+4. Warning se há conversas ativas na versão anterior
 
-Adicionar lazy import de `Templates` e rota `<Route path="templates" element={<TemplatesPage />} />` dentro do bloco `/admin`.
+## 5. Atualizar sidebar e rotas
 
-## Detalhes Técnicos
-
-- **Proteção de rota**: já existe via `AdminLayout` que verifica `super_admin` — não precisa de novo hook
-- **Chips de variáveis**: ao clicar, inserir texto na posição do cursor do textarea usando `useRef` + `selectionStart`
-- **Contagem de tenants/procedures**: queries paralelas com `.select('id', { count: 'exact', head: true }).eq('template_id', id)` para cada template, ou uma query agregada
-- **Supabase types**: `agent_templates` já existe no schema gerado, pode usar diretamente via `supabase.from('agent_templates')`
+- `AdminSidebar.tsx`: adicionar item "Procedimentos" (icon `GitBranch`) após "Templates"
+- `App.tsx`: lazy import + rota `<Route path="procedures" element={<ProceduresPage />} />`
 
 ## Arquivos
 
 | Ação | Arquivo |
 |------|---------|
-| Migration | RLS policies para `agent_templates` |
-| Criar | `src/hooks/admin/useAgentTemplates.ts` |
-| Criar | `src/pages/admin/Templates.tsx` |
-| Criar | `src/components/admin/templates/TemplateFormDrawer.tsx` |
-| Editar | `src/components/admin/AdminSidebar.tsx` — adicionar item Templates |
-| Editar | `src/App.tsx` — adicionar rota `/admin/templates` |
+| Migration | RLS INSERT/UPDATE para `procedures` |
+| Criar | `src/hooks/admin/useProcedures.ts` |
+| Criar | `src/pages/admin/Procedures.tsx` |
+| Criar | `src/components/admin/procedures/ProcedureEditor.tsx` |
+| Editar | `src/components/admin/AdminSidebar.tsx` |
+| Editar | `src/App.tsx` |
 
