@@ -100,7 +100,7 @@ export function useProcedures(templateFilter?: string) {
       is_active: boolean;
       definition: ProcedureDefinition;
     }) => {
-      const { error } = await supabase.from('procedures').insert({
+      const row = {
         name: data.name,
         description: data.description,
         template_id: data.template_id,
@@ -108,7 +108,8 @@ export function useProcedures(templateFilter?: string) {
         definition: data.definition as unknown as Record<string, unknown>,
         version: 1,
         is_current: true,
-      });
+      };
+      const { error } = await supabase.from('procedures').insert([row]);
       if (error) throw error;
     },
     onSuccess: () => {
