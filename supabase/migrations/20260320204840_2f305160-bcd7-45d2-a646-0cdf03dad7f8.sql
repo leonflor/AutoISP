@@ -1,0 +1,4 @@
+CREATE POLICY "Super admins can manage agent templates"
+ON public.agent_templates FOR ALL TO authenticated
+USING (has_role(auth.uid(), 'super_admin'::app_role))
+WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));

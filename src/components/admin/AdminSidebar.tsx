@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Wrench } from 'lucide-react';
+import { LayoutDashboard, Building2, Package, Users, Settings, LogOut, DollarSign, FileText, CreditCard, ChevronDown, MessageSquare, BarChart3, Wrench, Bot } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,6 +51,7 @@ const menuItems: MenuItem[] = [
     ]
   },
   { title: 'Ferramentas IA', url: '/admin/ai-tools', icon: Wrench },
+  { title: 'Templates', url: '/admin/templates', icon: Bot },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
 ];
