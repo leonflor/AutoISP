@@ -52,6 +52,7 @@ const menuItems: MenuItem[] = [
   },
   { title: 'Ferramentas IA', url: '/admin/ai-tools', icon: Wrench },
   { title: 'Templates', url: '/admin/templates', icon: Bot },
+  { title: 'Procedimentos', url: '/admin/procedures', icon: GitBranch },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
 ];

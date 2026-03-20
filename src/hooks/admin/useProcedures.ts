@@ -136,7 +136,7 @@ export function useProcedures(templateFilter?: string) {
       if (updateErr) throw updateErr;
 
       // 2. Insert new version
-      const { error: insertErr } = await supabase.from('procedures').insert({
+      const row = {
         name: data.name,
         description: data.description,
         template_id: data.template_id,
@@ -144,7 +144,8 @@ export function useProcedures(templateFilter?: string) {
         definition: data.definition as unknown as Record<string, unknown>,
         version: data.currentVersion + 1,
         is_current: true,
-      });
+      };
+      const { error: insertErr } = await supabase.from('procedures').insert([row]);
       if (insertErr) throw insertErr;
 
       return data.currentVersion + 1;
