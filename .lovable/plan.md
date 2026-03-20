@@ -1,88 +1,71 @@
 
 
-# Plano: Editor de Procedimentos com Versionamento
+# Plano: Painel de ISPs (`/admin/isps`)
 
 ## Resumo
 
-Criar página `/admin/procedures` com listagem filtrada por template e editor completo de procedimentos (triggers, steps com function calls, condições de avanço, on_complete). Salvar sempre como nova versão (imutável).
+Expandir a página existente `/admin/isps` com métricas reais e criar página de detalhe `/admin/isps/:id` com informações do agente, ERP, base de conhecimento e estatísticas de conversas. Usar terminologia "ISP" em todo lugar (não "tenant").
 
-## 1. Migration SQL — RLS para procedures (INSERT/UPDATE)
+## 1. Rotas
 
-A tabela `procedures` atualmente **só permite SELECT** para authenticated. Precisa de policies para super_admin fazer INSERT e UPDATE (necessário para versionamento):
+- **`App.tsx`**: Adicionar rota `isps/:id` dentro de `/admin` para a página de detalhe
 
-```sql
-CREATE POLICY "Super admins can insert procedures"
-ON public.procedures FOR INSERT TO authenticated
-WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
+Sidebar já tem item "ISPs" apontando para `/admin/isps` — sem alteração necessária.
 
-CREATE POLICY "Super admins can update procedures"
-ON public.procedures FOR UPDATE TO authenticated
-USING (has_role(auth.uid(), 'super_admin'::app_role));
-```
+## 2. Expandir página existente `/admin/isps`
 
-## 2. Criar hook `useProcedures`
+**`src/pages/admin/Isps.tsx`** — atualizar tabela para incluir colunas extras:
 
-**`src/hooks/admin/useProcedures.ts`**
+- Agente ativo (template name)
+- ERP configurado (provider)
+- Total conversas (30d)
+- Taxa resolução bot (%)
+- Status
 
-- `useQuery` para listar procedures com `is_current = true`, join com `agent_templates` (nome do template)
-- Filtro opcional por `template_id`
-- Count de `conversations` ativas por procedure (`active_procedure_id = procedure.id`)
-- Mutation para criar nova versão:
-  1. UPDATE `is_current = false` WHERE `name = X` AND `template_id = Y` AND `is_current = true`
-  2. INSERT novo registro com `version = old.version + 1`, `is_current = true`
-- Mutation para criar procedure novo (INSERT com version 1)
+Clique na linha → navega para `/admin/isps/:id`
 
-## 3. Criar página `/admin/procedures`
+## 3. Hook `useIspDetail`
 
-**`src/pages/admin/Procedures.tsx`**
+**`src/hooks/admin/useIspDetail.ts`**
 
-- Filtro por template (select com templates do `useAgentTemplates`)
-- Grid de cards: nome, template badge, nº de steps, versão atual, conversas ativas
-- Botão "Novo Procedimento"
-- Botão editar em cada card → abre editor
+- Query de detalhe por ID com métricas 7d e 30d:
+  - Total conversas, resolução bot (%), handovers, tempo médio
+- Info do agente: template, nome custom, avatar, whatsapp config
+- ERP: provider, base URL mascarada
+- Knowledge base: count docs + tamanho
 
-## 4. Criar editor de procedimento
+## 4. Página de Detalhe `/admin/isps/:id`
 
-**`src/components/admin/procedures/ProcedureEditor.tsx`** — modal fullscreen (Dialog)
+**`src/pages/admin/IspDetail.tsx`**
 
-### Seção 1 — Geral
-- Nome, descrição, template vinculado (select), status toggle
+### Cards de Métricas (7d e 30d)
+- Total conversas, Taxa resolução bot (%), Tempo médio atendimento, Handovers humano
+- Queries reais em `conversations` filtradas por `isp_id`
 
-### Seção 2 — Triggers
-- Chips de keywords (input + Enter para adicionar, × para remover)
-- Slider confiança mínima (50%–95%, default 70%)
+### Seção "Agente Configurado"
+- Template em uso (link para `/admin/templates`)
+- Nome e avatar customizados
+- WhatsApp configurado (sim/não)
 
-### Seção 3 — Steps (lista vertical de cards expansíveis via Collapsible)
-Cada step:
-- Nome do step (input)
-- Instrução (textarea)
-- Function calls disponíveis: checkboxes usando items do `TOOL_CATALOG` (display_name) + handlers mapeados no user request
-- Condição de avanço (select): `function_success` (+ qual function), `data_collected` (+ chips de fields), `user_confirmation`, `llm_judge`, `always`
-- Ao concluir (select): `next_step`, `end_procedure` (resolved/unresolved), `handover_agent` (select tipo), `handover_human`, `conditional` (lista if/then)
-- Se travar: nº de msgs (input number) + ação (select: escalate_human/repeat/skip/nunca)
-- Botão "+" para novo step
-- Drag handle para reordenar (opcional, pode ser setas up/down)
+### Seção "ERP"
+- Provider e URL mascarada
+- Botão "Testar conexão" → `supabase.functions.invoke('test-erp', { body: { isp_id, is_test: true } })`
 
-### Seção 4 — Salvar (versionamento imutável)
-Ao salvar procedimento existente:
-1. SET `is_current = false` no registro atual
-2. INSERT novo com `version + 1`, `is_current = true`
-3. Toast com versão
-4. Warning se há conversas ativas na versão anterior
+### Seção "Base de Conhecimento"
+- Count de documentos + tamanho total
+- Botão "Forçar reindexação" (toast placeholder)
 
-## 5. Atualizar sidebar e rotas
+## 5. Sem Migration
 
-- `AdminSidebar.tsx`: adicionar item "Procedimentos" (icon `GitBranch`) após "Templates"
-- `App.tsx`: lazy import + rota `<Route path="procedures" element={<ProceduresPage />} />`
+RLS já cobre `super_admin` para todas as tabelas envolvidas.
 
 ## Arquivos
 
 | Ação | Arquivo |
 |------|---------|
-| Migration | RLS INSERT/UPDATE para `procedures` |
-| Criar | `src/hooks/admin/useProcedures.ts` |
-| Criar | `src/pages/admin/Procedures.tsx` |
-| Criar | `src/components/admin/procedures/ProcedureEditor.tsx` |
-| Editar | `src/components/admin/AdminSidebar.tsx` |
-| Editar | `src/App.tsx` |
+| Criar | `src/hooks/admin/useIspDetail.ts` |
+| Criar | `src/pages/admin/IspDetail.tsx` |
+| Editar | `src/pages/admin/Isps.tsx` — adicionar colunas de métricas e navegação |
+| Editar | `src/hooks/useIsps.ts` — incluir joins para agente/ERP/conversas |
+| Editar | `src/App.tsx` — adicionar rota `isps/:id` |
 
