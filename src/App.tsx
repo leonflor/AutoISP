@@ -21,6 +21,7 @@ const AdminLayout = lazy(() => import("./components/admin/AdminLayout").then(m =
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const IspsPage = lazy(() => import("./pages/admin/Isps"));
+const IspDetailPage = lazy(() => import("./pages/admin/IspDetail"));
 const PlansPage = lazy(() => import("./pages/admin/Plans"));
 const FinancePage = lazy(() => import("./pages/admin/Finance"));
 const InvoicesPage = lazy(() => import("./pages/admin/Invoices"));
@@ -87,6 +88,7 @@ const App = () => (
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="isps" element={<IspsPage />} />
+                <Route path="isps/:id" element={<IspDetailPage />} />
                 <Route path="planos" element={<PlansPage />} />
                 <Route path="financeiro" element={<FinancePage />} />
                 <Route path="faturas" element={<InvoicesPage />} />
