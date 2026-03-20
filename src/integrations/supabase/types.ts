@@ -62,6 +62,57 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_templates: {
+        Row: {
+          created_at: string | null
+          default_avatar_url: string | null
+          default_name: string
+          id: string
+          intent_failure_action: string | null
+          intent_failure_message: string | null
+          is_active: boolean | null
+          max_intent_attempts: number
+          name: string
+          system_prompt_base: string
+          temperature: number
+          tone: string
+          type: string
+          version: number
+        }
+        Insert: {
+          created_at?: string | null
+          default_avatar_url?: string | null
+          default_name: string
+          id?: string
+          intent_failure_action?: string | null
+          intent_failure_message?: string | null
+          is_active?: boolean | null
+          max_intent_attempts?: number
+          name: string
+          system_prompt_base: string
+          temperature?: number
+          tone?: string
+          type: string
+          version?: number
+        }
+        Update: {
+          created_at?: string | null
+          default_avatar_url?: string | null
+          default_name?: string
+          id?: string
+          intent_failure_action?: string | null
+          intent_failure_message?: string | null
+          is_active?: boolean | null
+          max_intent_attempts?: number
+          name?: string
+          system_prompt_base?: string
+          temperature?: number
+          tone?: string
+          type?: string
+          version?: number
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -212,48 +263,79 @@ export type Database = {
       }
       conversations: {
         Row: {
-          agent_id: string | null
-          channel: string
-          closed_at: string | null
+          active_procedure_id: string | null
+          assigned_agent_id: string | null
+          channel: string | null
+          collected_context: Json | null
+          created_at: string | null
+          handover_at: string | null
+          handover_reason: string | null
+          handover_summary: string | null
           id: string
+          intent_attempts: number | null
           isp_id: string
-          messages: Json | null
-          metadata: Json | null
-          started_at: string | null
-          status: string | null
-          subject: string | null
-          subscriber_id: string | null
-          user_id: string | null
+          mode: string
+          resolved_at: string | null
+          resolved_by: string | null
+          step_index: number | null
+          tenant_agent_id: string
+          turns_on_current_step: number | null
+          updated_at: string | null
+          user_identifier: string | null
+          user_phone: string
         }
         Insert: {
-          agent_id?: string | null
-          channel: string
-          closed_at?: string | null
+          active_procedure_id?: string | null
+          assigned_agent_id?: string | null
+          channel?: string | null
+          collected_context?: Json | null
+          created_at?: string | null
+          handover_at?: string | null
+          handover_reason?: string | null
+          handover_summary?: string | null
           id?: string
+          intent_attempts?: number | null
           isp_id: string
-          messages?: Json | null
-          metadata?: Json | null
-          started_at?: string | null
-          status?: string | null
-          subject?: string | null
-          subscriber_id?: string | null
-          user_id?: string | null
+          mode?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          step_index?: number | null
+          tenant_agent_id: string
+          turns_on_current_step?: number | null
+          updated_at?: string | null
+          user_identifier?: string | null
+          user_phone: string
         }
         Update: {
-          agent_id?: string | null
-          channel?: string
-          closed_at?: string | null
+          active_procedure_id?: string | null
+          assigned_agent_id?: string | null
+          channel?: string | null
+          collected_context?: Json | null
+          created_at?: string | null
+          handover_at?: string | null
+          handover_reason?: string | null
+          handover_summary?: string | null
           id?: string
+          intent_attempts?: number | null
           isp_id?: string
-          messages?: Json | null
-          metadata?: Json | null
-          started_at?: string | null
-          status?: string | null
-          subject?: string | null
-          subscriber_id?: string | null
-          user_id?: string | null
+          mode?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          step_index?: number | null
+          tenant_agent_id?: string
+          turns_on_current_step?: number | null
+          updated_at?: string | null
+          user_identifier?: string | null
+          user_phone?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_active_procedure_id_fkey"
+            columns: ["active_procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_isp_id_fkey"
             columns: ["isp_id"]
@@ -262,10 +344,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "conversations_subscriber_id_fkey"
-            columns: ["subscriber_id"]
+            foreignKeyName: "conversations_tenant_agent_id_fkey"
+            columns: ["tenant_agent_id"]
             isOneToOne: false
-            referencedRelation: "subscribers"
+            referencedRelation: "tenant_agents"
             referencedColumns: ["id"]
           },
         ]
@@ -509,6 +591,54 @@ export type Database = {
           },
         ]
       }
+      human_agents: {
+        Row: {
+          current_chat_count: number | null
+          display_name: string
+          id: string
+          is_available: boolean | null
+          isp_id: string
+          last_seen_at: string | null
+          max_concurrent_chats: number | null
+          user_id: string
+        }
+        Insert: {
+          current_chat_count?: number | null
+          display_name: string
+          id?: string
+          is_available?: boolean | null
+          isp_id: string
+          last_seen_at?: string | null
+          max_concurrent_chats?: number | null
+          user_id: string
+        }
+        Update: {
+          current_chat_count?: number | null
+          display_name?: string
+          id?: string
+          is_available?: boolean | null
+          isp_id?: string
+          last_seen_at?: string | null
+          max_concurrent_chats?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "human_agents_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_agents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
@@ -661,6 +791,44 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_bases: {
+        Row: {
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          source_type: string | null
+          tenant_agent_id: string
+          title: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          source_type?: string | null
+          tenant_agent_id: string
+          title?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          source_type?: string | null
+          tenant_agent_id?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_bases_tenant_agent_id_fkey"
+            columns: ["tenant_agent_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           company: string | null
@@ -702,6 +870,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string | null
+          id: string
+          role: string
+          sent_by_agent_id: string | null
+          tool_call_id: string | null
+          tool_name: string | null
+          tool_result: Json | null
+          wamid: string | null
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          role: string
+          sent_by_agent_id?: string | null
+          tool_call_id?: string | null
+          tool_name?: string | null
+          tool_result?: Json | null
+          wamid?: string | null
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          sent_by_agent_id?: string | null
+          tool_call_id?: string | null
+          tool_name?: string | null
+          tool_result?: Json | null
+          wamid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       newsletter_subscribers: {
         Row: {
@@ -808,6 +1023,50 @@ export type Database = {
         }
         Relationships: []
       }
+      procedures: {
+        Row: {
+          created_at: string | null
+          definition: Json
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_current: boolean
+          name: string
+          template_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string | null
+          definition: Json
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_current?: boolean
+          name: string
+          template_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string | null
+          definition?: Json
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_current?: boolean
+          name?: string
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedures_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "agent_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -837,6 +1096,48 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      quick_replies: {
+        Row: {
+          category: string | null
+          id: string
+          isp_id: string | null
+          sort_order: number | null
+          template_id: string | null
+          text: string
+        }
+        Insert: {
+          category?: string | null
+          id?: string
+          isp_id?: string | null
+          sort_order?: number | null
+          template_id?: string | null
+          text: string
+        }
+        Update: {
+          category?: string | null
+          id?: string
+          isp_id?: string | null
+          sort_order?: number | null
+          template_id?: string | null
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_replies_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_replies_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "agent_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sla_configs: {
         Row: {
@@ -1136,6 +1437,51 @@ export type Database = {
           },
         ]
       }
+      tenant_agents: {
+        Row: {
+          created_at: string | null
+          custom_avatar_url: string | null
+          custom_name: string | null
+          id: string
+          is_active: boolean | null
+          isp_id: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          custom_avatar_url?: string | null
+          custom_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          isp_id: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string | null
+          custom_avatar_url?: string | null
+          custom_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          isp_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_agents_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_agents_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "agent_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1386,13 +1732,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "whatsapp_messages_isp_id_fkey"
             columns: ["isp_id"]
             isOneToOne: false
@@ -1413,6 +1752,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_conversation_isp_id: {
+        Args: { _conversation_id: string }
+        Returns: string
+      }
       get_user_isp_id: { Args: { _user_id: string }; Returns: string }
       has_isp_permission: {
         Args: { _isp_id: string; _permission: string; _user_id: string }
