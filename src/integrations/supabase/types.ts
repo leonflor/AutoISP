@@ -1776,6 +1776,19 @@ export type Database = {
         Args: { _isp_id: string; _user_id: string }
         Returns: boolean
       }
+      match_knowledge: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_tenant_agent_id: string
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          similarity: number
+          title: string
+        }[]
+      }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "support"
