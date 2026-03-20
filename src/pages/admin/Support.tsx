@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { MessageSquare, Filter, Clock, CheckCircle2, AlertCircle, User } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle2, AlertCircle, User, Bot, UserCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,14 +21,20 @@ import {
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
-  open: { label: "Aberto", variant: "destructive", icon: AlertCircle },
-  in_progress: { label: "Em Andamento", variant: "secondary", icon: Clock },
-  closed: { label: "Fechado", variant: "default", icon: CheckCircle2 },
+const modeConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
+  bot: { label: "Bot", variant: "secondary", icon: Bot },
+  human: { label: "Humano", variant: "destructive", icon: UserCheck },
+  paused: { label: "Pausado", variant: "outline", icon: Clock },
+  resolved: { label: "Resolvido", variant: "default", icon: CheckCircle2 },
 };
+
+function getConversationStatus(conv: { mode: string; resolved_at: string | null }) {
+  if (conv.resolved_at) return "resolved";
+  return conv.mode;
+}
 
 const AdminSupportPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -43,10 +48,9 @@ const AdminSupportPage = () => {
         .select(`
           *,
           isps:isp_id (name, slug),
-          subscribers:subscriber_id (name, email),
-          ai_agents:agent_id (name, type)
+          tenant_agents:tenant_agent_id (custom_name, template_id)
         `)
-        .order("started_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(100);
 
       if (error) throw error;
@@ -54,24 +58,22 @@ const AdminSupportPage = () => {
     },
   });
 
-  // Filter conversations
   const filteredConversations = conversations?.filter((conv) => {
-    const matchesStatus = statusFilter === "all" || conv.status === statusFilter;
+    const convStatus = getConversationStatus(conv);
+    const matchesStatus = statusFilter === "all" || convStatus === statusFilter;
     const matchesSearch =
       searchTerm === "" ||
-      conv.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      conv.user_phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (conv.isps as any)?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
-  // Calculate stats
-  const openCount = conversations?.filter((c) => c.status === "open").length || 0;
-  const inProgressCount = conversations?.filter((c) => c.status === "in_progress").length || 0;
-  const closedToday = conversations?.filter(
+  const activeCount = conversations?.filter((c) => !c.resolved_at).length || 0;
+  const humanCount = conversations?.filter((c) => c.mode === "human" && !c.resolved_at).length || 0;
+  const resolvedToday = conversations?.filter(
     (c) =>
-      c.status === "closed" &&
-      c.closed_at &&
-      new Date(c.closed_at).toDateString() === new Date().toDateString()
+      c.resolved_at &&
+      new Date(c.resolved_at).toDateString() === new Date().toDateString()
   ).length || 0;
 
   if (isLoading) {
@@ -79,7 +81,7 @@ const AdminSupportPage = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Suporte</h1>
-          <p className="text-muted-foreground">Gerencie tickets de suporte de todos os ISPs</p>
+          <p className="text-muted-foreground">Gerencie conversas de suporte de todos os ISPs</p>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -95,44 +97,42 @@ const AdminSupportPage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Suporte</h1>
-        <p className="text-muted-foreground">Gerencie tickets de suporte de todos os ISPs</p>
+        <p className="text-muted-foreground">Gerencie conversas de suporte de todos os ISPs</p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Tickets Abertos</CardDescription>
-            <CardTitle className="text-2xl text-destructive">{openCount}</CardTitle>
+            <CardDescription>Conversas Ativas</CardDescription>
+            <CardTitle className="text-2xl text-destructive">{activeCount}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Em Andamento</CardDescription>
-            <CardTitle className="text-2xl text-amber-600">{inProgressCount}</CardTitle>
+            <CardDescription>Atendimento Humano</CardDescription>
+            <CardTitle className="text-2xl text-amber-600">{humanCount}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Fechados Hoje</CardDescription>
-            <CardTitle className="text-2xl text-green-600">{closedToday}</CardTitle>
+            <CardDescription>Resolvidos Hoje</CardDescription>
+            <CardTitle className="text-2xl text-green-600">{resolvedToday}</CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
-              Todos os Tickets
+              Todas as Conversas
             </CardTitle>
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Buscar..."
+                placeholder="Buscar por telefone ou ISP..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-64"
@@ -143,9 +143,10 @@ const AdminSupportPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="open">Abertos</SelectItem>
-                  <SelectItem value="in_progress">Em Andamento</SelectItem>
-                  <SelectItem value="closed">Fechados</SelectItem>
+                  <SelectItem value="bot">Bot</SelectItem>
+                  <SelectItem value="human">Humano</SelectItem>
+                  <SelectItem value="paused">Pausado</SelectItem>
+                  <SelectItem value="resolved">Resolvido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -157,7 +158,7 @@ const AdminSupportPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>ISP</TableHead>
-                  <TableHead>Assunto</TableHead>
+                  <TableHead>Telefone</TableHead>
                   <TableHead>Canal</TableHead>
                   <TableHead>Agente</TableHead>
                   <TableHead>Status</TableHead>
@@ -166,8 +167,9 @@ const AdminSupportPage = () => {
               </TableHeader>
               <TableBody>
                 {filteredConversations.map((conv) => {
-                  const status = statusConfig[conv.status || "open"];
-                  const StatusIcon = status.icon;
+                  const convStatus = getConversationStatus(conv);
+                  const config = modeConfig[convStatus] || modeConfig.bot;
+                  const StatusIcon = config.icon;
                   return (
                     <TableRow key={conv.id} className="cursor-pointer hover:bg-muted/50">
                       <TableCell>
@@ -178,26 +180,24 @@ const AdminSupportPage = () => {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {conv.subject || "Sem assunto"}
-                      </TableCell>
+                      <TableCell>{conv.user_phone || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
                           {conv.channel}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {(conv.ai_agents as any)?.name || "-"}
+                        {(conv.tenant_agents as any)?.custom_name || "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={status.variant} className="gap-1">
+                        <Badge variant={config.variant} className="gap-1">
                           <StatusIcon className="h-3 w-3" />
-                          {status.label}
+                          {config.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {conv.started_at
-                          ? formatDistanceToNow(new Date(conv.started_at), {
+                        {conv.created_at
+                          ? formatDistanceToNow(new Date(conv.created_at), {
                               addSuffix: true,
                               locale: ptBR,
                             })
@@ -211,9 +211,9 @@ const AdminSupportPage = () => {
           ) : (
             <div className="text-center py-8">
               <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold">Nenhum ticket encontrado</h3>
+              <h3 className="font-semibold">Nenhuma conversa encontrada</h3>
               <p className="text-sm text-muted-foreground">
-                Os tickets de suporte aparecerão aqui.
+                As conversas de suporte aparecerão aqui.
               </p>
             </div>
           )}
