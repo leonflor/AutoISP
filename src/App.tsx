@@ -88,6 +88,7 @@ const App = () => (
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="isps" element={<IspsPage />} />
+                <Route path="isps/:id" element={<IspDetailPage />} />
                 <Route path="planos" element={<PlansPage />} />
                 <Route path="financeiro" element={<FinancePage />} />
                 <Route path="faturas" element={<InvoicesPage />} />
