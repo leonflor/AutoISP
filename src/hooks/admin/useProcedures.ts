@@ -141,7 +141,7 @@ export function useProcedures(templateFilter?: string) {
         description: data.description,
         template_id: data.template_id,
         is_active: data.is_active,
-        definition: data.definition as unknown as Record<string, unknown>,
+        definition: JSON.parse(JSON.stringify(data.definition)),
         version: data.currentVersion + 1,
         is_current: true,
       };
