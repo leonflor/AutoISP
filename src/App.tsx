@@ -47,6 +47,7 @@ const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const SupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
 const AiToolCatalogPage = lazy(() => import("./pages/admin/AiToolCatalog"));
 const TemplatesPage = lazy(() => import("./pages/admin/Templates"));
+const ProceduresPage = lazy(() => import("./pages/admin/Procedures"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
 
@@ -96,6 +97,7 @@ const App = () => (
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
                 <Route path="ai-tools" element={<AiToolCatalogPage />} />
                 <Route path="templates" element={<TemplatesPage />} />
+                <Route path="procedures" element={<ProceduresPage />} />
                 <Route path="whatsapp" element={<AdminWhatsApp />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
