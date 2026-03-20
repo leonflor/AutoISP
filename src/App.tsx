@@ -95,6 +95,7 @@ const App = () => (
                 <Route path="tickets" element={<SupportTickets />} />
                 <Route path="tickets/:id" element={<SupportTicketDetail />} />
                 <Route path="ai-tools" element={<AiToolCatalogPage />} />
+                <Route path="templates" element={<TemplatesPage />} />
                 <Route path="whatsapp" element={<AdminWhatsApp />} />
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="config" element={<AdminConfig />} />
