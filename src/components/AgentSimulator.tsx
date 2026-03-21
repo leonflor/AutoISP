@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Bot, Send, RotateCcw, Loader2, Thermometer, GitBranch,
-  Bug, Wrench, User, Zap,
+  Bug, Wrench, User, Zap, PhoneForwarded,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -244,6 +244,16 @@ export function AgentSimulator({
                         )}
                       </div>
                     ) : null}
+
+                    {/* Transfer to human indicator */}
+                    {msg.role === 'assistant' && msg.debug?.mode === 'human' && (
+                      <div className="mb-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs flex items-center gap-2">
+                        <PhoneForwarded className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span className="text-amber-700 font-medium">
+                          Conversa transferida para atendimento humano
+                        </span>
+                      </div>
+                    )}
 
                     {/* Message bubble */}
                     <div

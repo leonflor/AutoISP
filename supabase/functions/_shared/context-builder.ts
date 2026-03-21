@@ -289,7 +289,7 @@ export function buildSystemPrompt(context: RuntimeContext): string {
     guardrails += "\n- Você NÃO tem acesso ao sistema ERP. Não pode consultar dados de clientes, faturas ou contratos. Informe que o recurso não está disponível no momento e oriente o usuário a entrar em contato diretamente com o provedor.";
   }
   if (!hasProcedure) {
-    guardrails += "\n- Nenhum procedimento está ativo. Responda de forma genérica e ofereça transferir para atendimento humano quando o assunto exigir consulta a sistemas.";
+    guardrails += "\n- Nenhum procedimento está ativo. Responda de forma genérica. Quando o assunto exigir consulta a sistemas (faturas, contratos, dados cadastrais), use a ferramenta `transfer_to_human` para transferir — NUNCA apenas diga que vai transferir sem executar a ferramenta.";
   }
   if (!hasRag) {
     guardrails += "\n- Não há base de conhecimento configurada. Evite respostas que exijam conhecimento técnico específico do provedor.";
