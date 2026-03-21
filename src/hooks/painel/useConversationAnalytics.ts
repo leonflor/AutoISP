@@ -19,7 +19,7 @@ export function useConversationAnalytics({ period, ispId }: { period: Period; is
       if (ispId) query = query.eq('isp_id', ispId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as Array<{
+      return (data || []) as unknown as Array<{
         isp_id: string; date: string; total: number; resolved_by_bot: number;
         went_to_human: number; avg_minutes: number | null; avg_messages: number | null;
       }>;
