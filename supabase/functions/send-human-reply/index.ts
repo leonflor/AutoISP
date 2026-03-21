@@ -145,6 +145,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Auto-assign agent if conversation has no assigned agent
+    if (!conversation.assigned_agent_id && agentRecord) {
+      await supabase
+        .from("conversations")
+        .update({ assigned_agent_id: agentRecord.id })
+        .eq("id", body.conversation_id);
+    }
+
     // Send via WhatsApp
     if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
       // Message saved but WhatsApp not configured — still return success
