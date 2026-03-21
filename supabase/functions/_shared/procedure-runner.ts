@@ -373,6 +373,13 @@ export async function runProcedureStep(
       `tools=${toolIterations} advance=${!!step}`,
   );
 
+  // Re-read conversation to get latest mode (may have changed via transfer_to_human)
+  const { data: updatedConv } = await supabaseAdmin
+    .from("conversations")
+    .select("mode, handover_reason")
+    .eq("id", conversationId)
+    .single();
+
   return {
     reply,
     debug: {
@@ -383,6 +390,8 @@ export async function runProcedureStep(
         ? (context.procedure.name as string)
         : null,
       step_index: context.conversation.step_index,
+      mode: updatedConv?.mode ?? context.conversation.mode,
+      handover_reason: updatedConv?.handover_reason ?? null,
     },
   };
 }
