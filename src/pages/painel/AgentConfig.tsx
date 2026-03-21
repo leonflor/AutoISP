@@ -358,6 +358,15 @@ export default function AgentConfig() {
           </div>
         </CardContent>
       </Card>
+
+      {agent && (
+        <AgentSimulator
+          open={simulatorOpen}
+          onOpenChange={setSimulatorOpen}
+          tenantAgentId={agent.id}
+          agentName={agent.custom_name || agent.template?.default_name || 'Agente'}
+        />
+      )}
     </div>
   );
 }
