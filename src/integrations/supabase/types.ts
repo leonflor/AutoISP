@@ -796,8 +796,13 @@ export type Database = {
           content: string
           created_at: string | null
           embedding: string | null
+          error_message: string | null
+          file_size: number | null
+          file_url: string | null
           id: string
+          parent_id: string | null
           source_type: string | null
+          status: string
           tenant_agent_id: string
           title: string | null
         }
@@ -805,8 +810,13 @@ export type Database = {
           content: string
           created_at?: string | null
           embedding?: string | null
+          error_message?: string | null
+          file_size?: number | null
+          file_url?: string | null
           id?: string
+          parent_id?: string | null
           source_type?: string | null
+          status?: string
           tenant_agent_id: string
           title?: string | null
         }
@@ -814,12 +824,24 @@ export type Database = {
           content?: string
           created_at?: string | null
           embedding?: string | null
+          error_message?: string | null
+          file_size?: number | null
+          file_url?: string | null
           id?: string
+          parent_id?: string | null
           source_type?: string | null
+          status?: string
           tenant_agent_id?: string
           title?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "knowledge_bases_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_bases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "knowledge_bases_tenant_agent_id_fkey"
             columns: ["tenant_agent_id"]
