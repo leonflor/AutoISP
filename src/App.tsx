@@ -124,6 +124,7 @@ const App = () => (
                 <Route path="agent-config" element={<PainelAgentConfig />} />
                 <Route path="knowledge-base" element={<PainelKnowledgeBase />} />
                 <Route path="erp-config" element={<PainelErpConfig />} />
+                <Route path="suporte" element={<PainelLiveSupport />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
