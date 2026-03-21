@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Bot, Send, RotateCcw, Loader2, Thermometer, GitBranch,
-  Bug, Wrench, User, Zap,
+  Bug, Wrench, User, Zap, PhoneForwarded,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
