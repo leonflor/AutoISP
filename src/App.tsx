@@ -55,6 +55,8 @@ const TemplatesPage = lazy(() => import("./pages/admin/Templates"));
 const ProceduresPage = lazy(() => import("./pages/admin/Procedures"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
+const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
+const PainelAnalytics = lazy(() => import("./pages/painel/Analytics"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
