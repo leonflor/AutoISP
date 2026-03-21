@@ -1771,7 +1771,76 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      conversation_stats: {
+        Row: {
+          avg_messages: number | null
+          avg_minutes: number | null
+          date: string | null
+          isp_id: string | null
+          resolved_by_bot: number | null
+          total: number | null
+          went_to_human: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handover_reason_stats: {
+        Row: {
+          count: number | null
+          handover_reason: string | null
+          isp_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hourly_volume_stats: {
+        Row: {
+          count: number | null
+          hour: number | null
+          isp_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      procedure_stats: {
+        Row: {
+          completed: number | null
+          completion_rate: number | null
+          isp_id: string | null
+          procedure_name: string | null
+          total_triggered: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_isp_id_fkey"
+            columns: ["isp_id"]
+            isOneToOne: false
+            referencedRelation: "isps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_conversation_isp_id: {
