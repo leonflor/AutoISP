@@ -55,6 +55,8 @@ const TemplatesPage = lazy(() => import("./pages/admin/Templates"));
 const ProceduresPage = lazy(() => import("./pages/admin/Procedures"));
 const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
+const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
+const PainelAnalytics = lazy(() => import("./pages/painel/Analytics"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -106,6 +108,7 @@ const App = () => (
                 <Route path="procedures" element={<ProceduresPage />} />
                 <Route path="whatsapp" element={<AdminWhatsApp />} />
                 <Route path="relatorios" element={<AdminReports />} />
+                <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="config" element={<AdminConfig />} />
               </Route>
               
@@ -125,6 +128,7 @@ const App = () => (
                 <Route path="knowledge-base" element={<PainelKnowledgeBase />} />
                 <Route path="erp-config" element={<PainelErpConfig />} />
                 <Route path="suporte" element={<PainelLiveSupport />} />
+                <Route path="analytics" element={<PainelAnalytics />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
