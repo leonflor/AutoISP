@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useAgentTemplates, type AgentTemplate } from '@/hooks/admin/useAgentTemplates';
 import { TemplateFormDrawer } from '@/components/admin/templates/TemplateFormDrawer';
+import { AgentSimulator } from '@/components/AgentSimulator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Bot, Thermometer, Users, FileText } from 'lucide-react';
+import { Plus, Pencil, Bot, Thermometer, Users, FileText, Play } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const TYPE_LABELS: Record<string, string> = {
