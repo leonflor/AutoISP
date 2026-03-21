@@ -165,6 +165,13 @@ export default function Templates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AgentSimulator
+        open={!!simulatingTemplate}
+        onOpenChange={(o) => !o && setSimulatingTemplate(null)}
+        templateId={simulatingTemplate?.id}
+        agentName={simulatingTemplate?.name ?? 'Agente'}
+      />
     </div>
   );
 }
