@@ -275,5 +275,27 @@ export function buildSystemPrompt(context: RuntimeContext): string {
   // 6. ISP name anchoring
   prompt += `\n## Provedor: ${context.ispName}`;
 
+  // 7. Dynamic guardrails based on available capabilities
+  const hasErp = !!context.erpConfig;
+  const hasRag = ragChunks.length > 0;
+  const hasProcedure = !!procedure;
+
+  let guardrails = "\n\n## REGRAS OBRIGATÓRIAS:";
+  guardrails += "\n- NUNCA invente dados de clientes, faturas, contratos, CPF, valores ou endereços.";
+  guardrails += "\n- NUNCA forneça informações técnicas específicas (velocidade do plano, valor de fatura, status de conexão) sem ter consultado uma ferramenta.";
+  guardrails += "\n- Se não tiver certeza, diga que não tem a informação e ofereça alternativas.";
+
+  if (!hasErp) {
+    guardrails += "\n- Você NÃO tem acesso ao sistema ERP. Não pode consultar dados de clientes, faturas ou contratos. Informe que o recurso não está disponível no momento e oriente o usuário a entrar em contato diretamente com o provedor.";
+  }
+  if (!hasProcedure) {
+    guardrails += "\n- Nenhum procedimento está ativo. Responda de forma genérica e ofereça transferir para atendimento humano quando o assunto exigir consulta a sistemas.";
+  }
+  if (!hasRag) {
+    guardrails += "\n- Não há base de conhecimento configurada. Evite respostas que exijam conhecimento técnico específico do provedor.";
+  }
+
+  prompt += guardrails;
+
   return prompt;
 }
