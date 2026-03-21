@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAgentConfig } from '@/hooks/painel/useAgentConfig';
 import { useWhatsAppConfig } from '@/hooks/painel/useWhatsAppConfig';
+import { AgentSimulator } from '@/components/AgentSimulator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
   Bot, Upload, Save, Loader2, Copy, Check, ChevronDown,
-  Wifi, WifiOff, MessageSquare, Clock, Info, ExternalLink,
+  Wifi, WifiOff, MessageSquare, Clock, Info, ExternalLink, Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -35,6 +36,7 @@ export default function AgentConfig() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verifyToken] = useState(() => crypto.randomUUID());
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
 
   // Sync state when agent loads
   const [initialized, setInitialized] = useState(false);
@@ -109,9 +111,16 @@ export default function AgentConfig() {
 
   return (
     <div className="space-y-6 p-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuração do Agente IA</h1>
-        <p className="text-muted-foreground">Personalize a identidade do agente e conecte o WhatsApp</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Configuração do Agente IA</h1>
+          <p className="text-muted-foreground">Personalize a identidade do agente e conecte o WhatsApp</p>
+        </div>
+        {agent && (
+          <Button variant="outline" onClick={() => setSimulatorOpen(true)}>
+            <Play className="h-4 w-4 mr-2" /> Testar agente
+          </Button>
+        )}
       </div>
 
       {/* SEÇÃO 1 — Identidade do Agente */}
@@ -349,6 +358,15 @@ export default function AgentConfig() {
           </div>
         </CardContent>
       </Card>
+
+      {agent && (
+        <AgentSimulator
+          open={simulatorOpen}
+          onOpenChange={setSimulatorOpen}
+          tenantAgentId={agent.id}
+          agentName={agent.custom_name || agent.template?.default_name || 'Agente'}
+        />
+      )}
     </div>
   );
 }

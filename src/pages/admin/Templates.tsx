@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useAgentTemplates, type AgentTemplate } from '@/hooks/admin/useAgentTemplates';
 import { TemplateFormDrawer } from '@/components/admin/templates/TemplateFormDrawer';
+import { AgentSimulator } from '@/components/AgentSimulator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Bot, Thermometer, Users, FileText } from 'lucide-react';
+import { Plus, Pencil, Bot, Thermometer, Users, FileText, Play } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -29,6 +30,7 @@ export default function Templates() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<AgentTemplate | null>(null);
   const [deactivating, setDeactivating] = useState<AgentTemplate | null>(null);
+  const [simulatingTemplate, setSimulatingTemplate] = useState<AgentTemplate | null>(null);
 
   const handleSave = (payload: Record<string, unknown>) => {
     upsert.mutate(payload as any, {
@@ -94,7 +96,16 @@ export default function Templates() {
                   <CardTitle className="text-base truncate">{t.name}</CardTitle>
                   <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] ?? t.type}</Badge>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setSimulatingTemplate(t)}
+                    title="Testar"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -154,6 +165,13 @@ export default function Templates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AgentSimulator
+        open={!!simulatingTemplate}
+        onOpenChange={(o) => !o && setSimulatingTemplate(null)}
+        templateId={simulatingTemplate?.id}
+        agentName={simulatingTemplate?.name ?? 'Agente'}
+      />
     </div>
   );
 }
