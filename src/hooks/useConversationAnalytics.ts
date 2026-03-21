@@ -2,7 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, format } from 'date-fns';
 
-type Period = '7d' | '30d' | '90d';
+export type Period = '7d' | '30d' | '90d';
+
+export const PERIOD_OPTIONS: { label: string; value: Period }[] = [
+  { label: '7 dias', value: '7d' },
+  { label: '30 dias', value: '30d' },
+  { label: '90 dias', value: '90d' },
+];
 
 const periodToDays: Record<Period, number> = { '7d': 7, '30d': 30, '90d': 90 };
 
@@ -91,7 +97,6 @@ export function useConversationAnalytics({ period, ispId }: { period: Period; is
   const botResolutionRate = totalConversations > 0 ? (totalBotResolved / totalConversations) * 100 : 0;
   const handoverRate = totalConversations > 0 ? (totalHuman / totalConversations) * 100 : 0;
 
-  // Aggregate hourly data across ISPs if no ispId
   const hourlyData = (() => {
     const map = new Map<number, number>();
     for (let i = 0; i < 24; i++) map.set(i, 0);
@@ -99,7 +104,6 @@ export function useConversationAnalytics({ period, ispId }: { period: Period; is
     return Array.from(map.entries()).map(([hour, count]) => ({ hour: `${hour}h`, count }));
   })();
 
-  // Daily chart data
   const dailyData = (() => {
     const map = new Map<string, { total: number; bot: number }>();
     stats.forEach(r => {
