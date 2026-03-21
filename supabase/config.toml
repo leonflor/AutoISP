@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.transfer-conversation]
 verify_jwt = false
+
+[functions.simulate-agent]
+verify_jwt = false
