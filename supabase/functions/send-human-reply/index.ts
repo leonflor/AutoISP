@@ -78,6 +78,17 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate conversation is in human mode
+    if (conversation.mode !== "human") {
+      return new Response(
+        JSON.stringify({ error: "Conversation is not in human mode" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Validate: user must be the assigned agent or an ISP admin
     const { data: agentRecord } = await supabase
       .from("human_agents")
