@@ -9,7 +9,8 @@ import {
   Send,
   UserCog,
   Receipt,
-  Bot
+  Bot,
+  BookOpen
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
