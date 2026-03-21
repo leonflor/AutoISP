@@ -10,7 +10,8 @@ import {
   UserCog,
   Receipt,
   Bot,
-  BookOpen
+  BookOpen,
+  Database
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +39,7 @@ const menuItems = [
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
   { title: 'Agente IA', url: '/painel/agent-config', icon: Bot },
   { title: 'Base de Conhecimento', url: '/painel/knowledge-base', icon: BookOpen },
+  { title: 'Integração ERP', url: '/painel/erp-config', icon: Database },
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
   { title: 'Faturas', url: '/painel/faturas', icon: Receipt },
   { title: 'Relatórios', url: '/painel/relatorios', icon: BarChart3 },
