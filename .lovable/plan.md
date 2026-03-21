@@ -1,39 +1,74 @@
 
 
-# Plano: Upload de Avatar com validação 10MB e JPG/PNG/GIF
+# Plano: Suporte a Múltiplos Agentes de IA por ISP
 
-## O que muda
+## Problema atual
+- O hook `useAgentConfig` usa `.maybeSingle()`, retornando apenas 1 agente
+- A página `AgentConfig.tsx` é uma tela monolítica para um único agente
+- O upload de avatar usa path fixo (`{ispId}/avatar.ext`), colidiria entre agentes
 
-Dois pontos de upload de avatar precisam de ajuste:
+## Solução
 
-### 1. Admin — TemplateForm (avatar padrão do template)
+### 1. Hook `useAgentConfig.ts` — buscar todos os agentes
+- Trocar `.maybeSingle()` por query sem filtro de single, retornando array `AgentWithTemplate[]`
+- Renomear retorno de `agent` para `agents` (array)
+- Status passa a receber `agentId` opcional ou agrega dados de todos os agentes
+- Upload de avatar usa path `{ispId}/{agentId}/avatar.{ext}` para evitar colisão
+- `updateAgent` passa a receber o `agentId` como parâmetro
 
-Atualmente é um campo de texto URL. Será substituído por um upload com dropzone idêntico ao do ISP.
+### 2. Página `AgentConfig.tsx` — layout de grid/lista
+- Exibir grid de cards com todos os agentes do ISP
+- Cada card mostra: avatar, nome (custom ou default), template base, badge ativo/inativo
+- Ao clicar num card, expande um painel de edição inline (ou abre um dialog) com:
+  - Upload de avatar + campo de nome (identidade)
+  - Info do template base (read-only)
+  - Status individual (conversas hoje, última mensagem)
+  - Botão "Testar agente" (simulador)
+- A seção de WhatsApp permanece global (uma única conexão por ISP), fora do loop de agentes
+- Estado de loading usa skeleton grid
 
-**Arquivo**: `src/pages/admin/TemplateForm.tsx`
-- Adicionar `react-dropzone` e lógica de upload para Supabase Storage (`agent-avatars/templates/{templateId}`)
-- Substituir o `Input` de URL (linhas 208-217) por um componente de dropzone com preview
-- Validação: `accept: image/jpeg, image/png, image/gif`, `maxSize: 10MB`
-- No `handleSubmit`, fazer upload do arquivo antes de salvar e gravar a URL pública no campo `default_avatar_url`
+### 3. Arquivos afetados
 
-### 2. ISP — AgentConfig (avatar customizado do ISP)
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/painel/useAgentConfig.ts` | Retornar array, `updateAgent` com agentId, upload com agentId no path |
+| `src/pages/painel/AgentConfig.tsx` | Grid de agent cards + painel de edição por agente selecionado |
 
-Já tem dropzone mas com limites errados.
+### Detalhes técnicos
 
-**Arquivo**: `src/pages/painel/AgentConfig.tsx`
-- Linha 59: Mudar accept de `image/*: [.png, .jpg, .jpeg, .webp]` para `image/jpeg, image/png, image/gif` com extensões `.jpg, .jpeg, .png, .gif`
-- Linha 61: Mudar `maxSize` de `2 * 1024 * 1024` para `10 * 1024 * 1024`
-- Adicionar feedback de erro ao usuário quando arquivo for rejeitado (tamanho ou formato)
+**Hook — query refatorada:**
+```typescript
+const { data: agents } = useQuery({
+  queryKey: ['agent-config', ispId],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('tenant_agents')
+      .select('id, custom_name, custom_avatar_url, is_active, isp_id, template_id, agent_templates!inner(...)')
+      .eq('isp_id', ispId);
+    // retorna data mapeado como AgentWithTemplate[]
+  },
+});
+```
 
-### 3. Hook useAgentConfig — uploadAvatar
-
-**Arquivo**: `src/hooks/painel/useAgentConfig.ts`
-- Já funciona corretamente, sem alterações necessárias
-
-### Arquivos afetados
-
-| Ação | Arquivo |
-|------|---------|
-| Editar | `src/pages/admin/TemplateForm.tsx` — trocar input URL por dropzone + upload |
-| Editar | `src/pages/painel/AgentConfig.tsx` — corrigir accept e maxSize |
+**Página — estrutura:**
+```text
+┌──────────────────────────────────┐
+│ Título: Agentes de IA            │
+├──────────────────────────────────┤
+│ ┌─────────┐ ┌─────────┐ ┌─────┐ │
+│ │ Agent 1  │ │ Agent 2  │ │ ... │ │  ← Grid de cards
+│ │ (avatar) │ │ (avatar) │ │     │ │
+│ │ Nome     │ │ Nome     │ │     │ │
+│ │ Template │ │ Template │ │     │ │
+│ └─────────┘ └─────────┘ └─────┘ │
+├──────────────────────────────────┤
+│ [Painel de edição do selecionado]│  ← Expandido ao clicar
+│  Avatar upload + Nome + Salvar   │
+│  Template info (read-only)       │
+│  Status (conversas, última msg)  │
+│  Botão testar                    │
+├──────────────────────────────────┤
+│ Conexão WhatsApp (global)        │  ← Permanece igual
+└──────────────────────────────────┘
+```
 
