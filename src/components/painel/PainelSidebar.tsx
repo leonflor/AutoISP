@@ -8,7 +8,8 @@ import {
   Wifi,
   Send,
   UserCog,
-  Receipt
+  Receipt,
+  Bot
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +35,7 @@ const menuItems = [
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
+  { title: 'Agente IA', url: '/painel/agent-config', icon: Bot },
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
   { title: 'Faturas', url: '/painel/faturas', icon: Receipt },
   { title: 'Relatórios', url: '/painel/relatorios', icon: BarChart3 },

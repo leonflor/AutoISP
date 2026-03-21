@@ -41,6 +41,7 @@ const PainelSettings = lazy(() => import("./pages/painel/Settings"));
 const PainelInvoices = lazy(() => import("./pages/painel/Invoices"));
 const PainelWhatsApp = lazy(() => import("./pages/painel/WhatsAppConfig"));
 const PainelErpIntegrations = lazy(() => import("./pages/painel/ErpIntegrations"));
+const PainelAgentConfig = lazy(() => import("./pages/painel/AgentConfig"));
 
 // Lazy load - Admin extra pages
 const AdminSupport = lazy(() => import("./pages/admin/Support"));
@@ -117,6 +118,7 @@ const App = () => (
                 <Route path="relatorios" element={<PainelReports />} />
                 <Route path="configuracoes" element={<PainelSettings />} />
                 <Route path="integracoes/erp" element={<PainelErpIntegrations />} />
+                <Route path="agent-config" element={<PainelAgentConfig />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
