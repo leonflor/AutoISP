@@ -110,10 +110,29 @@ function buildStepTools(
   step: ProcedureStep | null,
   hasErp: boolean,
 ): unknown[] | undefined {
-  if (!step?.available_functions?.length) return undefined;
+  // Always include transfer_to_human
+  const transferTool = TOOL_CATALOG["transfer_to_human"];
+  const alwaysAvailable = transferTool
+    ? [
+        {
+          type: "function" as const,
+          function: {
+            name: transferTool.handler,
+            description: transferTool.description,
+            parameters: transferTool.parameters_schema,
+          },
+        },
+      ]
+    : [];
 
-  const tools = step.available_functions
+  if (!step?.available_functions?.length) {
+    // No procedure step — only transfer_to_human
+    return alwaysAvailable.length > 0 ? alwaysAvailable : undefined;
+  }
+
+  const stepTools = step.available_functions
     .filter((name) => {
+      if (name === "transfer_to_human") return false; // avoid duplicate
       const tool = TOOL_CATALOG[name];
       return tool && (!tool.requires_erp || hasErp);
     })
@@ -129,7 +148,8 @@ function buildStepTools(
       };
     });
 
-  return tools.length > 0 ? tools : undefined;
+  const allTools = [...alwaysAvailable, ...stepTools];
+  return allTools.length > 0 ? allTools : undefined;
 }
 
 // ─── Main: runProcedureStep ─────────────────────────────────────────
