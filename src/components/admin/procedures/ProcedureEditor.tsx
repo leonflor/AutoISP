@@ -71,6 +71,19 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
   );
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
 
+  useEffect(() => {
+    if (procedure) {
+      setName(procedure.name ?? '');
+      setDescription(procedure.description ?? '');
+      setTemplateId(procedure.template_id ?? '');
+      setIsActive(procedure.is_active ?? true);
+      setKeywords(procedure.definition?.triggers?.keywords ?? []);
+      setMinConfidence(procedure.definition?.triggers?.min_confidence ?? 70);
+      setSteps(procedure.definition?.steps?.length ? procedure.definition.steps : [{ ...EMPTY_STEP }]);
+      setOpenSteps({ 0: true });
+    }
+  }, [procedure]);
+
   const handleAddKeyword = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && keywordInput.trim()) {
       e.preventDefault();
