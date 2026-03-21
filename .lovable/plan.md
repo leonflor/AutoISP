@@ -1,35 +1,44 @@
 
 
-# Auditoria de Código — Cleanup Executado ✅
+# Plano: Agrupar itens de Agentes de IA no menu admin
 
-## Ações Realizadas
+## O que muda
 
-| # | Ação | Status |
-|---|------|--------|
-| 1 | Removido dead code `src/lib/llm/` (3 arquivos) e `src/lib/erp/` (3 arquivos) | ✅ |
-| 2 | Extraído `KpiCard`, `ConversationHistoryDialog`, `AnalyticsDashboard` para `src/components/analytics/` | ✅ |
-| 3 | Removido import `Cell` não usado e eliminado duplicação nas pages de Analytics | ✅ |
-| 4 | Removido re-export morto `src/components/ui/use-toast.ts` | ✅ |
-| 5 | Movido `useConversationAnalytics` para `src/hooks/` com `Period` e `PERIOD_OPTIONS` exportados | ✅ |
-| 6 | Adicionado comentário de sincronização ao `src/constants/tool-catalog.ts` | ✅ |
-| 7 | Padronização de rotas PT/EN | ⏳ Adiado (breaking change) |
+Os tres itens soltos no sidebar admin — **Ferramentas IA**, **Templates** e **Procedimentos** — serao agrupados num unico submenu colapsavel chamado **Agentes de IA** com icone `Bot`.
 
-## Arquivos
+## Antes → Depois
 
-| Ação | Arquivo |
-|------|---------|
-| Deletado | `src/lib/llm/tool-executor.ts` |
-| Deletado | `src/lib/llm/tool-result-formatter.ts` |
-| Deletado | `src/lib/llm/tools.ts` |
-| Deletado | `src/lib/erp/factory.ts` |
-| Deletado | `src/lib/erp/types.ts` |
-| Deletado | `src/lib/erp/adapters/ixcsoft.ts` |
-| Deletado | `src/components/ui/use-toast.ts` |
-| Deletado | `src/hooks/painel/useConversationAnalytics.ts` |
-| Criado | `src/hooks/useConversationAnalytics.ts` |
-| Criado | `src/components/analytics/KpiCard.tsx` |
-| Criado | `src/components/analytics/ConversationHistoryDialog.tsx` |
-| Criado | `src/components/analytics/AnalyticsDashboard.tsx` |
-| Reescrito | `src/pages/painel/Analytics.tsx` (usa componente compartilhado) |
-| Reescrito | `src/pages/admin/Analytics.tsx` (usa componente compartilhado) |
-| Editado | `src/constants/tool-catalog.ts` (sync warning) |
+```text
+ANTES                        DEPOIS
+─────                        ──────
+...                          ...
+Ferramentas IA               Agentes de IA ▾
+Templates                      ├ Templates
+Procedimentos                  ├ Procedimentos
+Relatórios                     └ Ferramentas
+...                          Relatórios
+                             ...
+```
+
+## Implementacao
+
+**Arquivo**: `src/components/admin/AdminSidebar.tsx`
+
+Substituir as 3 entradas no array `menuItems` (linhas 53-55) por uma unica entrada com submenu:
+
+```ts
+{
+  title: 'Agentes de IA',
+  icon: Bot,
+  submenu: [
+    { title: 'Templates', url: '/admin/templates', icon: Bot },
+    { title: 'Procedimentos', url: '/admin/procedures', icon: GitBranch },
+    { title: 'Ferramentas', url: '/admin/ai-tools', icon: Wrench },
+  ]
+},
+```
+
+Remover `Wrench` do import se nao for mais usado no nivel raiz (ainda sera usado no submenu, entao manter).
+
+Nenhuma outra alteracao necessaria — rotas e paginas permanecem iguais.
+
