@@ -12,7 +12,8 @@ import {
   Bot,
   BookOpen,
   Database,
-  Headset
+  Headset,
+  Activity
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
