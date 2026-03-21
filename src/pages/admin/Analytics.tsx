@@ -28,7 +28,7 @@ export default function AdminAnalytics() {
   const [searchParams, setSearchParams] = useSearchParams();
   const period = (searchParams.get('period') as Period) || '7d';
   const [selectedIspId, setSelectedIspId] = useState<string | undefined>();
-  const { data: isps } = useIsps();
+  const { isps } = useIsps();
 
   const { kpis, dailyData, handoverReasons, procedures, hourlyData, recentConversations, isLoading } = useConversationAnalytics({ period, ispId: selectedIspId });
 
