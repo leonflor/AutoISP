@@ -1,44 +1,47 @@
 
 
-# Plano: Agrupar itens de Agentes de IA no menu admin
+# Plano: Transformar edição de Template em página dedicada
 
 ## O que muda
 
-Os tres itens soltos no sidebar admin — **Ferramentas IA**, **Templates** e **Procedimentos** — serao agrupados num unico submenu colapsavel chamado **Agentes de IA** com icone `Bot`.
+O formulário de edição/criação de template deixa de ser um drawer/modal (`Sheet`) e passa a ser uma página própria com rota dedicada e botão voltar.
 
-## Antes → Depois
+## Implementação
 
-```text
-ANTES                        DEPOIS
-─────                        ──────
-...                          ...
-Ferramentas IA               Agentes de IA ▾
-Templates                      ├ Templates
-Procedimentos                  ├ Procedimentos
-Relatórios                     └ Ferramentas
-...                          Relatórios
-                             ...
+### 1. Criar página `TemplateForm.tsx`
+
+**Arquivo**: `src/pages/admin/TemplateForm.tsx`
+
+- Reutilizar todo o conteúdo do formulário atual (`TemplateFormDrawer.tsx`), mas renderizado como página full dentro do `AdminLayout`
+- Adicionar botão "Voltar" no topo com `useNavigate()` apontando para `/admin/templates`
+- Usar `useParams()` para capturar o `id` do template (edição) ou ausência dele (criação)
+- Carregar dados do template via `useAgentTemplates` quando houver `id`
+- Após salvar com sucesso, `navigate('/admin/templates')`
+
+### 2. Registrar rotas no App.tsx
+
+Adicionar duas rotas dentro do bloco `<Route path="/admin">`:
+```
+<Route path="templates/novo" element={<TemplateFormPage />} />
+<Route path="templates/:id" element={<TemplateFormPage />} />
 ```
 
-## Implementacao
+### 3. Atualizar `Templates.tsx`
 
-**Arquivo**: `src/components/admin/AdminSidebar.tsx`
+- Remover `TemplateFormDrawer` e seus estados (`drawerOpen`, `editing`)
+- Botão "Novo Template" → `navigate('/admin/templates/novo')`
+- Botão editar no card → `navigate(`/admin/templates/${t.id}`)`
 
-Substituir as 3 entradas no array `menuItems` (linhas 53-55) por uma unica entrada com submenu:
+### 4. Remover `TemplateFormDrawer.tsx`
 
-```ts
-{
-  title: 'Agentes de IA',
-  icon: Bot,
-  submenu: [
-    { title: 'Templates', url: '/admin/templates', icon: Bot },
-    { title: 'Procedimentos', url: '/admin/procedures', icon: GitBranch },
-    { title: 'Ferramentas', url: '/admin/ai-tools', icon: Wrench },
-  ]
-},
-```
+Arquivo deixa de ser necessário após a migração.
 
-Remover `Wrench` do import se nao for mais usado no nivel raiz (ainda sera usado no submenu, entao manter).
+## Arquivos
 
-Nenhuma outra alteracao necessaria — rotas e paginas permanecem iguais.
+| Ação | Arquivo |
+|------|---------|
+| Criar | `src/pages/admin/TemplateForm.tsx` |
+| Editar | `src/App.tsx` (2 rotas) |
+| Editar | `src/pages/admin/Templates.tsx` (remover drawer, usar navigate) |
+| Deletar | `src/components/admin/templates/TemplateFormDrawer.tsx` |
 
