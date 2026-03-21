@@ -1,6 +1,11 @@
 /**
  * Frontend mirror of the tool catalog — read-only display metadata.
  * No handler logic here; only used for the admin UI.
+ *
+ * ⚠️  SYNC WARNING: Keep in sync with the runtime catalog at
+ *     supabase/functions/_shared/tool-catalog.ts
+ *     The runtime uses `parameters_schema` (JSON Schema), while this
+ *     mirror uses a simplified `parameters` array for UI display.
  */
 
 export interface ToolCatalogEntry {
