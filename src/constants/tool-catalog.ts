@@ -53,4 +53,15 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     response_description: "Retorna array 'contratos' com objetos contendo: ordem, contrato_id, endereco, numero, complemento, bairro, endereco_completo e provider_name.",
     requires_erp: true,
   },
+  {
+    handler: "transfer_to_human",
+    display_name: "Transferir para Atendente Humano",
+    description:
+      "Transfere a conversa para um atendente humano quando o assunto exigir acesso a sistemas ou o cliente solicitar.",
+    parameters: [
+      { name: "reason", type: "string", description: "Motivo resumido da transferência", required: true },
+    ],
+    response_description: "Confirma que a conversa foi transferida para modo humano.",
+    requires_erp: false,
+  },
 ];

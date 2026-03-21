@@ -8,6 +8,7 @@ export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
   ispId: string;
   encryptionKey: string;
+  conversationId?: string;
 }
 
 export interface ToolResult {
@@ -63,12 +64,34 @@ const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
   return { success: true, data: result };
 };
 
+// ── Handler: transfer_to_human ──
+
+const transferToHumanHandler: ToolHandler = async (ctx, args) => {
+  const reason = String(args.reason || "Solicitado pelo agente");
+
+  if (!ctx.conversationId) {
+    return { success: false, error: "conversation_id não disponível no contexto" };
+  }
+
+  await ctx.supabaseAdmin
+    .from("conversations")
+    .update({
+      mode: "human",
+      handover_reason: reason,
+      handover_at: new Date().toISOString(),
+    })
+    .eq("id", ctx.conversationId);
+
+  return { success: true, data: { transferred: true, reason } };
+};
+
 // ── Registry ──
 
 const handlers: Record<string, ToolHandler> = {
   erp_client_lookup: erpClientLookupHandler,
   erp_contract_lookup: erpContractLookupHandler,
   erp_invoice_search: erpInvoiceSearchHandler,
+  transfer_to_human: transferToHumanHandler,
 };
 
 /**

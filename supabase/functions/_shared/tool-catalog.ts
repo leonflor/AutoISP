@@ -82,6 +82,27 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       "Retorna array 'contratos' com objetos contendo: ordem, contrato_id, endereco, numero, complemento, bairro, endereco_completo e provider_name. Use os campos estruturados para formatar a lista para o cliente.",
     requires_erp: true,
   },
+
+  transfer_to_human: {
+    handler: "transfer_to_human",
+    display_name: "Transferir para Atendente Humano",
+    description:
+      "Transfere a conversa para um atendente humano. Use quando o assunto exigir acesso a sistemas que você não possui, ou quando o cliente solicitar falar com uma pessoa.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Motivo resumido da transferência (ex: 'Cliente quer consultar fatura e ERP não disponível')",
+        },
+      },
+      required: ["reason"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Confirma que a conversa foi transferida para modo humano.",
+    requires_erp: false,
+  },
 };
 
 /**

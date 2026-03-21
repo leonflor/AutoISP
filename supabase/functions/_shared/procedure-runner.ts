@@ -231,6 +231,7 @@ export async function runProcedureStep(
     supabaseAdmin,
     ispId,
     encryptionKey,
+    conversationId,
   };
 
   while (toolIterations < MAX_TOOL_ITERATIONS) {
