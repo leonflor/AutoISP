@@ -96,7 +96,16 @@ export default function Templates() {
                   <CardTitle className="text-base truncate">{t.name}</CardTitle>
                   <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] ?? t.type}</Badge>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setSimulatingTemplate(t)}
+                    title="Testar"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
