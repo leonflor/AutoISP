@@ -44,7 +44,7 @@ export function useConversationAnalytics({ period, ispId }: { period: Period; is
       if (ispId) query = query.eq('isp_id', ispId);
       const { data, error } = await query.order('total_triggered', { ascending: false }).limit(10);
       if (error) throw error;
-      return (data || []) as Array<{
+      return (data || []) as unknown as Array<{
         isp_id: string; procedure_name: string; total_triggered: number;
         completed: number; completion_rate: number;
       }>;
