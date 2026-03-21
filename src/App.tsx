@@ -118,6 +118,7 @@ const App = () => (
                 <Route path="relatorios" element={<PainelReports />} />
                 <Route path="configuracoes" element={<PainelSettings />} />
                 <Route path="integracoes/erp" element={<PainelErpIntegrations />} />
+                <Route path="agent-config" element={<PainelAgentConfig />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
