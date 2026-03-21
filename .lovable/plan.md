@@ -1,74 +1,26 @@
 
 
-# Plano: Suporte a Múltiplos Agentes de IA por ISP
+# Plano: Mover seção WhatsApp do AgentConfig para Settings > Integrações
 
-## Problema atual
-- O hook `useAgentConfig` usa `.maybeSingle()`, retornando apenas 1 agente
-- A página `AgentConfig.tsx` é uma tela monolítica para um único agente
-- O upload de avatar usa path fixo (`{ispId}/avatar.ext`), colidiria entre agentes
+## O que muda
 
-## Solução
+A seção "Conexão WhatsApp" (linhas 349-449 de `AgentConfig.tsx`) e a seção "Status" (linhas 302-347) que inclui status de conexão WhatsApp estão atualmente dentro da página de Agentes de IA. Elas devem ser removidas de lá e a página `WhatsAppConfig.tsx` (já existente em `/painel/whatsapp`) já contém toda a funcionalidade completa de configuração WhatsApp.
 
-### 1. Hook `useAgentConfig.ts` — buscar todos os agentes
-- Trocar `.maybeSingle()` por query sem filtro de single, retornando array `AgentWithTemplate[]`
-- Renomear retorno de `agent` para `agents` (array)
-- Status passa a receber `agentId` opcional ou agrega dados de todos os agentes
-- Upload de avatar usa path `{ispId}/{agentId}/avatar.{ext}` para evitar colisão
-- `updateAgent` passa a receber o `agentId` como parâmetro
+O que precisa acontecer:
 
-### 2. Página `AgentConfig.tsx` — layout de grid/lista
-- Exibir grid de cards com todos os agentes do ISP
-- Cada card mostra: avatar, nome (custom ou default), template base, badge ativo/inativo
-- Ao clicar num card, expande um painel de edição inline (ou abre um dialog) com:
-  - Upload de avatar + campo de nome (identidade)
-  - Info do template base (read-only)
-  - Status individual (conversas hoje, última mensagem)
-  - Botão "Testar agente" (simulador)
-- A seção de WhatsApp permanece global (uma única conexão por ISP), fora do loop de agentes
-- Estado de loading usa skeleton grid
+### 1. `src/pages/painel/AgentConfig.tsx`
+- Remover toda a seção "Conexão WhatsApp" (linhas 349-449) e a seção "Status" de conexão (linhas 302-347)
+- Remover imports e estado relacionados ao WhatsApp (`useWhatsAppConfig`, `phoneNumberId`, `accessToken`, `phoneNumber`, `verifyToken`, `copiedField`, `webhookUrl`, `handleSaveWhatsApp`, `copyToClipboard`, `SUPABASE_PROJECT_ID`)
+- Manter apenas o grid de agentes e o painel de edição
 
-### 3. Arquivos afetados
+### 2. `src/pages/painel/Settings.tsx`
+- Atualizar o status do WhatsApp na lista de integrações para refletir dados reais usando `useWhatsAppConfig`
+- Mudar o status de `'pendente' as const` (hardcoded) para verificar `config?.is_connected`
+
+### Arquivos afetados
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/painel/useAgentConfig.ts` | Retornar array, `updateAgent` com agentId, upload com agentId no path |
-| `src/pages/painel/AgentConfig.tsx` | Grid de agent cards + painel de edição por agente selecionado |
-
-### Detalhes técnicos
-
-**Hook — query refatorada:**
-```typescript
-const { data: agents } = useQuery({
-  queryKey: ['agent-config', ispId],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('tenant_agents')
-      .select('id, custom_name, custom_avatar_url, is_active, isp_id, template_id, agent_templates!inner(...)')
-      .eq('isp_id', ispId);
-    // retorna data mapeado como AgentWithTemplate[]
-  },
-});
-```
-
-**Página — estrutura:**
-```text
-┌──────────────────────────────────┐
-│ Título: Agentes de IA            │
-├──────────────────────────────────┤
-│ ┌─────────┐ ┌─────────┐ ┌─────┐ │
-│ │ Agent 1  │ │ Agent 2  │ │ ... │ │  ← Grid de cards
-│ │ (avatar) │ │ (avatar) │ │     │ │
-│ │ Nome     │ │ Nome     │ │     │ │
-│ │ Template │ │ Template │ │     │ │
-│ └─────────┘ └─────────┘ └─────┘ │
-├──────────────────────────────────┤
-│ [Painel de edição do selecionado]│  ← Expandido ao clicar
-│  Avatar upload + Nome + Salvar   │
-│  Template info (read-only)       │
-│  Status (conversas, última msg)  │
-│  Botão testar                    │
-├──────────────────────────────────┤
-│ Conexão WhatsApp (global)        │  ← Permanece igual
-└──────────────────────────────────┘
-```
+| `src/pages/painel/AgentConfig.tsx` | Remover seções WhatsApp e Status de conexão |
+| `src/pages/painel/Settings.tsx` | Usar `useWhatsAppConfig` para status real do WhatsApp |
 
