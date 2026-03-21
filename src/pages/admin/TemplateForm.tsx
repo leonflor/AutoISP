@@ -57,6 +57,28 @@ export default function TemplateForm() {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const [form, setForm] = useState(getDefaults());
   const [loaded, setLoaded] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  const onAvatarDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: onAvatarDrop,
+    onDropRejected: (rejections) => {
+      const err = rejections[0]?.errors[0];
+      if (err?.code === 'file-too-large') toast({ title: 'Arquivo muito grande', description: 'Máximo 10 MB.', variant: 'destructive' });
+      else if (err?.code === 'file-invalid-type') toast({ title: 'Formato inválido', description: 'Use JPG, PNG ou GIF.', variant: 'destructive' });
+      else toast({ title: 'Arquivo rejeitado', variant: 'destructive' });
+    },
+    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/gif': ['.gif'] },
+    maxFiles: 1,
+    maxSize: 10 * 1024 * 1024,
+  });
 
   useEffect(() => {
     if (isEditing && template && !loaded) {
