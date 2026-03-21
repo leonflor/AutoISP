@@ -56,9 +56,15 @@ export default function AgentConfig() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
+    onDropRejected: (rejections) => {
+      const err = rejections[0]?.errors[0];
+      if (err?.code === 'file-too-large') toast.error('Arquivo muito grande. Máximo 10 MB.');
+      else if (err?.code === 'file-invalid-type') toast.error('Formato inválido. Use JPG, PNG ou GIF.');
+      else toast.error('Arquivo rejeitado.');
+    },
+    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/gif': ['.gif'] },
     maxFiles: 1,
-    maxSize: 2 * 1024 * 1024,
+    maxSize: 10 * 1024 * 1024,
   });
 
   const copyToClipboard = async (text: string, field: string) => {

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAgentTemplates } from '@/hooks/admin/useAgentTemplates';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
+import { useDropzone } from 'react-dropzone';
 const TYPES = [
   { value: 'atendente_geral', label: 'Atendente Geral' },
   { value: 'suporte_n2', label: 'Suporte N2' },
@@ -56,6 +57,28 @@ export default function TemplateForm() {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const [form, setForm] = useState(getDefaults());
   const [loaded, setLoaded] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  const onAvatarDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: onAvatarDrop,
+    onDropRejected: (rejections) => {
+      const err = rejections[0]?.errors[0];
+      if (err?.code === 'file-too-large') toast({ title: 'Arquivo muito grande', description: 'Máximo 10 MB.', variant: 'destructive' });
+      else if (err?.code === 'file-invalid-type') toast({ title: 'Formato inválido', description: 'Use JPG, PNG ou GIF.', variant: 'destructive' });
+      else toast({ title: 'Arquivo rejeitado', variant: 'destructive' });
+    },
+    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/gif': ['.gif'] },
+    maxFiles: 1,
+    maxSize: 10 * 1024 * 1024,
+  });
 
   useEffect(() => {
     if (isEditing && template && !loaded) {
@@ -89,8 +112,26 @@ export default function TemplateForm() {
     }, 0);
   };
 
-  const handleSubmit = () => {
-    const payload: Record<string, unknown> = { ...form };
+  const handleSubmit = async () => {
+    let avatarUrl = form.default_avatar_url;
+
+    if (avatarFile) {
+      const ext = avatarFile.name.split('.').pop();
+      const path = `templates/${id ?? crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('agent-avatars')
+        .upload(path, avatarFile, { upsert: true });
+
+      if (uploadError) {
+        toast({ title: 'Erro no upload', description: uploadError.message, variant: 'destructive' });
+        return;
+      }
+
+      const { data: publicData } = supabase.storage.from('agent-avatars').getPublicUrl(path);
+      avatarUrl = publicData.publicUrl;
+    }
+
+    const payload: Record<string, unknown> = { ...form, default_avatar_url: avatarUrl || null };
     if (id) payload.id = id;
     upsert.mutate(payload as any, {
       onSuccess: () => {
@@ -204,12 +245,23 @@ export default function TemplateForm() {
 
           {/* Avatar */}
           <div className="space-y-1.5">
-            <Label>URL do Avatar Padrão</Label>
-            <div className="flex items-center gap-3">
-              <Input value={form.default_avatar_url} onChange={(e) => set('default_avatar_url', e.target.value)} placeholder="https://..." className="flex-1" />
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarImage src={form.default_avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            <Label>Avatar Padrão</Label>
+            <div className="flex items-center gap-4">
+              <div
+                {...getRootProps()}
+                className={`flex-1 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                  isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
+                <p className="text-sm text-muted-foreground">
+                  {isDragActive ? 'Solte a imagem aqui' : 'Clique ou arraste (JPG, PNG, GIF — máx. 10 MB)'}
+                </p>
+              </div>
+              <Avatar className="h-14 w-14 shrink-0">
+                <AvatarImage src={avatarPreview || form.default_avatar_url || undefined} />
+                <AvatarFallback className="bg-primary/10 text-primary text-sm">
                   {form.default_name?.[0]?.toUpperCase() ?? 'A'}
                 </AvatarFallback>
               </Avatar>
