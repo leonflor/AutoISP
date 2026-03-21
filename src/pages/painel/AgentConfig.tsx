@@ -211,36 +211,11 @@ function AgentEditPanel({
 }
 
 export default function AgentConfig() {
-  const { agents, agentsLoading, status, updateAgent, uploadAvatar } = useAgentConfig();
-  const { config, saveConfig, testConnection } = useWhatsAppConfig();
+  const { agents, agentsLoading, updateAgent, uploadAvatar } = useAgentConfig();
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
-  const [phoneNumberId, setPhoneNumberId] = useState('');
-  const [accessToken, setAccessToken] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verifyToken] = useState(() => crypto.randomUUID());
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const webhookUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/whatsapp-webhook`;
-
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) ?? null;
-
-  const copyToClipboard = async (text: string, field: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    toast.success('Copiado!');
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const handleSaveWhatsApp = () => {
-    saveConfig.mutate({
-      phone_number_id: phoneNumberId,
-      access_token: accessToken,
-      phone_number: phoneNumber,
-      verify_token: verifyToken,
-    });
-  };
 
   if (agentsLoading) {
     return (
