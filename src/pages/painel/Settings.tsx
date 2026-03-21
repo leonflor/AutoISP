@@ -7,17 +7,19 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useIspMembership } from '@/hooks/useIspMembership';
 import { useErpConfigs } from '@/hooks/painel/useErpConfigs';
+import { useWhatsAppConfig } from '@/hooks/painel/useWhatsAppConfig';
 import { Building2, Palette, Bell, Link as LinkIcon, CheckCircle, XCircle, ChevronRight, Database, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function SettingsPage() {
   const { membership } = useIspMembership();
   const { activeConfigsCount } = useErpConfigs();
+  const { config: whatsAppConfig } = useWhatsAppConfig();
 
   const integrations = [
     { 
       name: 'WhatsApp Business', 
-      status: 'pendente' as const, 
+      status: whatsAppConfig?.is_connected ? 'configurado' as const : 'pendente' as const, 
       icon: MessageSquare,
       href: '/painel/whatsapp',
       description: 'Comunicação via WhatsApp'

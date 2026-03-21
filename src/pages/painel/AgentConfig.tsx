@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useAgentConfig, type AgentWithTemplate } from '@/hooks/painel/useAgentConfig';
-import { useWhatsAppConfig } from '@/hooks/painel/useWhatsAppConfig';
 import { AgentSimulator } from '@/components/AgentSimulator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,19 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
-  Bot, Upload, Save, Loader2, Copy, Check, ChevronDown,
-  Wifi, WifiOff, MessageSquare, Clock, Info, ExternalLink, Play, X,
+  Bot, Upload, Save, Loader2, Info, Play, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { useDropzone } from 'react-dropzone';
-
-const SUPABASE_PROJECT_ID = 'zvxcwwhsjtdliihlvvof';
 
 function AgentCard({ agent, isSelected, onClick }: { agent: AgentWithTemplate; isSelected: boolean; onClick: () => void }) {
   const name = agent.custom_name || agent.template.default_name;
@@ -218,36 +211,11 @@ function AgentEditPanel({
 }
 
 export default function AgentConfig() {
-  const { agents, agentsLoading, status, updateAgent, uploadAvatar } = useAgentConfig();
-  const { config, saveConfig, testConnection } = useWhatsAppConfig();
+  const { agents, agentsLoading, updateAgent, uploadAvatar } = useAgentConfig();
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
-  const [phoneNumberId, setPhoneNumberId] = useState('');
-  const [accessToken, setAccessToken] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verifyToken] = useState(() => crypto.randomUUID());
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const webhookUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/whatsapp-webhook`;
-
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) ?? null;
-
-  const copyToClipboard = async (text: string, field: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    toast.success('Copiado!');
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const handleSaveWhatsApp = () => {
-    saveConfig.mutate({
-      phone_number_id: phoneNumberId,
-      access_token: accessToken,
-      phone_number: phoneNumber,
-      verify_token: verifyToken,
-    });
-  };
 
   if (agentsLoading) {
     return (
@@ -299,154 +267,6 @@ export default function AgentConfig() {
         />
       )}
 
-      {/* Status global */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
-            Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-              {status.isConnected ? (
-                <Wifi className="h-5 w-5 text-emerald-500" />
-              ) : (
-                <WifiOff className="h-5 w-5 text-destructive" />
-              )}
-              <div>
-                <p className="text-sm font-medium">Conexão</p>
-                <Badge variant={status.isConnected ? 'default' : 'destructive'} className="mt-1">
-                  {status.isConnected ? 'Ativo' : 'Inativo'}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-              <MessageSquare className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium">Conversas hoje</p>
-                <p className="text-2xl font-bold">{status.conversationsToday}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Última mensagem</p>
-                <p className="text-sm text-muted-foreground">
-                  {status.lastMessageAt
-                    ? formatDistanceToNow(new Date(status.lastMessageAt), { addSuffix: true, locale: ptBR })
-                    : 'Nenhuma'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Conexão WhatsApp (global) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
-            Conexão WhatsApp
-          </CardTitle>
-          <CardDescription>Configure a integração com a API do WhatsApp Business (Meta)</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="phone-number-id">Phone Number ID</Label>
-              <Input
-                id="phone-number-id"
-                value={phoneNumberId}
-                onChange={(e) => setPhoneNumberId(e.target.value)}
-                placeholder="Ex: 123456789012345"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone-number">Número do telefone</Label>
-              <Input
-                id="phone-number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="Ex: +5511999999999"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="access-token">Access Token</Label>
-            <Input
-              id="access-token"
-              type="password"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder={config?.api_key_encrypted ? '••••••••••••••••' : 'Cole seu token aqui'}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Verify Token (somente leitura)</Label>
-            <div className="flex gap-2">
-              <Input readOnly value={verifyToken} className="font-mono text-xs" />
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(verifyToken, 'verify')}>
-                {copiedField === 'verify' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>URL do Webhook</Label>
-            <div className="flex gap-2">
-              <Input readOnly value={webhookUrl} className="font-mono text-xs" />
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(webhookUrl, 'webhook')}>
-                {copiedField === 'webhook' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-
-          <Collapsible>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                <ChevronDown className="h-4 w-4" />
-                Instruções de configuração na Meta
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3">
-              <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
-                <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                  <li>Acesse o <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">Meta for Developers <ExternalLink className="h-3 w-3" /></a></li>
-                  <li>Crie ou selecione seu aplicativo do tipo "Business"</li>
-                  <li>Adicione o produto "WhatsApp" ao app</li>
-                  <li>Em <strong>API Setup</strong>, copie o <strong>Phone Number ID</strong> e o <strong>Access Token</strong></li>
-                  <li>Em <strong>Configuration → Webhook</strong>, cole a URL do webhook acima</li>
-                  <li>Cole o <strong>Verify Token</strong> gerado acima</li>
-                  <li>Inscreva-se nos campos: <code className="bg-background px-1 rounded">messages</code></li>
-                  <li>Salve as configurações e clique em "Testar conexão" abaixo</li>
-                </ol>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          <div className="flex gap-3">
-            <Button onClick={handleSaveWhatsApp} disabled={saveConfig.isPending || !phoneNumberId}>
-              {saveConfig.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Salvar credenciais
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => testConnection.mutate()}
-              disabled={testConnection.isPending}
-            >
-              {testConnection.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wifi className="h-4 w-4 mr-2" />}
-              Testar conexão
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
