@@ -33,7 +33,7 @@ export function useConversationAnalytics({ period, ispId }: { period: Period; is
       if (ispId) query = query.eq('isp_id', ispId);
       const { data, error } = await query.order('count', { ascending: false }).limit(5);
       if (error) throw error;
-      return (data || []) as Array<{ isp_id: string; handover_reason: string; count: number }>;
+      return (data || []) as unknown as Array<{ isp_id: string; handover_reason: string; count: number }>;
     },
   });
 
