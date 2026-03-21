@@ -46,6 +46,7 @@ const menuItems = [
   { title: 'Usuários', url: '/painel/usuarios', icon: UserCog },
   { title: 'Faturas', url: '/painel/faturas', icon: Receipt },
   { title: 'Relatórios', url: '/painel/relatorios', icon: BarChart3 },
+  { title: 'Analytics', url: '/painel/analytics', icon: Activity },
   { title: 'Configurações', url: '/painel/configuracoes', icon: Settings },
 ];
 

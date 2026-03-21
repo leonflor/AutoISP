@@ -128,6 +128,7 @@ const App = () => (
                 <Route path="knowledge-base" element={<PainelKnowledgeBase />} />
                 <Route path="erp-config" element={<PainelErpConfig />} />
                 <Route path="suporte" element={<PainelLiveSupport />} />
+                <Route path="analytics" element={<PainelAnalytics />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
