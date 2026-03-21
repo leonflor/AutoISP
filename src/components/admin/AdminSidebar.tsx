@@ -50,9 +50,15 @@ const menuItems: MenuItem[] = [
       { title: 'Conversas', url: '/admin/suporte', icon: MessageSquare },
     ]
   },
-  { title: 'Ferramentas IA', url: '/admin/ai-tools', icon: Wrench },
-  { title: 'Templates', url: '/admin/templates', icon: Bot },
-  { title: 'Procedimentos', url: '/admin/procedures', icon: GitBranch },
+  { 
+    title: 'Agentes de IA', 
+    icon: Bot,
+    submenu: [
+      { title: 'Templates', url: '/admin/templates', icon: Bot },
+      { title: 'Procedimentos', url: '/admin/procedures', icon: GitBranch },
+      { title: 'Ferramentas', url: '/admin/ai-tools', icon: Wrench },
+    ]
+  },
   { title: 'Relatórios', url: '/admin/relatorios', icon: BarChart3 },
   { title: 'Analytics', url: '/admin/analytics', icon: Activity },
   { title: 'Configurações', url: '/admin/config', icon: Settings },
