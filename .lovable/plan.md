@@ -1,83 +1,71 @@
 
 
-# Plano: Base de Conhecimento e FAQ (`/painel/knowledge-base`)
+# Plano: Configuração ERP IXC Soft (`/painel/erp-config`)
 
-## Resumo
+## Análise do existente
 
-Criar página com três abas (FAQ, Documentos, URLs) para gerenciar a base de conhecimento do agente via RAG. Criar Edge Function `embed-content` para chunking e embeddings.
+A infraestrutura de ERP já está completa:
+- **`useErpConfigs`**: hook com `saveConfig`, `testConnection`, `removeConfig` — reutilizar integralmente
+- **`test-erp` Edge Function**: já aceita credenciais temporárias via `api_url` + `credentials` no body — **não precisa criar `test-erp-connection`**
+- **`save-erp-config` Edge Function**: já criptografa e salva — reutilizar
+- **`IxcConfigDialog`**: dialog existente — **não modificar** (política non-destructive)
 
-## 1. Migration
+## O que falta
 
-Adicionar colunas na tabela `knowledge_bases`:
-- `status` text DEFAULT 'pending' (pending, indexing, indexed, error)
-- `file_url` text (para documentos no Storage)
-- `file_size` integer (bytes)
-- `parent_id` uuid (auto-ref para chunks filhos de docs longos)
-- `error_message` text
+1. Uma página dedicada `/painel/erp-config` com layout inline (não dialog), selector de provider, seção de campos disponíveis pós-teste, e enforcement de "testar antes de salvar"
+2. Link na sidebar
+3. Rota no App.tsx
 
-## 2. Edge Function `embed-content`
+## 1. Página `/painel/erp-config`
 
-**`supabase/functions/embed-content/index.ts`**
+**`src/pages/painel/ErpConfig.tsx`**
 
-- Recebe `{ knowledge_base_id }`
-- Busca registro via service role
-- Atualiza status → 'indexing'
-- Para source_type='url': fetch URL, extrair texto (HTML → text)
-- Divide content em chunks de ~500 tokens (~2000 chars) com 50 tokens overlap
-- Para chunk único: gera embedding via OpenAI `text-embedding-3-small` (reutilizar lógica do `context-builder.ts`) e atualiza o registro
-- Para múltiplos chunks: INSERT registros filhos com `parent_id`, cada um com embedding
-- Atualiza status → 'indexed' (ou 'error')
-- Chave OpenAI: descriptografar de `platform_config` usando `ENCRYPTION_KEY` (mesmo padrão do context-builder)
+### Header
+- Título "Integração com sistema de gestão"
 
-## 3. Hook `useKnowledgeBase`
+### Selector de ERP
+- Cards/tabs: IXC Soft (ativo), SGP/MK-Auth/Hubsoft (disabled + badge "em breve")
 
-**`src/hooks/painel/useKnowledgeBase.ts`**
+### Formulário IXC (inline, não dialog)
+- URL base da API (input)
+- Token de acesso (password, mascarado após salvar)
+- ID do usuário API (input number)
+- Checkbox "Usar HTTPS" (default: true)
 
-- Query `knowledge_bases` filtrado por `tenant_agent_id` (obtido do agente do ISP)
-- Separar por `source_type`: faq, document, url
-- Stats: counts por tipo, itens com status='indexing'
-- Mutations: create, update, delete
-- Upload de arquivo → Storage bucket `knowledge-docs`
-- Chamada `supabase.functions.invoke('embed-content')` após INSERT
+### Botão "Testar conexão"
+- Chama `test-erp` com credenciais temporárias: `supabase.functions.invoke('test-erp', { body: { provider: 'ixc', api_url, credentials: { username, password } } })`
+- Resultado: success → mostrar seção campos disponíveis; error → mensagem clara
 
-## 4. Página `/painel/knowledge-base`
+### Seção "Campos disponíveis" (aparece após teste OK)
+- Lista estática dos campos canônicos agrupados por categoria (CustomerProfile, Invoice, ServiceStatus, Contract) com ícone check verde
+- Dados estáticos baseados no `supportedFields()` do provider IXC
 
-**`src/pages/painel/KnowledgeBase.tsx`**
+### Botão "Salvar" (habilitado somente após teste OK)
+- Usa `saveConfig` do `useErpConfigs`
 
-### Card de resumo no topo
-- "{X} documentos · {Y} perguntas · {Z} URLs indexados"
-- Progress bar se há itens com status='indexing'
+### Status (se já configurado)
+- Badge ativo/inativo, data da última conexão
 
-### Aba 1 — FAQ
-- Cards com pergunta + prévia da resposta
-- Dialog criar/editar: input pergunta, textarea resposta, input categoria
-- Salvar: INSERT `knowledge_bases` com source_type='faq', content formatado
-- Invoke `embed-content`
+## 2. Sidebar e Rota
 
-### Aba 2 — Documentos
-- Upload dropzone (PDF, TXT, DOCX, max 10MB)
-- Lista: nome, tamanho, data, badge de status
-- Upload → Storage `knowledge-docs/{tenantAgentId}/` + INSERT + embed-content
-- Botão excluir: remove Storage + DELETE knowledge_bases
+- **`PainelSidebar.tsx`**: Adicionar "Integração ERP" (icon `Database`) após "Base de Conhecimento"
+- **`App.tsx`**: Rota `erp-config` dentro de `/painel`
 
-### Aba 3 — URLs
-- Input URL + botão "Adicionar"
-- Lista com status por URL
-- INSERT + embed-content (EF faz fetch e extração de texto)
+## Sem nova Edge Function
 
-## 5. Rota e Sidebar
+`test-erp` já suporta o fluxo completo de teste com credenciais temporárias.
 
-- **`App.tsx`**: Rota `knowledge-base` dentro de `/painel`
-- **`PainelSidebar.tsx`**: Item "Base de Conhecimento" (icon `BookOpen`) após "Agente IA"
+## Sem Migration
+
+Tabela `erp_configs` já existe com RLS adequado.
 
 ## Arquivos
 
 | Ação | Arquivo |
 |------|---------|
-| Migration | Adicionar colunas a `knowledge_bases` |
-| Criar | `supabase/functions/embed-content/index.ts` |
-| Criar | `src/hooks/painel/useKnowledgeBase.ts` |
-| Criar | `src/pages/painel/KnowledgeBase.tsx` |
-| Editar | `src/components/painel/PainelSidebar.tsx` |
-| Editar | `src/App.tsx` |
+| Criar | `src/pages/painel/ErpConfig.tsx` |
+| Editar | `src/components/painel/PainelSidebar.tsx` — adicionar "Integração ERP" |
+| Editar | `src/App.tsx` — adicionar rota `erp-config` |
+
+Nenhum arquivo existente de ERP será modificado.
 
