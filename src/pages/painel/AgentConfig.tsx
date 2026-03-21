@@ -111,9 +111,16 @@ export default function AgentConfig() {
 
   return (
     <div className="space-y-6 p-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuração do Agente IA</h1>
-        <p className="text-muted-foreground">Personalize a identidade do agente e conecte o WhatsApp</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Configuração do Agente IA</h1>
+          <p className="text-muted-foreground">Personalize a identidade do agente e conecte o WhatsApp</p>
+        </div>
+        {agent && (
+          <Button variant="outline" onClick={() => setSimulatorOpen(true)}>
+            <Play className="h-4 w-4 mr-2" /> Testar agente
+          </Button>
+        )}
       </div>
 
       {/* SEÇÃO 1 — Identidade do Agente */}
