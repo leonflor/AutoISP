@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAgentConfig } from '@/hooks/painel/useAgentConfig';
 import { useWhatsAppConfig } from '@/hooks/painel/useWhatsAppConfig';
+import { AgentSimulator } from '@/components/AgentSimulator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
   Bot, Upload, Save, Loader2, Copy, Check, ChevronDown,
-  Wifi, WifiOff, MessageSquare, Clock, Info, ExternalLink,
+  Wifi, WifiOff, MessageSquare, Clock, Info, ExternalLink, Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
