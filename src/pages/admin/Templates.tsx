@@ -30,6 +30,7 @@ export default function Templates() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<AgentTemplate | null>(null);
   const [deactivating, setDeactivating] = useState<AgentTemplate | null>(null);
+  const [simulatingTemplate, setSimulatingTemplate] = useState<AgentTemplate | null>(null);
 
   const handleSave = (payload: Record<string, unknown>) => {
     upsert.mutate(payload as any, {
