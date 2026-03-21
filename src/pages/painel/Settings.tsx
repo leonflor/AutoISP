@@ -14,11 +14,12 @@ import { Link } from 'react-router-dom';
 export default function SettingsPage() {
   const { membership } = useIspMembership();
   const { activeConfigsCount } = useErpConfigs();
+  const { config: whatsAppConfig } = useWhatsAppConfig();
 
   const integrations = [
     { 
       name: 'WhatsApp Business', 
-      status: 'pendente' as const, 
+      status: whatsAppConfig?.is_connected ? 'configurado' as const : 'pendente' as const, 
       icon: MessageSquare,
       href: '/painel/whatsapp',
       description: 'Comunicação via WhatsApp'
