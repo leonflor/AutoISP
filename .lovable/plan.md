@@ -1,47 +1,39 @@
 
 
-# Plano: Transformar edição de Template em página dedicada
+# Plano: Upload de Avatar com validação 10MB e JPG/PNG/GIF
 
 ## O que muda
 
-O formulário de edição/criação de template deixa de ser um drawer/modal (`Sheet`) e passa a ser uma página própria com rota dedicada e botão voltar.
+Dois pontos de upload de avatar precisam de ajuste:
 
-## Implementação
+### 1. Admin — TemplateForm (avatar padrão do template)
 
-### 1. Criar página `TemplateForm.tsx`
+Atualmente é um campo de texto URL. Será substituído por um upload com dropzone idêntico ao do ISP.
 
 **Arquivo**: `src/pages/admin/TemplateForm.tsx`
+- Adicionar `react-dropzone` e lógica de upload para Supabase Storage (`agent-avatars/templates/{templateId}`)
+- Substituir o `Input` de URL (linhas 208-217) por um componente de dropzone com preview
+- Validação: `accept: image/jpeg, image/png, image/gif`, `maxSize: 10MB`
+- No `handleSubmit`, fazer upload do arquivo antes de salvar e gravar a URL pública no campo `default_avatar_url`
 
-- Reutilizar todo o conteúdo do formulário atual (`TemplateFormDrawer.tsx`), mas renderizado como página full dentro do `AdminLayout`
-- Adicionar botão "Voltar" no topo com `useNavigate()` apontando para `/admin/templates`
-- Usar `useParams()` para capturar o `id` do template (edição) ou ausência dele (criação)
-- Carregar dados do template via `useAgentTemplates` quando houver `id`
-- Após salvar com sucesso, `navigate('/admin/templates')`
+### 2. ISP — AgentConfig (avatar customizado do ISP)
 
-### 2. Registrar rotas no App.tsx
+Já tem dropzone mas com limites errados.
 
-Adicionar duas rotas dentro do bloco `<Route path="/admin">`:
-```
-<Route path="templates/novo" element={<TemplateFormPage />} />
-<Route path="templates/:id" element={<TemplateFormPage />} />
-```
+**Arquivo**: `src/pages/painel/AgentConfig.tsx`
+- Linha 59: Mudar accept de `image/*: [.png, .jpg, .jpeg, .webp]` para `image/jpeg, image/png, image/gif` com extensões `.jpg, .jpeg, .png, .gif`
+- Linha 61: Mudar `maxSize` de `2 * 1024 * 1024` para `10 * 1024 * 1024`
+- Adicionar feedback de erro ao usuário quando arquivo for rejeitado (tamanho ou formato)
 
-### 3. Atualizar `Templates.tsx`
+### 3. Hook useAgentConfig — uploadAvatar
 
-- Remover `TemplateFormDrawer` e seus estados (`drawerOpen`, `editing`)
-- Botão "Novo Template" → `navigate('/admin/templates/novo')`
-- Botão editar no card → `navigate(`/admin/templates/${t.id}`)`
+**Arquivo**: `src/hooks/painel/useAgentConfig.ts`
+- Já funciona corretamente, sem alterações necessárias
 
-### 4. Remover `TemplateFormDrawer.tsx`
-
-Arquivo deixa de ser necessário após a migração.
-
-## Arquivos
+### Arquivos afetados
 
 | Ação | Arquivo |
 |------|---------|
-| Criar | `src/pages/admin/TemplateForm.tsx` |
-| Editar | `src/App.tsx` (2 rotas) |
-| Editar | `src/pages/admin/Templates.tsx` (remover drawer, usar navigate) |
-| Deletar | `src/components/admin/templates/TemplateFormDrawer.tsx` |
+| Editar | `src/pages/admin/TemplateForm.tsx` — trocar input URL por dropzone + upload |
+| Editar | `src/pages/painel/AgentConfig.tsx` — corrigir accept e maxSize |
 
