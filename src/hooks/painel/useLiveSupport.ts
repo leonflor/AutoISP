@@ -332,47 +332,38 @@ export function useLiveSupport() {
     [activeConversationId, myAgent, sending]
   );
 
-  // Return to bot
+  // Return to bot (via Edge Function)
   const returnToBot = useCallback(async () => {
     if (!activeConversationId) return;
 
-    await supabase
-      .from('conversations')
-      .update({
-        mode: 'bot',
-        assigned_agent_id: null,
-      })
-      .eq('id', activeConversationId);
+    await supabase.functions.invoke('resolve-conversation', {
+      body: { conversation_id: activeConversationId, return_to_bot: true },
+    });
 
     setActiveConversationId(null);
     fetchQueues();
   }, [activeConversationId, fetchQueues]);
 
-  // Resolve
+  // Resolve (via Edge Function)
   const resolveConversation = useCallback(async () => {
     if (!activeConversationId) return;
 
-    await supabase
-      .from('conversations')
-      .update({
-        resolved_at: new Date().toISOString(),
-        resolved_by: 'human',
-      })
-      .eq('id', activeConversationId);
+    await supabase.functions.invoke('resolve-conversation', {
+      body: { conversation_id: activeConversationId, return_to_bot: false },
+    });
 
     setActiveConversationId(null);
     fetchQueues();
   }, [activeConversationId, fetchQueues]);
 
-  // Transfer
+  // Transfer (via Edge Function)
   const transferConversation = useCallback(
     async (targetAgentId: string) => {
       if (!activeConversationId) return;
 
-      await supabase
-        .from('conversations')
-        .update({ assigned_agent_id: targetAgentId })
-        .eq('id', activeConversationId);
+      await supabase.functions.invoke('transfer-conversation', {
+        body: { conversation_id: activeConversationId, to_agent_id: targetAgentId },
+      });
 
       setActiveConversationId(null);
       fetchQueues();

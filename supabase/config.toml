@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.test-whatsapp-connection]
 verify_jwt = false
+
+[functions.resolve-conversation]
+verify_jwt = false
+
+[functions.transfer-conversation]
+verify_jwt = false
