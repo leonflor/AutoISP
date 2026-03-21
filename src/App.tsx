@@ -44,6 +44,7 @@ const PainelErpIntegrations = lazy(() => import("./pages/painel/ErpIntegrations"
 const PainelAgentConfig = lazy(() => import("./pages/painel/AgentConfig"));
 const PainelKnowledgeBase = lazy(() => import("./pages/painel/KnowledgeBase"));
 const PainelErpConfig = lazy(() => import("./pages/painel/ErpConfig"));
+const PainelLiveSupport = lazy(() => import("./pages/painel/LiveSupport"));
 
 // Lazy load - Admin extra pages
 const AdminSupport = lazy(() => import("./pages/admin/Support"));
