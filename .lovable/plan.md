@@ -1,27 +1,35 @@
 
 
-# Plano: Dashboard de Analytics de Conversas ✅
+# Auditoria de Código — Cleanup Executado ✅
 
-## Implementado
+## Ações Realizadas
 
-1. **4 Views SQL** — `conversation_stats`, `handover_reason_stats`, `procedure_stats`, `hourly_volume_stats` com `security_invoker = true`.
-
-2. **Hook `useConversationAnalytics`** — Busca dados das views e conversas recentes, computa KPIs (total, resolução bot %, handover %, tempo médio, msgs/conversa).
-
-3. **Página Tenant `/painel/analytics`** — Seletor de período (7d/30d/90d), 5 cards KPI, 4 gráficos Recharts, tabela últimas 20 conversas com modal de histórico.
-
-4. **Página Admin `/admin/analytics`** — Mesma página com seletor de ISP adicional para filtrar por tenant.
-
-5. **Sidebar** — Item "Analytics" adicionado em ambos os painéis.
+| # | Ação | Status |
+|---|------|--------|
+| 1 | Removido dead code `src/lib/llm/` (3 arquivos) e `src/lib/erp/` (3 arquivos) | ✅ |
+| 2 | Extraído `KpiCard`, `ConversationHistoryDialog`, `AnalyticsDashboard` para `src/components/analytics/` | ✅ |
+| 3 | Removido import `Cell` não usado e eliminado duplicação nas pages de Analytics | ✅ |
+| 4 | Removido re-export morto `src/components/ui/use-toast.ts` | ✅ |
+| 5 | Movido `useConversationAnalytics` para `src/hooks/` com `Period` e `PERIOD_OPTIONS` exportados | ✅ |
+| 6 | Adicionado comentário de sincronização ao `src/constants/tool-catalog.ts` | ✅ |
+| 7 | Padronização de rotas PT/EN | ⏳ Adiado (breaking change) |
 
 ## Arquivos
 
 | Ação | Arquivo |
 |------|---------|
-| Criado | `src/hooks/painel/useConversationAnalytics.ts` |
-| Criado | `src/pages/painel/Analytics.tsx` |
-| Criado | `src/pages/admin/Analytics.tsx` |
-| Editado | `src/App.tsx` |
-| Editado | `src/components/painel/PainelSidebar.tsx` |
-| Editado | `src/components/admin/AdminSidebar.tsx` |
-| Migration | 4 VIEWs + security_invoker |
+| Deletado | `src/lib/llm/tool-executor.ts` |
+| Deletado | `src/lib/llm/tool-result-formatter.ts` |
+| Deletado | `src/lib/llm/tools.ts` |
+| Deletado | `src/lib/erp/factory.ts` |
+| Deletado | `src/lib/erp/types.ts` |
+| Deletado | `src/lib/erp/adapters/ixcsoft.ts` |
+| Deletado | `src/components/ui/use-toast.ts` |
+| Deletado | `src/hooks/painel/useConversationAnalytics.ts` |
+| Criado | `src/hooks/useConversationAnalytics.ts` |
+| Criado | `src/components/analytics/KpiCard.tsx` |
+| Criado | `src/components/analytics/ConversationHistoryDialog.tsx` |
+| Criado | `src/components/analytics/AnalyticsDashboard.tsx` |
+| Reescrito | `src/pages/painel/Analytics.tsx` (usa componente compartilhado) |
+| Reescrito | `src/pages/admin/Analytics.tsx` (usa componente compartilhado) |
+| Editado | `src/constants/tool-catalog.ts` (sync warning) |
