@@ -36,6 +36,7 @@ export default function AgentConfig() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verifyToken] = useState(() => crypto.randomUUID());
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
 
   // Sync state when agent loads
   const [initialized, setInitialized] = useState(false);
