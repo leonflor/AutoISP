@@ -10,7 +10,8 @@ import {
   UserCog,
   Receipt,
   Bot,
-  BookOpen
+  BookOpen,
+  Database
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
