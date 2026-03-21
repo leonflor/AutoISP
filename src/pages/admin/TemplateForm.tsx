@@ -112,8 +112,26 @@ export default function TemplateForm() {
     }, 0);
   };
 
-  const handleSubmit = () => {
-    const payload: Record<string, unknown> = { ...form };
+  const handleSubmit = async () => {
+    let avatarUrl = form.default_avatar_url;
+
+    if (avatarFile) {
+      const ext = avatarFile.name.split('.').pop();
+      const path = `templates/${id ?? crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('agent-avatars')
+        .upload(path, avatarFile, { upsert: true });
+
+      if (uploadError) {
+        toast({ title: 'Erro no upload', description: uploadError.message, variant: 'destructive' });
+        return;
+      }
+
+      const { data: publicData } = supabase.storage.from('agent-avatars').getPublicUrl(path);
+      avatarUrl = publicData.publicUrl;
+    }
+
+    const payload: Record<string, unknown> = { ...form, default_avatar_url: avatarUrl || null };
     if (id) payload.id = id;
     upsert.mutate(payload as any, {
       onSuccess: () => {
