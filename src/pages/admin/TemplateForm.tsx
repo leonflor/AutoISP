@@ -245,12 +245,23 @@ export default function TemplateForm() {
 
           {/* Avatar */}
           <div className="space-y-1.5">
-            <Label>URL do Avatar Padrão</Label>
-            <div className="flex items-center gap-3">
-              <Input value={form.default_avatar_url} onChange={(e) => set('default_avatar_url', e.target.value)} placeholder="https://..." className="flex-1" />
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarImage src={form.default_avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            <Label>Avatar Padrão</Label>
+            <div className="flex items-center gap-4">
+              <div
+                {...getRootProps()}
+                className={`flex-1 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                  isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
+                <p className="text-sm text-muted-foreground">
+                  {isDragActive ? 'Solte a imagem aqui' : 'Clique ou arraste (JPG, PNG, GIF — máx. 10 MB)'}
+                </p>
+              </div>
+              <Avatar className="h-14 w-14 shrink-0">
+                <AvatarImage src={avatarPreview || form.default_avatar_url || undefined} />
+                <AvatarFallback className="bg-primary/10 text-primary text-sm">
                   {form.default_name?.[0]?.toUpperCase() ?? 'A'}
                 </AvatarFallback>
               </Avatar>
