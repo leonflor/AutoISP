@@ -11,7 +11,8 @@ import {
   Receipt,
   Bot,
   BookOpen,
-  Database
+  Database,
+  Headset
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,6 +37,7 @@ const menuItems = [
   { title: 'Dashboard', url: '/painel', icon: LayoutDashboard },
   { title: 'Assinantes', url: '/painel/assinantes', icon: Users },
   { title: 'Atendimentos', url: '/painel/atendimentos', icon: MessageSquare },
+  { title: 'Suporte ao Vivo', url: '/painel/suporte', icon: Headset },
   { title: 'Comunicação', url: '/painel/comunicacao', icon: Send },
   { title: 'Agente IA', url: '/painel/agent-config', icon: Bot },
   { title: 'Base de Conhecimento', url: '/painel/knowledge-base', icon: BookOpen },
