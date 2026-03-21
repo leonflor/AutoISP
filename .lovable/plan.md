@@ -1,61 +1,98 @@
 
 
-# Plano: Edge Functions de Atendimento Humano
+# Plano: Simulador de Agente (Chat de Testes)
 
-## Análise do existente
+## Resumo
 
-- **`send-human-reply`** já existe e funciona bem. Precisa de dois ajustes: (1) validar `mode='human'`, (2) auto-assign `assigned_agent_id` se ainda null.
-- **`resolve-conversation`** e **`transfer-conversation`** não existem — criar.
-- O hook `useLiveSupport` faz resolve/transfer via cliente direto. Após criar as EFs, atualizar o hook para usar as EFs em vez de updates diretos.
+Criar um Edge Function dedicado para testes do agente sem WhatsApp, um componente reutilizável de chat com debug, e integrá-lo nas páginas de templates (admin) e agent-config (tenant).
 
-## 1. Atualizar `send-human-reply`
+## 1. Migration: tabela `test_conversations`
 
-Dois ajustes no arquivo existente:
-- Após buscar a conversa, validar que `mode === 'human'` (retornar 400 se não)
-- Após inserir mensagem, se `assigned_agent_id` é null, fazer UPDATE para atribuir ao agente atual
+```sql
+CREATE TABLE public.test_conversations (
+  id text PRIMARY KEY,
+  tenant_agent_id uuid REFERENCES tenant_agents(id) ON DELETE CASCADE,
+  template_id uuid REFERENCES agent_templates(id) ON DELETE SET NULL,
+  user_id uuid NOT NULL,
+  messages jsonb DEFAULT '[]'::jsonb,
+  created_at timestamptz DEFAULT now(),
+  expires_at timestamptz DEFAULT now() + interval '24 hours'
+);
 
-## 2. Criar `resolve-conversation`
+ALTER TABLE public.test_conversations ENABLE ROW LEVEL SECURITY;
 
-**`supabase/functions/resolve-conversation/index.ts`**
+CREATE POLICY "Users can manage own test conversations"
+  ON public.test_conversations FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+```
 
-- Recebe `{ conversation_id, return_to_bot }` + JWT
-- Valida JWT → busca user → busca agent record
-- Busca conversa, valida que é mode='human' e que o user é assigned ou ISP admin
-- UPDATE conversations: `resolved_at=now()`, `resolved_by='human'`, `assigned_agent_id=null`, `mode = return_to_bot ? 'bot' : 'human'`
-- Decrementa `human_agents.current_chat_count` do agente
-- Se `return_to_bot=true`: envia mensagem de encerramento via WhatsApp (reutilizar padrão de decrypt/send do `send-human-reply`)
-- Retorna `{ success: true }`
+## 2. Edge Function `simulate-agent`
 
-## 3. Criar `transfer-conversation`
+**`supabase/functions/simulate-agent/index.ts`**
 
-**`supabase/functions/transfer-conversation/index.ts`**
+Receives `{ tenant_agent_id, template_id?, message, test_conversation_id }` + JWT.
 
-- Recebe `{ conversation_id, to_agent_id }` + JWT
-- Valida JWT → busca user → busca agent record do remetente
-- Valida que user é assigned agent ou ISP admin
-- Valida `to_agent_id`: `is_available=true` AND `current_chat_count < max_concurrent_chats`
-- UPDATE conversations: `assigned_agent_id = to_agent_id`
-- Decrementa `current_chat_count` do from_agent
-- Incrementa `current_chat_count` do to_agent
-- Retorna `{ success: true }`
+Flow:
+- Auth via JWT, get user_id
+- If no `test_conversation_id`: create new conversation in `conversations` table with a special prefix marker and `mode='bot'`, return the id
+- Use the existing `runProcedureStep` + `detectProcedure` from `_shared/procedure-runner.ts` directly (same engine as webhook)
+- Skip WhatsApp sending entirely
+- Return `{ reply, debug, conversation_id }` where debug includes: procedure name, step index, tool calls, tokens
 
-## 4. Atualizar hook `useLiveSupport`
+Key difference from webhook: no WhatsApp config lookup, no message sending, direct procedure engine call.
 
-Substituir chamadas diretas ao Supabase client por invocações das EFs:
-- `resolveConversation` → `supabase.functions.invoke('resolve-conversation')`
-- `transferConversation` → `supabase.functions.invoke('transfer-conversation')`
-- `returnToBot` → `supabase.functions.invoke('resolve-conversation', { return_to_bot: true })`
+Uses a **real conversation row** (not test_conversations table) so `runProcedureStep` works without modification. The conversation gets a `channel='simulator'` marker to distinguish from real ones. Cleanup via `expires_at` or manual delete.
 
-## Sem Migration
+Revised approach: Use `conversations` table with `channel='simulator'` instead of a separate `test_conversations` table. This avoids modifying `runProcedureStep` which expects real conversation rows. No migration needed.
 
-Todas as tabelas e colunas necessárias já existem.
+## 3. Component `AgentSimulator.tsx`
 
-## Arquivos
+**`src/components/AgentSimulator.tsx`**
 
-| Acao | Arquivo |
-|------|---------|
-| Editar | `supabase/functions/send-human-reply/index.ts` |
-| Criar | `supabase/functions/resolve-conversation/index.ts` |
-| Criar | `supabase/functions/transfer-conversation/index.ts` |
-| Editar | `src/hooks/painel/useLiveSupport.ts` |
+Props: `tenantAgentId?: string`, `templateId?: string`, `showDebug?: boolean`, `onClose?: () => void`
+
+Two-panel layout in a Dialog/Sheet:
+
+**Left panel (config, 280px)**:
+- Temperature (read-only from template)
+- Active procedure detected (updates per response from debug)
+- Current step (index + instruction snippet)
+- Toggle "Show prompt debug"
+- Button "Reset conversation" (creates new conversation_id)
+
+**Right panel (chat, flex-1)**:
+- Header: agent name + avatar + Badge "Modo Teste"
+- Message history (bot/user bubbles)
+- If debug on: gray card before each bot message showing procedure, step, tool calls (name + result snippet), token count
+- Input textarea (Enter=send, Shift+Enter=newline)
+- Sends via `supabase.functions.invoke('simulate-agent', { body: {...} })`
+- Optimistic UI for user messages
+
+State: conversation messages stored locally in component state (populated from API responses).
+
+## 4. Integration points
+
+**`src/pages/admin/Templates.tsx`**: Add "Testar" button on each template card → opens AgentSimulator as Dialog with `templateId={t.id}`
+
+**`src/pages/painel/AgentConfig.tsx`**: Add "Testar agente" button in header → opens AgentSimulator with `tenantAgentId={agent.id}`
+
+**`src/App.tsx`**: No standalone pages needed initially — the component opens as a Dialog overlay from existing pages.
+
+## 5. Config.toml
+
+Register `simulate-agent` with `verify_jwt = false` (JWT validated in code).
+
+## Files
+
+| Action | File |
+|--------|------|
+| Create | `supabase/functions/simulate-agent/index.ts` |
+| Create | `src/components/AgentSimulator.tsx` |
+| Edit | `src/pages/admin/Templates.tsx` — add "Testar" button |
+| Edit | `src/pages/painel/AgentConfig.tsx` — add "Testar agente" button |
+| Edit | `src/App.tsx` — no route changes needed |
+| Edit | `supabase/config.toml` — register function |
+
+No migration needed — reuses `conversations` table with `channel='simulator'`.
 
