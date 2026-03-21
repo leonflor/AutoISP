@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAgentTemplates } from '@/hooks/admin/useAgentTemplates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +10,9 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
-import type { AgentTemplate } from '@/hooks/admin/useAgentTemplates';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 const TYPES = [
   { value: 'atendente_geral', label: 'Atendente Geral' },
@@ -28,53 +30,50 @@ const TONES = [
 
 const VARIABLES = ['{agent_name}', '{tenant_name}', '{current_date}', '{current_time}'];
 
-interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  template?: AgentTemplate | null;
-  onSave: (data: Record<string, unknown>) => void;
-  saving?: boolean;
+function getDefaults() {
+  return {
+    name: '',
+    type: 'atendente_geral',
+    system_prompt_base: '',
+    temperature: 0.4,
+    tone: 'professional',
+    default_name: '',
+    default_avatar_url: '',
+    max_intent_attempts: 3,
+    intent_failure_message: '',
+    is_active: true,
+  };
 }
 
-export function TemplateFormDrawer({ open, onOpenChange, template, onSave, saving }: Props) {
+export default function TemplateForm() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditing = !!id;
+
+  const { data: templates, upsert } = useAgentTemplates();
+  const template = templates?.find((t) => t.id === id) ?? null;
+
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const [form, setForm] = useState(getDefaults());
-
-  function getDefaults() {
-    return {
-      name: '',
-      type: 'atendente_geral',
-      system_prompt_base: '',
-      temperature: 0.4,
-      tone: 'professional',
-      default_name: '',
-      default_avatar_url: '',
-      max_intent_attempts: 3,
-      intent_failure_message: '',
-      is_active: true,
-    };
-  }
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setForm(
-        template
-          ? {
-              name: template.name,
-              type: template.type,
-              system_prompt_base: template.system_prompt_base,
-              temperature: Number(template.temperature),
-              tone: template.tone,
-              default_name: template.default_name,
-              default_avatar_url: template.default_avatar_url ?? '',
-              max_intent_attempts: template.max_intent_attempts,
-              intent_failure_message: template.intent_failure_message ?? '',
-              is_active: template.is_active ?? true,
-            }
-          : getDefaults()
-      );
+    if (isEditing && template && !loaded) {
+      setForm({
+        name: template.name,
+        type: template.type,
+        system_prompt_base: template.system_prompt_base,
+        temperature: Number(template.temperature),
+        tone: template.tone,
+        default_name: template.default_name,
+        default_avatar_url: template.default_avatar_url ?? '',
+        max_intent_attempts: template.max_intent_attempts,
+        intent_failure_message: template.intent_failure_message ?? '',
+        is_active: template.is_active ?? true,
+      });
+      setLoaded(true);
     }
-  }, [open, template]);
+  }, [isEditing, template, loaded]);
 
   const insertVariable = (v: string) => {
     const el = promptRef.current;
@@ -83,7 +82,7 @@ export function TemplateFormDrawer({ open, onOpenChange, template, onSave, savin
     const before = form.system_prompt_base.slice(0, start);
     const after = form.system_prompt_base.slice(el.selectionEnd ?? start);
     const newVal = before + v + after;
-    setForm((f) => ({ ...f, system_prompt_base: newVal }));
+    set('system_prompt_base', newVal);
     setTimeout(() => {
       el.focus();
       el.selectionStart = el.selectionEnd = start + v.length;
@@ -92,20 +91,39 @@ export function TemplateFormDrawer({ open, onOpenChange, template, onSave, savin
 
   const handleSubmit = () => {
     const payload: Record<string, unknown> = { ...form };
-    if (template?.id) payload.id = template.id;
-    onSave(payload);
+    if (id) payload.id = id;
+    upsert.mutate(payload as any, {
+      onSuccess: () => {
+        toast({ title: isEditing ? 'Template atualizado' : 'Template criado' });
+        navigate('/admin/templates');
+      },
+      onError: (err) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
+    });
   };
 
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{template ? 'Editar Template' : 'Novo Template'}</SheetTitle>
-        </SheetHeader>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/templates')}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isEditing ? 'Editar Template' : 'Novo Template'}
+          </h1>
+          <p className="text-muted-foreground">
+            {isEditing ? 'Altere as configurações do template de agente.' : 'Crie um novo template para seus agentes IA.'}
+          </p>
+        </div>
+      </div>
 
-        <div className="space-y-5 mt-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Configurações</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5 max-w-2xl">
           {/* Nome */}
           <div className="space-y-1.5">
             <Label>Nome</Label>
@@ -228,12 +246,15 @@ export function TemplateFormDrawer({ open, onOpenChange, template, onSave, savin
           </div>
 
           {/* Submit */}
-          <Button onClick={handleSubmit} disabled={saving || !form.name || !form.system_prompt_base || !form.default_name} className="w-full">
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {template ? 'Salvar Alterações' : 'Criar Template'}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+          <div className="flex gap-3 pt-4">
+            <Button variant="outline" onClick={() => navigate('/admin/templates')}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={upsert.isPending || !form.name || !form.system_prompt_base || !form.default_name}>
+              {upsert.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? 'Salvar Alterações' : 'Criar Template'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

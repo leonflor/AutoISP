@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAgentTemplates, type AgentTemplate } from '@/hooks/admin/useAgentTemplates';
-import { TemplateFormDrawer } from '@/components/admin/templates/TemplateFormDrawer';
 import { AgentSimulator } from '@/components/AgentSimulator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,22 +26,10 @@ const TONE_LABELS: Record<string, string> = {
 };
 
 export default function Templates() {
+  const navigate = useNavigate();
   const { data: templates, isLoading, upsert } = useAgentTemplates();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<AgentTemplate | null>(null);
   const [deactivating, setDeactivating] = useState<AgentTemplate | null>(null);
   const [simulatingTemplate, setSimulatingTemplate] = useState<AgentTemplate | null>(null);
-
-  const handleSave = (payload: Record<string, unknown>) => {
-    upsert.mutate(payload as any, {
-      onSuccess: () => {
-        toast({ title: editing ? 'Template atualizado' : 'Template criado' });
-        setDrawerOpen(false);
-        setEditing(null);
-      },
-      onError: (err) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
-    });
-  };
 
   const handleToggleActive = (t: AgentTemplate) => {
     if (t.is_active && t.tenants_count > 0) {
@@ -68,7 +56,7 @@ export default function Templates() {
           <h1 className="text-2xl font-bold tracking-tight">Templates de Agentes</h1>
           <p className="text-muted-foreground">Gerencie os templates que definem o comportamento dos agentes IA.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDrawerOpen(true); }}>
+        <Button onClick={() => navigate('/admin/templates/novo')}>
           <Plus className="mr-2 h-4 w-4" /> Novo Template
         </Button>
       </div>
@@ -83,7 +71,7 @@ export default function Templates() {
         <Card className="flex flex-col items-center justify-center py-16 text-center">
           <Bot className="h-12 w-12 text-muted-foreground/40 mb-4" />
           <p className="text-muted-foreground">Nenhum template cadastrado.</p>
-          <Button variant="outline" className="mt-4" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
+          <Button variant="outline" className="mt-4" onClick={() => navigate('/admin/templates/novo')}>
             Criar primeiro template
           </Button>
         </Card>
@@ -110,7 +98,7 @@ export default function Templates() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => { setEditing(t); setDrawerOpen(true); }}
+                    onClick={() => navigate(`/admin/templates/${t.id}`)}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -141,14 +129,6 @@ export default function Templates() {
           ))}
         </div>
       )}
-
-      <TemplateFormDrawer
-        open={drawerOpen}
-        onOpenChange={(o) => { setDrawerOpen(o); if (!o) setEditing(null); }}
-        template={editing}
-        onSave={handleSave}
-        saving={upsert.isPending}
-      />
 
       <AlertDialog open={!!deactivating} onOpenChange={(o) => !o && setDeactivating(null)}>
         <AlertDialogContent>
