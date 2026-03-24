@@ -257,6 +257,14 @@ export async function runProcedureStep(
       tool_calls: assistantMsg.tool_calls,
     });
 
+    // Persist assistant message with tool_calls to DB (required for history reconstruction)
+    await supabaseAdmin.from("messages").insert({
+      conversation_id: conversationId,
+      role: "assistant",
+      content: assistantMsg.content ?? "",
+      tool_calls: assistantMsg.tool_calls,
+    });
+
     // Execute each tool call
     for (const tc of assistantMsg.tool_calls) {
       const args = JSON.parse(tc.function.arguments);
