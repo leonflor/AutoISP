@@ -100,6 +100,9 @@ function formatMessagesForOpenAI(
       msg.tool_call_id = m.tool_call_id as string;
       msg.name = m.tool_name as string;
     }
+    if (m.tool_calls) {
+      msg.tool_calls = m.tool_calls as OpenAIMessage["tool_calls"];
+    }
     return msg;
   });
 }
@@ -254,6 +257,14 @@ export async function runProcedureStep(
     historyMessages.push({
       role: "assistant",
       content: assistantMsg.content,
+      tool_calls: assistantMsg.tool_calls,
+    });
+
+    // Persist assistant message with tool_calls to DB (required for history reconstruction)
+    await supabaseAdmin.from("messages").insert({
+      conversation_id: conversationId,
+      role: "assistant",
+      content: assistantMsg.content ?? "",
       tool_calls: assistantMsg.tool_calls,
     });
 

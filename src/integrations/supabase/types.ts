@@ -902,6 +902,7 @@ export type Database = {
           role: string
           sent_by_agent_id: string | null
           tool_call_id: string | null
+          tool_calls: Json | null
           tool_name: string | null
           tool_result: Json | null
           wamid: string | null
@@ -914,6 +915,7 @@ export type Database = {
           role: string
           sent_by_agent_id?: string | null
           tool_call_id?: string | null
+          tool_calls?: Json | null
           tool_name?: string | null
           tool_result?: Json | null
           wamid?: string | null
@@ -926,6 +928,7 @@ export type Database = {
           role?: string
           sent_by_agent_id?: string | null
           tool_call_id?: string | null
+          tool_calls?: Json | null
           tool_name?: string | null
           tool_result?: Json | null
           wamid?: string | null
