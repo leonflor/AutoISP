@@ -198,6 +198,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Load template config (needed for max_intent_attempts)
+    const { data: tenantAgent } = await supabase
+      .from("tenant_agents")
+      .select("template_id")
+      .eq("id", resolvedTenantAgentId)
+      .single();
+
+    let maxIntentAttempts = 3;
+    if (tenantAgent?.template_id) {
+      const { data: tmpl } = await supabase
+        .from("agent_templates")
+        .select("max_intent_attempts")
+        .eq("id", tenantAgent.template_id)
+        .single();
+      if (tmpl) maxIntentAttempts = tmpl.max_intent_attempts ?? 3;
+    }
+
     // Find or create simulator conversation
     let activeConversationId = conversation_id;
 
@@ -244,9 +261,111 @@ Deno.serve(async (req) => {
       activeConversationId = newConv.id;
     }
 
+    // ── Replicate webhook pre-processing logic ──
+
+    // 1. Fetch current conversation state
+    const { data: convState } = await supabase
+      .from("conversations")
+      .select("mode, active_procedure_id, intent_attempts")
+      .eq("id", activeConversationId)
+      .single();
+
+    // 2. Check mode — if human or paused, don't run AI
+    if (convState?.mode === "human") {
+      // Save user message but don't process with AI
+      await supabase.from("messages").insert({
+        conversation_id: activeConversationId,
+        role: "user",
+        content: message.trim(),
+      });
+
+      return new Response(
+        JSON.stringify({
+          reply: null,
+          conversation_id: activeConversationId,
+          debug: {
+            mode: "human",
+            info: "Conversa em modo humano. Mensagem salva mas não processada pela IA.",
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (convState?.mode === "paused") {
+      await supabase.from("messages").insert({
+        conversation_id: activeConversationId,
+        role: "user",
+        content: message.trim(),
+      });
+
+      return new Response(
+        JSON.stringify({
+          reply: null,
+          conversation_id: activeConversationId,
+          debug: {
+            mode: "paused",
+            info: "Conversa pausada. Mensagem salva mas não processada.",
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // 3. Intent tracking — same as webhook lines 677-708
+    if (!convState?.active_procedure_id) {
+      const templateId = tenantAgent?.template_id;
+      if (templateId) {
+        const detected = await detectProcedure(supabase, message.trim(), templateId);
+
+        if (!detected) {
+          const currentAttempts = (convState?.intent_attempts ?? 0) + 1;
+
+          await supabase
+            .from("conversations")
+            .update({ intent_attempts: currentAttempts })
+            .eq("id", activeConversationId);
+
+          if (currentAttempts >= maxIntentAttempts) {
+            // Escalate to human (simplified — no WhatsApp, no summary)
+            await supabase
+              .from("conversations")
+              .update({
+                mode: "human",
+                handover_reason: "max_intent_attempts",
+                handover_at: new Date().toISOString(),
+              })
+              .eq("id", activeConversationId);
+
+            // Save user message
+            await supabase.from("messages").insert({
+              conversation_id: activeConversationId,
+              role: "user",
+              content: message.trim(),
+            });
+
+            return new Response(
+              JSON.stringify({
+                reply: "Não consegui identificar sua solicitação. Vou transferir você para um atendente humano.",
+                conversation_id: activeConversationId,
+                debug: {
+                  escalated: true,
+                  mode: "human",
+                  intent_attempts: currentAttempts,
+                  max_intent_attempts: maxIntentAttempts,
+                  handover_reason: "max_intent_attempts",
+                },
+              }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
+        }
+        // If detected, runProcedureStep will handle activation internally
+      }
+    }
+
     // Run the procedure engine (same as webhook, but no WhatsApp sending)
     const result = await runProcedureStep(supabase, activeConversationId, message.trim());
-
     // Fetch updated conversation state for debug
     const { data: updatedConv } = await supabase
       .from("conversations")
