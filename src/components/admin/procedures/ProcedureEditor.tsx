@@ -175,6 +175,16 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 
   const handleSubmit = () => {
     if (!name || !templateId) return;
+    // Convert back to backend format for compatibility
+    const backendSteps = steps.map(s => ({
+      name: s.name,
+      instruction: s.instruction,
+      available_functions: s.available_functions.map(f => f.handler),
+      advance_condition: s.advance_condition,
+      on_complete: s.on_complete,
+      stuck_after_turns: s.stuck_config.max_turns,
+      stuck_action: s.stuck_config.action,
+    }));
     onSave({
       name,
       description: description || null,
@@ -182,7 +192,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       is_active: isActive,
       definition: {
         triggers: { keywords, min_confidence: minConfidence },
-        steps,
+        steps: backendSteps as any,
       },
     });
   };
