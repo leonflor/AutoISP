@@ -330,8 +330,8 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
               <Slider
                 value={[minConfidence]}
                 onValueChange={([v]) => setMinConfidence(v)}
-                min={50}
-                max={95}
+                min={5}
+                max={100}
                 step={5}
                 className="max-w-sm"
               />
