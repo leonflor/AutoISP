@@ -1,48 +1,80 @@
 
 
-# Corrigir avanço prematuro do Step 0 — "sim" avança sem CPF
+# Tornar o fluxo de Cobrança de Fatura mais fluido e contextual
 
-## Problema
+## Problemas identificados no diálogo
 
-O fluxo atual falha assim:
+### Problema 1: "Turno morto" entre steps
+A arquitetura avalia o `advance_condition` **depois** de gerar a resposta. Quando step 0 avança, a resposta do bot ainda é do contexto do step 0 ("em que posso ajudar?"). O turno seguinte já está no step 1, mas o usuário não sabe o que dizer — e a mensagem ("consultar em aberto") confunde o LLM.
 
-```text
-Usuário: "pagamento"
-→ Procedimento ativado, step 0. Agente pergunta sobre boletos.
+### Problema 2: Step 1 não age proativamente
+O step 1 instrui o agente a "usar erp_contract_lookup", mas o LLM espera input relevante. Ao receber "consultar em aberto", não reconhece como trigger para chamar a ferramenta e transfere para humano.
 
-Usuário: "sim"
-→ advance_condition = user_confirmation → "sim" = positivo → AVANÇA para step 1
-→ Mas erp_client_lookup NUNCA foi chamado — nenhum CPF foi coletado
-→ Step 1 tenta erp_contract_lookup sem dados → agente não sabe o que fazer → transfer_to_human
+### Problema 3: llm_judge tem contexto limitado
+O `llm_judge` recebe apenas a instrução do passo e a resposta do bot. Não vê a mensagem do usuário nem o histórico de tool calls, o que prejudica a avaliação.
+
+## Solução (2 frentes)
+
+### Frente 1: Melhorar instruções do procedimento (migration SQL — v9)
+
+**Step 0** — Adicionar na instrução:
+- "Após a confirmação positiva do cliente, informe que vai consultar os contratos disponíveis. Exemplo: 'Perfeito, [nome]! Vou consultar seus contratos agora.'"
+- Isso cria uma transição natural para o step 1.
+
+**Step 1** — Reescrever instrução para ser proativa:
+- "IMEDIATAMENTE ao receber qualquer mensagem neste passo, execute erp_contract_lookup com o CPF/CNPJ já identificado. NÃO espere o cliente pedir. NÃO pergunte o que ele deseja. NÃO transfira para humano. Sua PRIMEIRA ação deve ser chamar a ferramenta, depois apresentar os resultados numerados."
+- Remover `transfer_to_human` do escopo implícito adicionando no texto: "A ferramenta transfer_to_human está PROIBIDA neste passo."
+
+### Frente 2: Melhorar o llm_judge no procedure-runner (código)
+
+Atualizar o prompt do `llm_judge` (linha ~450 do procedure-runner.ts) para incluir:
+- A mensagem do usuário
+- Se houve tool calls com sucesso neste turno
+
+Prompt atual:
+```
+Dado o objetivo do passo: "{instruction}"
+E a resposta do assistente: "{botReply}"
+O objetivo foi cumprido?
 ```
 
-A `user_confirmation` no step 0 avança com qualquer "sim", mesmo que o cliente ainda não tenha sido identificado. A confirmação deveria ocorrer **depois** do lookup, não antes.
+Prompt melhorado:
+```
+Dado o objetivo do passo: "{instruction}"
+Mensagem do usuário: "{userMessage}"
+Houve chamada de ferramenta com sucesso neste turno: {sim/não}
+Resposta do assistente: "{botReply}"
+O objetivo deste passo foi cumprido? Responda APENAS "sim" ou "não".
+```
 
-## Solucao
+## Resumo do fluxo corrigido
 
-Trocar `advance_condition` do step 0 de `user_confirmation` para `llm_judge`. O `llm_judge` avalia se o **objetivo do passo** foi cumprido — que exige ambas as condições:
+```text
+Usuário: "boleto"
+→ Step 0. Agente pede CPF.
 
-1. `erp_client_lookup` foi chamado com sucesso
-2. O cliente confirmou sua identidade
+Usuário: "12.059.400/0001-51"
+→ erp_client_lookup. "Estou falando com Rei das Tecnologias?"
+→ llm_judge: lookup feito mas sem confirmação → NÃO avança
 
-Um simples "sim" sem lookup prévio fará o `llm_judge` responder "não, o objetivo não foi cumprido" e o step permanece ativo.
+Usuário: "sim"
+→ Bot: "Perfeito, Rei das Tecnologias! Vou consultar seus contratos agora."
+→ llm_judge: lookup + confirmação → AVANÇA para step 1
 
-### Ajuste na instruction do Step 0
+(qualquer mensagem seguinte, step 1)
+→ Bot IMEDIATAMENTE chama erp_contract_lookup
+→ Lista contratos numerados. Pede seleção.
+→ llm_judge: contratos listados mas sem seleção → NÃO avança
 
-Reforçar que o agente deve:
-- Primeiro solicitar CPF/CNPJ
-- Chamar `erp_client_lookup`
-- Perguntar "Estou falando com [nome]?"
-- Só considerar o passo completo após confirmação positiva
+Usuário: "3"
+→ Bot confirma contrato selecionado → AVANÇA para step 2
+→ erp_invoice_search → faturas
+```
 
-## Implementacao
+## Arquivos alterados
 
-**Migration SQL** — atualizar definition do procedimento (v8):
-- Step 0: `advance_condition` de `"user_confirmation"` → `"llm_judge"`
-- Instruction atualizada para deixar claro que o objetivo só é cumprido quando **ambos** (lookup + confirmação) ocorrem
-- Steps 1-3: mantidos sem alteração
-
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---|---|
-| Nova migration SQL | Marcar v7 como inativa, inserir v8 com step 0 corrigido |
+| Nova migration SQL | Procedimento v9 com instruções reescritas para steps 0 e 1 |
+| `supabase/functions/_shared/procedure-runner.ts` | Prompt do `llm_judge` (~linha 450) enriquecido com userMessage e lastToolSuccess |
 
