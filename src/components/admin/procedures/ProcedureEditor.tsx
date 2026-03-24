@@ -17,6 +17,44 @@ import { TOOL_CATALOG } from '@/constants/tool-catalog';
 import type { AgentTemplate } from '@/hooks/admin/useAgentTemplates';
 import type { ProcedureDefinition, ProcedureStep, ProcedureWithMeta } from '@/hooks/admin/useProcedures';
 
+/** Normalize a step from legacy DB format to UI format */
+function normalizeStep(raw: any): ProcedureStep {
+  // available_functions: string[] → { handler, required }[]
+  const fns = Array.isArray(raw.available_functions)
+    ? raw.available_functions.map((f: any) =>
+        typeof f === 'string' ? { handler: f, required: false } : f
+      )
+    : [];
+
+  // stuck_config vs stuck_after_turns/stuck_action
+  const stuck_config = raw.stuck_config ?? {
+    max_turns: raw.stuck_after_turns ?? 5,
+    action: raw.stuck_action ?? 'escalate_human',
+  };
+
+  // on_complete.conditions vs on_complete.rules
+  const on_complete = raw.on_complete
+    ? {
+        ...raw.on_complete,
+        conditions: raw.on_complete.conditions ?? raw.on_complete.rules ?? undefined,
+      }
+    : { type: 'next_step' as const };
+
+  return {
+    name: raw.name ?? '',
+    instruction: raw.instruction ?? '',
+    available_functions: fns,
+    advance_condition: raw.advance_condition ?? { type: 'always' as const },
+    on_complete,
+    stuck_config,
+  };
+}
+
+function normalizeSteps(steps: any[] | undefined): ProcedureStep[] {
+  if (!steps?.length) return [{ ...EMPTY_STEP }];
+  return steps.map(normalizeStep);
+}
+
 // Full list of available functions as specified
 const AVAILABLE_FUNCTIONS = [
   { handler: 'get_customer_by_document', label: 'Buscar cliente por documento' },
@@ -67,7 +105,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 
   // Steps
   const [steps, setSteps] = useState<ProcedureStep[]>(
-    procedure?.definition?.steps?.length ? procedure.definition.steps : [{ ...EMPTY_STEP }]
+    normalizeSteps(procedure?.definition?.steps)
   );
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
 
@@ -79,7 +117,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       setIsActive(procedure.is_active ?? true);
       setKeywords(procedure.definition?.triggers?.keywords ?? []);
       setMinConfidence(procedure.definition?.triggers?.min_confidence ?? 70);
-      setSteps(procedure.definition?.steps?.length ? procedure.definition.steps : [{ ...EMPTY_STEP }]);
+      setSteps(normalizeSteps(procedure.definition?.steps));
       setOpenSteps({ 0: true });
     }
   }, [procedure]);
@@ -137,6 +175,16 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 
   const handleSubmit = () => {
     if (!name || !templateId) return;
+    // Convert back to backend format for compatibility
+    const backendSteps = steps.map(s => ({
+      name: s.name,
+      instruction: s.instruction,
+      available_functions: s.available_functions.map(f => f.handler),
+      advance_condition: s.advance_condition,
+      on_complete: s.on_complete,
+      stuck_after_turns: s.stuck_config.max_turns,
+      stuck_action: s.stuck_config.action,
+    }));
     onSave({
       name,
       description: description || null,
@@ -144,7 +192,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       is_active: isActive,
       definition: {
         triggers: { keywords, min_confidence: minConfidence },
-        steps,
+        steps: backendSteps as any,
       },
     });
   };
