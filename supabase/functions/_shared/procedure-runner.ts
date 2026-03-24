@@ -338,6 +338,7 @@ export async function runProcedureStep(
     );
 
     if (shouldAdvance) {
+      const oldStepIndex = (context.conversation.step_index as number) ?? 0;
       const outcome = step.on_complete ?? { action: "next_step" };
       await resolveStepOutcome(
         outcome as Record<string, unknown>,
@@ -346,6 +347,53 @@ export async function runProcedureStep(
         context,
         openaiKey,
       );
+
+      // Auto-advance: re-run next step immediately to avoid "dead turn"
+      if (_depth < 2) {
+        const { data: refreshed } = await supabaseAdmin
+          .from("conversations")
+          .select("step_index, active_procedure_id, mode")
+          .eq("id", conversationId)
+          .single();
+
+        const newStepIndex = refreshed?.step_index ?? 0;
+
+        if (
+          refreshed?.active_procedure_id &&
+          refreshed?.mode === "bot" &&
+          newStepIndex !== oldStepIndex
+        ) {
+          console.log(
+            `[procedure-runner] Auto-advance: step ${oldStepIndex} → ${newStepIndex} (depth=${_depth})`,
+          );
+
+          // Save current reply before auto-advancing
+          await supabaseAdmin.from("messages").insert({
+            conversation_id: conversationId,
+            role: "assistant",
+            content: reply,
+          });
+
+          const autoResult = await runProcedureStep(
+            supabaseAdmin,
+            conversationId,
+            "[continuar]",
+            _depth + 1,
+          );
+
+          // Combine replies and return early
+          const combinedReply = reply + "\n\n" + autoResult.reply;
+          const elapsed = Math.round(performance.now() - t0);
+          return {
+            reply: combinedReply,
+            debug: {
+              ...autoResult.debug,
+              auto_advanced_from: oldStepIndex,
+              elapsed_ms: elapsed,
+            },
+          };
+        }
+      }
     } else {
       // Increment turns_on_current_step
       const currentTurns =
