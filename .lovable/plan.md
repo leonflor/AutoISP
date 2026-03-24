@@ -1,61 +1,38 @@
 
 
-# Evitar transferência prematura — pedir esclarecimento quando não entende
+# Fix: keyword detection penalizes having more keywords
 
-## Problema
+## Root Cause
 
-"pagamento" não ativa nenhum procedimento porque os triggers do procedimento "Cobrança de fatura" provavelmente não incluem essa palavra. Sem procedimento ativo, o guardrail na linha 294 do `context-builder.ts` instrui o LLM a transferir para humano imediatamente:
+The scoring formula is `matchedCount / totalKeywords`. Before: 1/3 = 0.33 (passed). Now with 10 keywords: 1/10 = 0.10, which is below `min_confidence` of 0.14. Adding synonyms made detection worse.
 
-```
-"Nenhum procedimento está ativo. (...) use a ferramenta transfer_to_human para transferir"
-```
+## Solution: Change scoring logic
 
-Resultado: o bot transfere sem tentar entender o que o usuário precisa.
+Replace the ratio-based scoring with a simpler approach: **if at least 1 keyword matches, the procedure is a candidate**. Use `matchedCount` as the ranking score (more matches = better match), not a ratio.
 
-## Solucao (2 frentes)
+In `detectProcedure` (procedure-runner.ts, line ~666-671):
 
-### Frente 1: Ampliar triggers do procedimento (migration SQL)
+```typescript
+// BEFORE (ratio penalizes large keyword lists)
+const score = matchedCount / keywords.length;
+if (score >= minConfidence && score > bestScore) { ... }
 
-Adicionar "pagamento" (e variações como "pagar", "segunda via", "débito") aos triggers do procedimento "Cobrança de fatura" v9, para que a detecção funcione com vocabulário mais amplo.
-
-### Frente 2: Mudar guardrail "sem procedimento" (código)
-
-No `context-builder.ts` (linha 293-294), trocar a instrução de transferir imediatamente por uma instrução de **pedir esclarecimento**:
-
-**Antes:**
-```
-Nenhum procedimento está ativo. (...) use transfer_to_human para transferir
+// AFTER (any single keyword match qualifies)
+if (matchedCount > 0 && matchedCount > bestScore) {
+  bestScore = matchedCount;
+  bestMatch = proc;
+}
 ```
 
-**Depois:**
-```
-Nenhum procedimento está ativo. Pergunte ao cliente de forma clara e simples
-o que ele precisa. Tente entender a intenção antes de transferir para humano.
-Exemplos: "Poderia me explicar melhor o que precisa?" ou "Você gostaria de
-consultar boletos, verificar sua conexão ou outro assunto?"
-Só use transfer_to_human se o cliente pedir explicitamente ou se após 2
-tentativas de esclarecimento o assunto continuar fora do seu escopo.
-```
+This also means `min_confidence` in the trigger definition becomes unused for now, which is fine — it was always fragile with ratio-based math.
 
-## Fluxo corrigido
+Additionally, improve substring matching to handle phrases like "quero do meu boleto" by normalizing common filler words. The current `searchText.includes(kw)` already handles this — "quero do meu boleto".includes("boleto") is true. So the main fix is the scoring threshold.
 
-```text
-Usuário: "pagamento"
-→ Trigger detecta "pagamento" → procedimento ativado → step 0 pede CPF
-```
+## Files changed
 
-Caso alternativo (palavra não mapeada):
-```text
-Usuário: "preciso de ajuda"
-→ Sem procedimento → bot pergunta: "Claro! Poderia me dizer o que precisa?"
-→ Usuário: "quero pagar meu boleto"
-→ Trigger detecta "boleto/pagar" → procedimento ativado
-```
-
-## Arquivos alterados
-
-| Arquivo | Alteracao |
+| File | Change |
 |---|---|
-| Nova migration SQL | Adicionar "pagamento", "pagar", "segunda via", "débito" aos triggers da v9 |
-| `supabase/functions/_shared/context-builder.ts` | Linha 293-294: trocar guardrail de transferência por esclarecimento |
+| `supabase/functions/_shared/procedure-runner.ts` | Lines 666-674: replace ratio scoring with absolute match count |
+
+No migration needed.
 
