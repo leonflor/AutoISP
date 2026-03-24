@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useDropzone } from 'react-dropzone';
+import { ImageCropDialog } from '@/components/ui/image-crop-dialog';
 const TYPES = [
   { value: 'atendente_geral', label: 'Atendente Geral' },
   { value: 'suporte_n2', label: 'Suporte N2' },
@@ -59,12 +60,18 @@ export default function TemplateForm() {
   const [loaded, setLoaded] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   const onAvatarDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    setCropSrc(URL.createObjectURL(file));
+  }, []);
+
+  const handleCropConfirm = useCallback((croppedFile: File) => {
+    setAvatarFile(croppedFile);
+    setAvatarPreview(URL.createObjectURL(croppedFile));
+    setCropSrc(null);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -145,6 +152,7 @@ export default function TemplateForm() {
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/admin/templates')}>
@@ -308,5 +316,15 @@ export default function TemplateForm() {
         </CardContent>
       </Card>
     </div>
+
+    {cropSrc && (
+      <ImageCropDialog
+        open
+        imageSrc={cropSrc}
+        onClose={() => setCropSrc(null)}
+        onConfirm={handleCropConfirm}
+      />
+    )}
+  </>
   );
 }

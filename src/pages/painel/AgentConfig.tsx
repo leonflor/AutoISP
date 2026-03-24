@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
+import { ImageCropDialog } from '@/components/ui/image-crop-dialog';
 
 function AgentCard({ agent, isSelected, onClick }: { agent: AgentWithTemplate; isSelected: boolean; onClick: () => void }) {
   const name = agent.custom_name || agent.template.default_name;
@@ -63,12 +64,18 @@ function AgentEditPanel({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    setCropSrc(URL.createObjectURL(file));
+  }, []);
+
+  const handleCropConfirm = useCallback((croppedFile: File) => {
+    setAvatarFile(croppedFile);
+    setAvatarPreview(URL.createObjectURL(croppedFile));
+    setCropSrc(null);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -206,6 +213,15 @@ function AgentEditPanel({
         tenantAgentId={agent.id}
         agentName={agent.custom_name || agent.template.default_name}
       />
+
+      {cropSrc && (
+        <ImageCropDialog
+          open
+          imageSrc={cropSrc}
+          onClose={() => setCropSrc(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </>
   );
 }
