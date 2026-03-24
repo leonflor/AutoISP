@@ -661,15 +661,12 @@ export async function detectProcedure(
     if (!triggers?.keywords?.length) continue;
 
     const keywords = triggers.keywords;
-    const rawConfidence = triggers.min_confidence ?? 0.5;
-    const minConfidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
     const matchedCount = keywords.filter((kw) =>
       searchText.includes(kw.toLowerCase()),
     ).length;
-    const score = matchedCount / keywords.length;
 
-    if (score >= minConfidence && score > bestScore) {
-      bestScore = score;
+    if (matchedCount > 0 && matchedCount > bestScore) {
+      bestScore = matchedCount;
       bestMatch = proc;
     }
   }
