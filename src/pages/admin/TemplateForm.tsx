@@ -325,5 +325,6 @@ export default function TemplateForm() {
         onConfirm={handleCropConfirm}
       />
     )}
-  </>;
+  </>
+  );
 }
