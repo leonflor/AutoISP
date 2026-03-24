@@ -54,15 +54,13 @@ export function AgentSimulator({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(initialShowDebug);
   const [lastDebug, setLastDebug] = useState<SimulatorMessage['debug'] | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll on new messages
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sending]);
 
   // Focus input on open
   useEffect(() => {
@@ -211,7 +209,7 @@ export function AgentSimulator({
 
           {/* Right panel — Chat */}
           <div className="flex-1 flex flex-col">
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <ScrollArea className="flex-1 p-4">
               <div className="space-y-4 max-w-2xl mx-auto">
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
@@ -298,6 +296,7 @@ export function AgentSimulator({
                     </div>
                   </div>
                 )}
+                <div ref={bottomRef} />
               </div>
             </ScrollArea>
 
