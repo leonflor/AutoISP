@@ -211,8 +211,16 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       name: s.name,
       instruction: s.instruction,
       available_functions: s.available_functions.map(f => f.handler),
-      advance_condition: s.advance_condition,
-      on_complete: s.on_complete,
+      advance_condition: s.advance_condition.type, // UI object → DB string
+      on_complete: {
+        action: s.on_complete.type, // UI "type" → DB "action"
+        resolution: s.on_complete.resolution,
+        agent_type: s.on_complete.agent_type,
+        conditions: s.on_complete.conditions?.map(c => ({
+          if_context: c.if, // UI "if" → DB "if_context"
+          then: c.then,
+        })),
+      },
       stuck_after_turns: s.stuck_config.max_turns,
       stuck_action: s.stuck_config.action,
     }));
