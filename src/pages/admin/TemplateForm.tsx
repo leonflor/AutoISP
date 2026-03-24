@@ -60,12 +60,18 @@ export default function TemplateForm() {
   const [loaded, setLoaded] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   const onAvatarDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    setCropSrc(URL.createObjectURL(file));
+  }, []);
+
+  const handleCropConfirm = useCallback((croppedFile: File) => {
+    setAvatarFile(croppedFile);
+    setAvatarPreview(URL.createObjectURL(croppedFile));
+    setCropSrc(null);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
