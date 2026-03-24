@@ -1,80 +1,91 @@
 
 
-# Tornar o fluxo de Cobrança de Fatura mais fluido e contextual
+# Fix "dead turn" — auto-execute next step after advancing
 
-## Problemas identificados no diálogo
+## Problem
 
-### Problema 1: "Turno morto" entre steps
-A arquitetura avalia o `advance_condition` **depois** de gerar a resposta. Quando step 0 avança, a resposta do bot ainda é do contexto do step 0 ("em que posso ajudar?"). O turno seguinte já está no step 1, mas o usuário não sabe o que dizer — e a mensagem ("consultar em aberto") confunde o LLM.
-
-### Problema 2: Step 1 não age proativamente
-O step 1 instrui o agente a "usar erp_contract_lookup", mas o LLM espera input relevante. Ao receber "consultar em aberto", não reconhece como trigger para chamar a ferramenta e transfere para humano.
-
-### Problema 3: llm_judge tem contexto limitado
-O `llm_judge` recebe apenas a instrução do passo e a resposta do bot. Não vê a mensagem do usuário nem o histórico de tool calls, o que prejudica a avaliação.
-
-## Solução (2 frentes)
-
-### Frente 1: Melhorar instruções do procedimento (migration SQL — v9)
-
-**Step 0** — Adicionar na instrução:
-- "Após a confirmação positiva do cliente, informe que vai consultar os contratos disponíveis. Exemplo: 'Perfeito, [nome]! Vou consultar seus contratos agora.'"
-- Isso cria uma transição natural para o step 1.
-
-**Step 1** — Reescrever instrução para ser proativa:
-- "IMEDIATAMENTE ao receber qualquer mensagem neste passo, execute erp_contract_lookup com o CPF/CNPJ já identificado. NÃO espere o cliente pedir. NÃO pergunte o que ele deseja. NÃO transfira para humano. Sua PRIMEIRA ação deve ser chamar a ferramenta, depois apresentar os resultados numerados."
-- Remover `transfer_to_human` do escopo implícito adicionando no texto: "A ferramenta transfer_to_human está PROIBIDA neste passo."
-
-### Frente 2: Melhorar o llm_judge no procedure-runner (código)
-
-Atualizar o prompt do `llm_judge` (linha ~450 do procedure-runner.ts) para incluir:
-- A mensagem do usuário
-- Se houve tool calls com sucesso neste turno
-
-Prompt atual:
-```
-Dado o objetivo do passo: "{instruction}"
-E a resposta do assistente: "{botReply}"
-O objetivo foi cumprido?
+The current flow:
+```text
+User: "sim"
+→ Bot generates reply: "Perfeito! Vou consultar seus contratos agora."
+→ llm_judge evaluates → YES → advances step_index to 1
+→ STOPS. Waits for next user message.
+→ User confused: bot said it would check contracts but did nothing.
 ```
 
-Prompt melhorado:
-```
-Dado o objetivo do passo: "{instruction}"
-Mensagem do usuário: "{userMessage}"
-Houve chamada de ferramenta com sucesso neste turno: {sim/não}
-Resposta do assistente: "{botReply}"
-O objetivo deste passo foi cumprido? Responda APENAS "sim" ou "não".
+The advance happens AFTER the reply is generated (line 329). The next step's tools only run when a NEW user message arrives. This creates a dead turn where the bot promises action but doesn't deliver.
+
+## Solution
+
+After `resolveStepOutcome` advances to a new step, **re-run the procedure engine** for the new step using the bot's last reply as a synthetic context trigger. This eliminates the dead turn.
+
+Concretely, in `runProcedureStep` (after line 347):
+
+1. After `resolveStepOutcome` completes and the step advanced (not end_procedure or handover), **re-read the conversation state** to get the new `step_index`.
+2. If the step changed, **recursively call** `runProcedureStep` with a synthetic message like `"[auto-advance]"` — or better, re-build context and call OpenAI again for the new step within the same function, appending the bot's reply to history.
+3. The new step's tools (e.g., `erp_contract_lookup`) will be available, and the LLM will execute them proactively per the step 1 instruction.
+4. Combine the replies: original reply + new step's reply.
+
+### Implementation detail
+
+After line 347 in `procedure-runner.ts`:
+
+```typescript
+if (shouldAdvance) {
+  const outcome = step.on_complete ?? { action: "next_step" };
+  await resolveStepOutcome(outcome, ...);
+
+  // Check if we moved to a new step (not end/handover)
+  const { data: refreshed } = await supabaseAdmin
+    .from("conversations")
+    .select("step_index, active_procedure_id, mode")
+    .eq("id", conversationId)
+    .single();
+
+  const newStepIndex = refreshed?.step_index ?? 0;
+  const oldStepIndex = (context.conversation.step_index as number) ?? 0;
+
+  if (
+    refreshed?.active_procedure_id &&
+    refreshed?.mode === "bot" &&
+    newStepIndex !== oldStepIndex
+  ) {
+    // Auto-execute next step — recursive call
+    const autoResult = await runProcedureStep(
+      supabaseAdmin,
+      conversationId,
+      "[continuar]",  // synthetic message
+    );
+    // Combine replies
+    reply = reply + "\n\n" + autoResult.reply;
+    // Merge debug info
+    Object.assign(debugInfo, autoResult.debug);
+  }
+}
 ```
 
-## Resumo do fluxo corrigido
+The synthetic message `"[continuar]"` will be saved as a user message but step 1's instruction says "IMEDIATAMENTE ao receber qualquer mensagem" — so it will trigger `erp_contract_lookup`.
+
+### Safeguard
+
+Add a recursion depth limit (max 2 auto-advances) via an optional parameter to prevent infinite loops.
+
+## Expected corrected flow
 
 ```text
-Usuário: "boleto"
-→ Step 0. Agente pede CPF.
-
-Usuário: "12.059.400/0001-51"
-→ erp_client_lookup. "Estou falando com Rei das Tecnologias?"
-→ llm_judge: lookup feito mas sem confirmação → NÃO avança
-
-Usuário: "sim"
-→ Bot: "Perfeito, Rei das Tecnologias! Vou consultar seus contratos agora."
-→ llm_judge: lookup + confirmação → AVANÇA para step 1
-
-(qualquer mensagem seguinte, step 1)
-→ Bot IMEDIATAMENTE chama erp_contract_lookup
-→ Lista contratos numerados. Pede seleção.
-→ llm_judge: contratos listados mas sem seleção → NÃO avança
-
-Usuário: "3"
-→ Bot confirma contrato selecionado → AVANÇA para step 2
-→ erp_invoice_search → faturas
+User: "sim"
+→ Step 0: Bot replies "Perfeito! Vou consultar seus contratos agora."
+→ llm_judge → YES → advances to step 1
+→ AUTO-EXECUTE step 1 with "[continuar]"
+→ Step 1: Bot calls erp_contract_lookup → lists contracts
+→ Combined reply: "Perfeito! Vou consultar... \n\n Encontrei os seguintes contratos: 1. ..."
 ```
 
-## Arquivos alterados
+## Files changed
 
-| Arquivo | Alteração |
+| File | Change |
 |---|---|
-| Nova migration SQL | Procedimento v9 com instruções reescritas para steps 0 e 1 |
-| `supabase/functions/_shared/procedure-runner.ts` | Prompt do `llm_judge` (~linha 450) enriquecido com userMessage e lastToolSuccess |
+| `supabase/functions/_shared/procedure-runner.ts` | Add auto-advance logic after `resolveStepOutcome`, with recursion depth limit |
+
+No database migration needed.
 
