@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Loader2, ZoomIn } from 'lucide-react';
+import { Loader2, ZoomIn, Minus, Plus } from 'lucide-react';
 
 async function getCroppedImg(imageSrc: string, crop: Area): Promise<File> {
   const image = await createImage(imageSrc);
