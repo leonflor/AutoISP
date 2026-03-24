@@ -105,7 +105,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 
   // Steps
   const [steps, setSteps] = useState<ProcedureStep[]>(
-    procedure?.definition?.steps?.length ? procedure.definition.steps : [{ ...EMPTY_STEP }]
+    normalizeSteps(procedure?.definition?.steps)
   );
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
 
