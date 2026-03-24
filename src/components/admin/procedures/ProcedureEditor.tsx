@@ -15,10 +15,32 @@ import { ChevronDown, Plus, Trash2, X, ArrowUp, ArrowDown, AlertTriangle } from 
 import { cn } from '@/lib/utils';
 import { TOOL_CATALOG } from '@/constants/tool-catalog';
 import type { AgentTemplate } from '@/hooks/admin/useAgentTemplates';
-import type { ProcedureDefinition, ProcedureStep, ProcedureWithMeta } from '@/hooks/admin/useProcedures';
+import type { ProcedureDefinition, ProcedureWithMeta } from '@/hooks/admin/useProcedures';
 
-/** Normalize a step from legacy DB format to UI format */
-function normalizeStep(raw: any): ProcedureStep {
+/** UI-internal rich step type (differs from DB ProcedureStep) */
+type UIStep = {
+  name: string;
+  instruction: string;
+  available_functions: { handler: string; required: boolean }[];
+  advance_condition: {
+    type: string;
+    function_name?: string;
+    fields?: string[];
+  };
+  on_complete: {
+    type: string;
+    resolution?: string;
+    agent_type?: string;
+    conditions?: { if: string; then: string }[];
+  };
+  stuck_config: {
+    max_turns: number;
+    action: string;
+  };
+};
+
+/** Normalize a step from DB/backend format to UI format */
+function normalizeStep(raw: any): UIStep {
   // available_functions: string[] → { handler, required }[]
   const fns = Array.isArray(raw.available_functions)
     ? raw.available_functions.map((f: any) =>
@@ -32,25 +54,34 @@ function normalizeStep(raw: any): ProcedureStep {
     action: raw.stuck_action ?? 'escalate_human',
   };
 
-  // on_complete.conditions vs on_complete.rules
-  const on_complete = raw.on_complete
-    ? {
-        ...raw.on_complete,
-        conditions: raw.on_complete.conditions ?? raw.on_complete.rules ?? undefined,
-      }
-    : { type: 'next_step' as const };
+  // advance_condition: string → { type: string, ... }
+  const advance_condition = typeof raw.advance_condition === 'string'
+    ? { type: raw.advance_condition }
+    : raw.advance_condition ?? { type: 'always' };
+
+  // on_complete: action → type (UI key), if_context → if
+  const oc = raw.on_complete ?? {};
+  const on_complete = {
+    type: oc.type ?? oc.action ?? 'next_step',
+    resolution: oc.resolution,
+    agent_type: oc.agent_type,
+    conditions: (oc.conditions ?? oc.rules)?.map((c: any) => ({
+      if: c.if ?? c.if_context ?? '',
+      then: typeof c.then === 'string' ? c.then : JSON.stringify(c.then ?? ''),
+    })),
+  };
 
   return {
     name: raw.name ?? '',
     instruction: raw.instruction ?? '',
     available_functions: fns,
-    advance_condition: raw.advance_condition ?? { type: 'always' as const },
+    advance_condition,
     on_complete,
     stuck_config,
   };
 }
 
-function normalizeSteps(steps: any[] | undefined): ProcedureStep[] {
+function normalizeSteps(steps: any[] | undefined): UIStep[] {
   if (!steps?.length) return [{ ...EMPTY_STEP }];
   return steps.map(normalizeStep);
 }
