@@ -132,7 +132,10 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
   // Triggers
   const [keywords, setKeywords] = useState<string[]>(procedure?.definition?.triggers?.keywords ?? []);
   const [keywordInput, setKeywordInput] = useState('');
-  const [minConfidence, setMinConfidence] = useState(procedure?.definition?.triggers?.min_confidence ?? 70);
+  const [minConfidence, setMinConfidence] = useState(() => {
+    const raw = procedure?.definition?.triggers?.min_confidence ?? 0.7;
+    return raw <= 1 ? Math.round(raw * 100) : raw;
+  });
 
   // Steps
   const [steps, setSteps] = useState<UIStep[]>(
@@ -147,7 +150,8 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       setTemplateId(procedure.template_id ?? '');
       setIsActive(procedure.is_active ?? true);
       setKeywords(procedure.definition?.triggers?.keywords ?? []);
-      setMinConfidence(procedure.definition?.triggers?.min_confidence ?? 70);
+      const raw = procedure.definition?.triggers?.min_confidence ?? 0.7;
+      setMinConfidence(raw <= 1 ? Math.round(raw * 100) : raw);
       setSteps(normalizeSteps(procedure.definition?.steps));
       setOpenSteps({ 0: true });
     }
@@ -230,7 +234,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       template_id: templateId,
       is_active: isActive,
       definition: {
-        triggers: { keywords, min_confidence: minConfidence },
+        triggers: { keywords, min_confidence: minConfidence / 100 },
         steps: backendSteps as any,
       },
     });
@@ -244,7 +248,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       setTemplateId('');
       setIsActive(true);
       setKeywords([]);
-      setMinConfidence(70);
+      setMinConfidence(15);
       setSteps([{ ...EMPTY_STEP }]);
       setOpenSteps({ 0: true });
     }
@@ -326,8 +330,8 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
               <Slider
                 value={[minConfidence]}
                 onValueChange={([v]) => setMinConfidence(v)}
-                min={50}
-                max={95}
+                min={5}
+                max={100}
                 step={5}
                 className="max-w-sm"
               />
