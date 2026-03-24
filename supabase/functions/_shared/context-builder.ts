@@ -285,7 +285,9 @@ export function buildSystemPrompt(context: RuntimeContext): string {
   guardrails += "\n- NUNCA forneça informações técnicas específicas (velocidade do plano, valor de fatura, status de conexão) sem ter consultado uma ferramenta.";
   guardrails += "\n- Se não tiver certeza, diga que não tem a informação e ofereça alternativas.";
 
-  if (!hasErp) {
+  if (!hasErp && hasProcedure) {
+    guardrails += "\n- O sistema ERP NÃO está configurado neste momento. As ferramentas de consulta (faturas, contratos, dados cadastrais) estão temporariamente indisponíveis. Informe ao usuário que o serviço de consulta está temporariamente indisponível e peça desculpas. NÃO transfira para humano a menos que o usuário solicite explicitamente falar com uma pessoa.";
+  } else if (!hasErp) {
     guardrails += "\n- Você NÃO tem acesso ao sistema ERP. Não pode consultar dados de clientes, faturas ou contratos. Informe que o recurso não está disponível no momento e oriente o usuário a entrar em contato diretamente com o provedor.";
   }
   if (!hasProcedure) {
