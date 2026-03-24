@@ -248,7 +248,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       setTemplateId('');
       setIsActive(true);
       setKeywords([]);
-      setMinConfidence(70);
+      setMinConfidence(15);
       setSteps([{ ...EMPTY_STEP }]);
       setOpenSteps({ 0: true });
     }

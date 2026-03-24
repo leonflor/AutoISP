@@ -594,7 +594,8 @@ export async function detectProcedure(
     if (!triggers?.keywords?.length) continue;
 
     const keywords = triggers.keywords;
-    const minConfidence = triggers.min_confidence ?? 0.5;
+    const rawConfidence = triggers.min_confidence ?? 0.5;
+    const minConfidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
     const matchedCount = keywords.filter((kw) =>
       messageLower.includes(kw.toLowerCase()),
     ).length;
