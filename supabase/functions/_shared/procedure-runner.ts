@@ -112,30 +112,37 @@ function formatMessagesForOpenAI(
 function buildStepTools(
   step: ProcedureStep | null,
   hasErp: boolean,
+  hasProcedure: boolean,
 ): unknown[] | undefined {
-  // Always include transfer_to_human
+  // Only include transfer_to_human when:
+  // - No procedure is active (free conversation), OR
+  // - The step explicitly lists it in available_functions
+  const shouldIncludeTransfer =
+    !hasProcedure || (step?.available_functions?.includes("transfer_to_human") ?? false);
+
   const transferTool = TOOL_CATALOG["transfer_to_human"];
-  const alwaysAvailable = transferTool
-    ? [
-        {
-          type: "function" as const,
-          function: {
-            name: transferTool.handler,
-            description: transferTool.description,
-            parameters: transferTool.parameters_schema,
+  const alwaysAvailable =
+    shouldIncludeTransfer && transferTool
+      ? [
+          {
+            type: "function" as const,
+            function: {
+              name: transferTool.handler,
+              description: transferTool.description,
+              parameters: transferTool.parameters_schema,
+            },
           },
-        },
-      ]
-    : [];
+        ]
+      : [];
 
   if (!step?.available_functions?.length) {
-    // No procedure step — only transfer_to_human
+    // No procedure step — only transfer_to_human (if allowed)
     return alwaysAvailable.length > 0 ? alwaysAvailable : undefined;
   }
 
   const stepTools = step.available_functions
     .filter((name) => {
-      if (name === "transfer_to_human") return false; // avoid duplicate
+      if (name === "transfer_to_human") return false; // already handled above
       const tool = TOOL_CATALOG[name];
       return tool && (!tool.requires_erp || hasErp);
     })
