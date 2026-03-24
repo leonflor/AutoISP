@@ -16,13 +16,13 @@ export type ProcedureStep = {
   name?: string;
   instruction: string;
   available_functions?: string[];
-  advance_condition?: string; // "always" | "function_success" | "data_collected" | "user_confirmation" | "llm_judge"
+  advance_condition?: string;
   on_complete?: {
-    action: string; // "next_step" | "end_procedure" | "handover_agent" | "handover_human" | "conditional"
+    action: string;
     resolution?: string;
     reason?: string;
     agent_type?: string;
-    conditions?: { if_context: string; then: Record<string, unknown> | string }[];
+    conditions?: { if_context: string; then: Json | string }[];
   };
   stuck_after_turns?: number;
   stuck_action?: string;
