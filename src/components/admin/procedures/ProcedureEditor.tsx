@@ -87,15 +87,10 @@ function normalizeSteps(steps: any[] | undefined): UIStep[] {
 }
 
 // Full list of available functions as specified
-const AVAILABLE_FUNCTIONS = [
-  { handler: 'get_customer_by_document', label: 'Buscar cliente por documento' },
-  { handler: 'get_customer_by_email', label: 'Buscar cliente por email' },
-  { handler: 'get_open_invoices', label: 'Consultar faturas abertas' },
-  { handler: 'get_service_status', label: 'Status do serviço' },
-  { handler: 'get_contract', label: 'Consultar contrato' },
-  { handler: 'generate_payment_link', label: 'Gerar link de pagamento' },
-  { handler: 'send_invoice_by_email', label: 'Enviar fatura por email' },
-];
+// Derive available functions from the canonical tool catalog (excluding transfer_to_human)
+const AVAILABLE_FUNCTIONS = TOOL_CATALOG
+  .filter(t => t.handler !== 'transfer_to_human')
+  .map(t => ({ handler: t.handler, label: t.display_name }));
 
 const EMPTY_STEP: UIStep = {
   name: '',
