@@ -276,7 +276,8 @@ export async function buscarFaturas(
   ispId: string,
   encryptionKey: string,
   cpfCnpj: string,
-  endereco?: string
+  endereco?: string,
+  contratoId?: string
 ): Promise<ToolEnvelope<FaturaResponse>> {
   const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
   if (configs.length === 0) return { encontrados: 0, itens: [], erros: [] };
@@ -286,11 +287,14 @@ export async function buscarFaturas(
   const today = new Date();
   const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
 
-  // Se endereço fornecido, pré-resolver contratos para filtrar
+  // Filtro por contrato: contrato_id tem prioridade sobre endereco
   let allowedContratoIds: Set<string> | null = null;
   let contratoEnderecoMap: Map<string, string> = new Map();
 
-  if (endereco) {
+  if (contratoId) {
+    // Filtro direto por ID do contrato — sem necessidade de resolver por endereço
+    allowedContratoIds = new Set([contratoId]);
+  } else if (endereco) {
     const contratosResult = await buscarContratos(supabaseAdmin, ispId, encryptionKey, cpfCnpj);
     const enderecoLower = endereco.toLowerCase();
     allowedContratoIds = new Set();

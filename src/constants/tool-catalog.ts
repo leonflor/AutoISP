@@ -22,9 +22,10 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     handler: "erp_invoice_search",
     display_name: "Consulta de Faturas",
     description:
-      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Aceita parâmetro opcional de endereço para filtrar por contrato.",
+      "Consulta faturas em aberto de um cliente no ERP por CPF/CNPJ. Aceita filtro por contrato_id ou endereço.",
     parameters: [
       { name: "cpf_cnpj", type: "string", description: "CPF ou CNPJ do cliente", required: true },
+      { name: "contrato_id", type: "string", description: "ID do contrato para filtrar faturas (prioridade sobre endereço)", required: false },
       { name: "endereco", type: "string", description: "Endereço parcial para filtrar o contrato desejado (opcional)", required: false },
     ],
     response_description:

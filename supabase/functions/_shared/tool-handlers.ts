@@ -58,8 +58,9 @@ const erpInvoiceSearchHandler: ToolHandler = async (ctx, args) => {
   const cpf = validateCpfCnpj(args.cpf_cnpj);
   if (!cpf) return { success: false, error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido" };
 
+  const contratoId = args.contrato_id ? String(args.contrato_id) : undefined;
   const endereco = args.endereco ? String(args.endereco) : undefined;
-  const result = await buscarFaturas(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpf, endereco);
+  const result = await buscarFaturas(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, cpf, endereco, contratoId);
 
   return { success: true, data: result };
 };

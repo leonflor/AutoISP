@@ -26,9 +26,13 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
           description: "CPF ou CNPJ do cliente (somente números ou formatado)",
           minLength: 11,
         },
+        contrato_id: {
+          type: "string",
+          description: "ID do contrato para filtrar faturas. Use quando disponível no contexto (selected_contract_id). Tem prioridade sobre endereco.",
+        },
         endereco: {
           type: "string",
-          description: "Endereço parcial para filtrar o contrato desejado (opcional, obtido via erp_contract_lookup)",
+          description: "Endereço parcial para filtrar o contrato desejado. OPCIONAL — se contrato_id estiver disponível no contexto, use-o em vez deste parâmetro.",
         },
       },
       required: ["cpf_cnpj"],
