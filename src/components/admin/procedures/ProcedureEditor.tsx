@@ -150,7 +150,8 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       setTemplateId(procedure.template_id ?? '');
       setIsActive(procedure.is_active ?? true);
       setKeywords(procedure.definition?.triggers?.keywords ?? []);
-      setMinConfidence(procedure.definition?.triggers?.min_confidence ?? 70);
+      const raw = procedure.definition?.triggers?.min_confidence ?? 0.7;
+      setMinConfidence(raw <= 1 ? Math.round(raw * 100) : raw);
       setSteps(normalizeSteps(procedure.definition?.steps));
       setOpenSteps({ 0: true });
     }
