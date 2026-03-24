@@ -100,6 +100,9 @@ function formatMessagesForOpenAI(
       msg.tool_call_id = m.tool_call_id as string;
       msg.name = m.tool_name as string;
     }
+    if (m.tool_calls) {
+      msg.tool_calls = m.tool_calls as OpenAIMessage["tool_calls"];
+    }
     return msg;
   });
 }
