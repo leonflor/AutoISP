@@ -117,7 +117,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       setIsActive(procedure.is_active ?? true);
       setKeywords(procedure.definition?.triggers?.keywords ?? []);
       setMinConfidence(procedure.definition?.triggers?.min_confidence ?? 70);
-      setSteps(procedure.definition?.steps?.length ? procedure.definition.steps : [{ ...EMPTY_STEP }]);
+      setSteps(normalizeSteps(procedure.definition?.steps));
       setOpenSteps({ 0: true });
     }
   }, [procedure]);
