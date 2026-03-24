@@ -132,7 +132,10 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
   // Triggers
   const [keywords, setKeywords] = useState<string[]>(procedure?.definition?.triggers?.keywords ?? []);
   const [keywordInput, setKeywordInput] = useState('');
-  const [minConfidence, setMinConfidence] = useState(procedure?.definition?.triggers?.min_confidence ?? 70);
+  const [minConfidence, setMinConfidence] = useState(() => {
+    const raw = procedure?.definition?.triggers?.min_confidence ?? 0.7;
+    return raw <= 1 ? Math.round(raw * 100) : raw;
+  });
 
   // Steps
   const [steps, setSteps] = useState<UIStep[]>(
