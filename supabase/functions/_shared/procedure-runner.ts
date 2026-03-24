@@ -626,6 +626,7 @@ export async function detectProcedure(
   supabaseAdmin: SupabaseClient,
   message: string,
   templateId: string,
+  lastBotMessage?: string,
 ): Promise<Record<string, unknown> | null> {
   const { data: procedures } = await supabaseAdmin
     .from("procedures")
@@ -636,7 +637,15 @@ export async function detectProcedure(
 
   if (!procedures?.length) return null;
 
-  const messageLower = message.toLowerCase();
+  const messageLower = message.toLowerCase().trim();
+
+  // If user sent a short confirmation, combine with last bot message for context
+  const confirmationWords = ["sim", "isso", "quero", "pode", "ok", "s", "claro", "por favor", "yes", "positivo", "exato", "isso mesmo"];
+  const isConfirmation = confirmationWords.includes(messageLower) || messageLower.length <= 5;
+  const searchText = isConfirmation && lastBotMessage
+    ? `${messageLower} ${lastBotMessage.toLowerCase()}`
+    : messageLower;
+
   let bestMatch: Record<string, unknown> | null = null;
   let bestScore = 0;
 
@@ -649,7 +658,7 @@ export async function detectProcedure(
     const rawConfidence = triggers.min_confidence ?? 0.5;
     const minConfidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
     const matchedCount = keywords.filter((kw) =>
-      messageLower.includes(kw.toLowerCase()),
+      searchText.includes(kw.toLowerCase()),
     ).length;
     const score = matchedCount / keywords.length;
 
