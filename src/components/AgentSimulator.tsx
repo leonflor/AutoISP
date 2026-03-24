@@ -209,7 +209,7 @@ export function AgentSimulator({
 
           {/* Right panel — Chat */}
           <div className="flex-1 flex flex-col">
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <ScrollArea className="flex-1 p-4">
               <div className="space-y-4 max-w-2xl mx-auto">
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
