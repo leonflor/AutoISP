@@ -1,40 +1,53 @@
 
+Problema provável: a tela está quebrando ao abrir o modal porque o formato salvo em `procedures.definition` não bate com o formato que o editor espera.
 
-# Plano: Corrigir modal de edição de procedimentos não carregando dados
+O que encontrei:
+- O editor (`src/components/admin/procedures/ProcedureEditor.tsx`) espera steps assim:
+  - `available_functions: { handler, required }[]`
+  - `stuck_config: { max_turns, action }`
+  - `on_complete.conditions`
+- Mas o banco tem steps assim:
+  - `available_functions: string[]`
+  - `stuck_after_turns`, `stuck_action`
+  - `on_complete.rules`
+- O backend (`supabase/functions/_shared/procedure-runner.ts`) também usa o formato antigo/string-array.
+- Isso explica o “não abre tela”: ao editar, o modal renderiza e faz `.find()`/`.map()` assumindo objetos em `available_functions`, mas recebe strings do banco.
 
-## Problema
+Plano de correção:
+1. Normalizar os dados ao carregar no editor
+   - Em `src/components/admin/procedures/ProcedureEditor.tsx`, criar um helper para converter o formato salvo no banco para o formato esperado pela UI.
+   - Aplicar essa normalização no `useEffect` e também na inicialização dos estados.
 
-O `ProcedureEditor` usa `useState` com valores iniciais do `procedure` prop. Esses estados são definidos apenas na montagem do componente. Como o `Dialog` nunca desmonta (está sempre no DOM), ao clicar em outro card, o prop `procedure` muda mas os estados internos mantêm os valores antigos (ou vazios).
+2. Tornar o editor tolerante a dados legados
+   - Garantir fallback para:
+     - `available_functions` como `string[]` ou objeto[]
+     - `stuck_after_turns/stuck_action` ou `stuck_config`
+     - `on_complete.rules` ou `on_complete.conditions`
+   - Assim o modal abre mesmo com registros antigos.
 
-O `handleOpenChange` só reseta o estado para "novo procedimento" (`!procedure`), nunca sincroniza quando é edição.
+3. Normalizar antes de salvar
+   - No submit, converter de volta para o formato que o backend realmente consome hoje.
+   - Isso evita incompatibilidade entre UI e `procedure-runner`.
 
-## Solução
+4. Ajustar tipagem do hook
+   - Em `src/hooks/admin/useProcedures.ts`, revisar os tipos para refletirem que existem dados legados e evitar falsa segurança de TypeScript.
 
-Adicionar um `useEffect` que sincroniza todos os estados internos quando o prop `procedure` muda:
+Arquivos a ajustar:
+- `src/components/admin/procedures/ProcedureEditor.tsx`
+- `src/hooks/admin/useProcedures.ts`
 
-### Arquivo: `src/components/admin/procedures/ProcedureEditor.tsx`
+Resultado esperado:
+- O modal volta a abrir ao clicar em “Procedimentos”
+- Dados existentes carregam corretamente
+- Salvar continua compatível com o motor atual de procedimentos
 
-Adicionar após as declarações de estado (linha ~72):
+Detalhe técnico:
+```text
+Banco atual:
+available_functions: ["get_open_invoices"]
 
-```typescript
-useEffect(() => {
-  if (procedure) {
-    setName(procedure.name ?? '');
-    setDescription(procedure.description ?? '');
-    setTemplateId(procedure.template_id ?? '');
-    setIsActive(procedure.is_active ?? true);
-    setKeywords(procedure.definition?.triggers?.keywords ?? []);
-    setMinConfidence(procedure.definition?.triggers?.min_confidence ?? 70);
-    setSteps(procedure.definition?.steps?.length ? procedure.definition.steps : [{ ...EMPTY_STEP }]);
-    setOpenSteps({ 0: true });
-  }
-}, [procedure]);
+UI espera:
+available_functions: [{ handler: "get_open_invoices", required: false }]
 ```
 
-Importar `useEffect` (já existe `useState` e `useCallback` no import, basta adicionar `useEffect`).
-
-### Impacto
-- Arquivo único alterado
-- Ao clicar em qualquer card, o modal carrega os dados corretos
-- Criação de novo procedimento continua funcionando via `handleOpenChange`
-
+Também vale revisar depois se você quer unificar definitivamente o schema entre UI e backend, porque hoje eles estão divergentes e isso tende a gerar novos bugs.
