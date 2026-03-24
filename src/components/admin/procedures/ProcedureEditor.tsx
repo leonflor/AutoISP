@@ -234,7 +234,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       template_id: templateId,
       is_active: isActive,
       definition: {
-        triggers: { keywords, min_confidence: minConfidence },
+        triggers: { keywords, min_confidence: minConfidence / 100 },
         steps: backendSteps as any,
       },
     });
