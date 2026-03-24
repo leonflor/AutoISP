@@ -747,13 +747,13 @@ async function resolveContractSelectionFromMessage(
   );
   if (!selected) return;
 
-  // Persist structured selection
-  const selection = {
+  // Persist structured selection — omit null fields so LLM never sees them
+  const selection: Record<string, unknown> = {
     selected_contract_option: num,
-    selected_contract_id: selected.contrato_id ?? selected.id ?? null,
-    selected_contract_address: selected.endereco ?? null,
-    selected_contract_plan: selected.plano ?? null,
   };
+  if (selected.contrato_id ?? selected.id) selection.selected_contract_id = selected.contrato_id ?? selected.id;
+  if (selected.endereco) selection.selected_contract_address = selected.endereco;
+  if (selected.plano) selection.selected_contract_plan = selected.plano;
 
   console.log(
     `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}`,
