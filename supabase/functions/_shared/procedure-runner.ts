@@ -112,30 +112,37 @@ function formatMessagesForOpenAI(
 function buildStepTools(
   step: ProcedureStep | null,
   hasErp: boolean,
+  hasProcedure: boolean,
 ): unknown[] | undefined {
-  // Always include transfer_to_human
+  // Only include transfer_to_human when:
+  // - No procedure is active (free conversation), OR
+  // - The step explicitly lists it in available_functions
+  const shouldIncludeTransfer =
+    !hasProcedure || (step?.available_functions?.includes("transfer_to_human") ?? false);
+
   const transferTool = TOOL_CATALOG["transfer_to_human"];
-  const alwaysAvailable = transferTool
-    ? [
-        {
-          type: "function" as const,
-          function: {
-            name: transferTool.handler,
-            description: transferTool.description,
-            parameters: transferTool.parameters_schema,
+  const alwaysAvailable =
+    shouldIncludeTransfer && transferTool
+      ? [
+          {
+            type: "function" as const,
+            function: {
+              name: transferTool.handler,
+              description: transferTool.description,
+              parameters: transferTool.parameters_schema,
+            },
           },
-        },
-      ]
-    : [];
+        ]
+      : [];
 
   if (!step?.available_functions?.length) {
-    // No procedure step — only transfer_to_human
+    // No procedure step — only transfer_to_human (if allowed)
     return alwaysAvailable.length > 0 ? alwaysAvailable : undefined;
   }
 
   const stepTools = step.available_functions
     .filter((name) => {
-      if (name === "transfer_to_human") return false; // avoid duplicate
+      if (name === "transfer_to_human") return false; // already handled above
       const tool = TOOL_CATALOG[name];
       return tool && (!tool.requires_erp || hasErp);
     })
@@ -207,18 +214,24 @@ export async function runProcedureStep(
   const hasErp = !!context.erpConfig;
   const temperature = (context.template.temperature as number) ?? 0.4;
 
-  // 4. Save user message
+  // 4. Try to resolve contract selection from user message (before saving)
+  await resolveContractSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
+
+  // 4b. Save user message
   await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
     role: "user",
     content: userMessage,
   });
 
+  // 4c. Re-build context if contract was resolved (so system prompt reflects it)
+  context = await buildRuntimeContext(supabaseAdmin, conversationId);
+
   // 5. Build system prompt + message history + tools
   const systemPrompt = buildSystemPrompt(context);
   const historyMessages = formatMessagesForOpenAI(context.messages);
   historyMessages.push({ role: "user", content: userMessage });
-  const tools = buildStepTools(step, hasErp);
+  const tools = buildStepTools(step, hasErp, !!context.procedure);
 
   // 6. Call OpenAI
   let response = await callOpenAI(
@@ -304,6 +317,16 @@ export async function runProcedureStep(
       // Merge relevant data into collected_context
       if (result.success && result.data) {
         await mergeToContext(supabaseAdmin, conversationId, result.data);
+      }
+
+      // If this was a contract lookup, try to resolve a numeric selection from the user message
+      if (tc.function.name === "erp_contract_lookup" && result.success && result.data) {
+        await tryResolveContractSelection(
+          supabaseAdmin,
+          conversationId,
+          userMessage,
+          result.data as Record<string, unknown>,
+        );
       }
 
       // Add tool result to history for re-call
@@ -672,6 +695,71 @@ export async function detectProcedure(
   }
 
   return bestMatch;
+}
+
+// ─── tryResolveContractSelection ────────────────────────────────────
+// When user sends a numeric choice and we have contract items in context,
+// resolve and persist the selected contract as structured data.
+
+async function tryResolveContractSelection(
+  supabaseAdmin: SupabaseClient,
+  conversationId: string,
+  userMessage: string,
+  _toolData: Record<string, unknown>,
+): Promise<void> {
+  // This runs right after erp_contract_lookup returns. The items are already
+  // in collected_context via mergeToContext. We don't need to do anything yet;
+  // the actual selection happens on the NEXT user turn (user sends "8").
+  // So we register a hook: on subsequent turns, check if user sent a number.
+  // Actually, let's handle it differently: we check on EVERY user message
+  // whether there are unresolved contract items in the context.
+}
+
+// Called before the OpenAI call to check if the user is selecting a contract
+async function resolveContractSelectionFromMessage(
+  supabaseAdmin: SupabaseClient,
+  conversationId: string,
+  userMessage: string,
+): Promise<void> {
+  const trimmed = userMessage.trim();
+  const num = parseInt(trimmed, 10);
+  if (isNaN(num) || num < 1) return;
+
+  // Read current context
+  const { data: conv } = await supabaseAdmin
+    .from("conversations")
+    .select("collected_context")
+    .eq("id", conversationId)
+    .single();
+
+  const ctx = (conv?.collected_context as Record<string, unknown>) ?? {};
+
+  // Already resolved
+  if (ctx.selected_contract_id) return;
+
+  // Look for contract items (from erp_contract_lookup result)
+  const itens = ctx.itens as Array<Record<string, unknown>> | undefined;
+  if (!itens?.length) return;
+
+  // Find the item matching the user's numeric choice
+  const selected = itens.find(
+    (item) => Number(item.opcao) === num,
+  );
+  if (!selected) return;
+
+  // Persist structured selection
+  const selection = {
+    selected_contract_option: num,
+    selected_contract_id: selected.contrato_id ?? selected.id ?? null,
+    selected_contract_address: selected.endereco ?? null,
+    selected_contract_plan: selected.plano ?? null,
+  };
+
+  console.log(
+    `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}`,
+  );
+
+  await mergeToContext(supabaseAdmin, conversationId, selection);
 }
 
 // ─── mergeToContext ─────────────────────────────────────────────────
