@@ -225,7 +225,7 @@ export async function runProcedureStep(
   const systemPrompt = buildSystemPrompt(context);
   const historyMessages = formatMessagesForOpenAI(context.messages);
   historyMessages.push({ role: "user", content: userMessage });
-  const tools = buildStepTools(step, hasErp);
+  const tools = buildStepTools(step, hasErp, !!context.procedure);
 
   // 6. Call OpenAI
   let response = await callOpenAI(
