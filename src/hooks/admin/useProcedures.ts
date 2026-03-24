@@ -11,25 +11,21 @@ export type ProcedureDefinition = {
   steps: ProcedureStep[];
 };
 
+/** DB/backend format — matches procedure-runner.ts */
 export type ProcedureStep = {
-  name: string;
+  name?: string;
   instruction: string;
-  available_functions: { handler: string; required: boolean }[];
-  advance_condition: {
-    type: 'function_success' | 'data_collected' | 'user_confirmation' | 'llm_judge' | 'always';
-    function_name?: string;
-    fields?: string[];
-  };
-  on_complete: {
-    type: 'next_step' | 'end_procedure' | 'handover_agent' | 'handover_human' | 'conditional';
-    resolution?: 'resolved' | 'unresolved';
+  available_functions?: string[];
+  advance_condition?: string;
+  on_complete?: {
+    action: string;
+    resolution?: string;
+    reason?: string;
     agent_type?: string;
-    conditions?: { if: string; then: string }[];
+    conditions?: { if_context: string; then: Json | string }[];
   };
-  stuck_config: {
-    max_turns: number;
-    action: 'escalate_human' | 'repeat' | 'skip' | 'never';
-  };
+  stuck_after_turns?: number;
+  stuck_action?: string;
 };
 
 export type ProcedureWithMeta = Tables<'procedures'> & {

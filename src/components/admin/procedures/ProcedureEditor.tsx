@@ -15,10 +15,32 @@ import { ChevronDown, Plus, Trash2, X, ArrowUp, ArrowDown, AlertTriangle } from 
 import { cn } from '@/lib/utils';
 import { TOOL_CATALOG } from '@/constants/tool-catalog';
 import type { AgentTemplate } from '@/hooks/admin/useAgentTemplates';
-import type { ProcedureDefinition, ProcedureStep, ProcedureWithMeta } from '@/hooks/admin/useProcedures';
+import type { ProcedureDefinition, ProcedureWithMeta } from '@/hooks/admin/useProcedures';
 
-/** Normalize a step from legacy DB format to UI format */
-function normalizeStep(raw: any): ProcedureStep {
+/** UI-internal rich step type (differs from DB ProcedureStep) */
+type UIStep = {
+  name: string;
+  instruction: string;
+  available_functions: { handler: string; required: boolean }[];
+  advance_condition: {
+    type: string;
+    function_name?: string;
+    fields?: string[];
+  };
+  on_complete: {
+    type: string;
+    resolution?: string;
+    agent_type?: string;
+    conditions?: { if: string; then: string }[];
+  };
+  stuck_config: {
+    max_turns: number;
+    action: string;
+  };
+};
+
+/** Normalize a step from DB/backend format to UI format */
+function normalizeStep(raw: any): UIStep {
   // available_functions: string[] → { handler, required }[]
   const fns = Array.isArray(raw.available_functions)
     ? raw.available_functions.map((f: any) =>
@@ -32,25 +54,34 @@ function normalizeStep(raw: any): ProcedureStep {
     action: raw.stuck_action ?? 'escalate_human',
   };
 
-  // on_complete.conditions vs on_complete.rules
-  const on_complete = raw.on_complete
-    ? {
-        ...raw.on_complete,
-        conditions: raw.on_complete.conditions ?? raw.on_complete.rules ?? undefined,
-      }
-    : { type: 'next_step' as const };
+  // advance_condition: string → { type: string, ... }
+  const advance_condition = typeof raw.advance_condition === 'string'
+    ? { type: raw.advance_condition }
+    : raw.advance_condition ?? { type: 'always' };
+
+  // on_complete: action → type (UI key), if_context → if
+  const oc = raw.on_complete ?? {};
+  const on_complete = {
+    type: oc.type ?? oc.action ?? 'next_step',
+    resolution: oc.resolution,
+    agent_type: oc.agent_type,
+    conditions: (oc.conditions ?? oc.rules)?.map((c: any) => ({
+      if: c.if ?? c.if_context ?? '',
+      then: typeof c.then === 'string' ? c.then : JSON.stringify(c.then ?? ''),
+    })),
+  };
 
   return {
     name: raw.name ?? '',
     instruction: raw.instruction ?? '',
     available_functions: fns,
-    advance_condition: raw.advance_condition ?? { type: 'always' as const },
+    advance_condition,
     on_complete,
     stuck_config,
   };
 }
 
-function normalizeSteps(steps: any[] | undefined): ProcedureStep[] {
+function normalizeSteps(steps: any[] | undefined): UIStep[] {
   if (!steps?.length) return [{ ...EMPTY_STEP }];
   return steps.map(normalizeStep);
 }
@@ -66,7 +97,7 @@ const AVAILABLE_FUNCTIONS = [
   { handler: 'send_invoice_by_email', label: 'Enviar fatura por email' },
 ];
 
-const EMPTY_STEP: ProcedureStep = {
+const EMPTY_STEP: UIStep = {
   name: '',
   instruction: '',
   available_functions: [],
@@ -104,7 +135,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
   const [minConfidence, setMinConfidence] = useState(procedure?.definition?.triggers?.min_confidence ?? 70);
 
   // Steps
-  const [steps, setSteps] = useState<ProcedureStep[]>(
+  const [steps, setSteps] = useState<UIStep[]>(
     normalizeSteps(procedure?.definition?.steps)
   );
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
@@ -134,7 +165,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 
   const removeKeyword = (kw: string) => setKeywords(keywords.filter(k => k !== kw));
 
-  const updateStep = useCallback((idx: number, patch: Partial<ProcedureStep>) => {
+  const updateStep = useCallback((idx: number, patch: Partial<UIStep>) => {
     setSteps(prev => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }, []);
 
@@ -180,8 +211,16 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
       name: s.name,
       instruction: s.instruction,
       available_functions: s.available_functions.map(f => f.handler),
-      advance_condition: s.advance_condition,
-      on_complete: s.on_complete,
+      advance_condition: s.advance_condition.type, // UI object → DB string
+      on_complete: {
+        action: s.on_complete.type, // UI "type" → DB "action"
+        resolution: s.on_complete.resolution,
+        agent_type: s.on_complete.agent_type,
+        conditions: s.on_complete.conditions?.map(c => ({
+          if_context: c.if, // UI "if" → DB "if_context"
+          then: c.then,
+        })),
+      },
       stuck_after_turns: s.stuck_config.max_turns,
       stuck_action: s.stuck_config.action,
     }));
@@ -345,12 +384,12 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 function StepCard({
   step, index, total, isOpen, onToggle, onChange, onRemove, onMove, onToggleFunction, onToggleFnRequired,
 }: {
-  step: ProcedureStep;
+  step: UIStep;
   index: number;
   total: number;
   isOpen: boolean;
   onToggle: () => void;
-  onChange: (patch: Partial<ProcedureStep>) => void;
+  onChange: (patch: Partial<UIStep>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   onToggleFunction: (handler: string) => void;
@@ -449,7 +488,7 @@ function StepCard({
               <Select
                 value={step.advance_condition.type}
                 onValueChange={v =>
-                  onChange({ advance_condition: { type: v as ProcedureStep['advance_condition']['type'] } })
+                  onChange({ advance_condition: { type: v as string } })
                 }
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -508,7 +547,7 @@ function StepCard({
               <Select
                 value={step.on_complete.type}
                 onValueChange={v =>
-                  onChange({ on_complete: { type: v as ProcedureStep['on_complete']['type'] } })
+                  onChange({ on_complete: { type: v as string } })
                 }
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -572,7 +611,7 @@ function StepCard({
                   <Select
                     value={step.stuck_config.action}
                     onValueChange={v =>
-                      onChange({ stuck_config: { ...step.stuck_config, action: v as ProcedureStep['stuck_config']['action'] } })
+                      onChange({ stuck_config: { ...step.stuck_config, action: v as string } })
                     }
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
