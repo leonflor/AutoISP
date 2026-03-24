@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
+import { ImageCropDialog } from '@/components/ui/image-crop-dialog';
 
 function AgentCard({ agent, isSelected, onClick }: { agent: AgentWithTemplate; isSelected: boolean; onClick: () => void }) {
   const name = agent.custom_name || agent.template.default_name;
