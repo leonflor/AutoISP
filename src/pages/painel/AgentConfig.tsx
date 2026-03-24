@@ -213,6 +213,15 @@ function AgentEditPanel({
         tenantAgentId={agent.id}
         agentName={agent.custom_name || agent.template.default_name}
       />
+
+      {cropSrc && (
+        <ImageCropDialog
+          open
+          imageSrc={cropSrc}
+          onClose={() => setCropSrc(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </>
   );
 }
