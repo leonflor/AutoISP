@@ -506,17 +506,12 @@ async function evaluateAdvanceCondition(
       const step = context.currentStep;
       const instruction = step?.instruction ?? "";
       const hadToolSuccess = lastToolSuccess ? "Sim" : "Não";
-      const collected = (context.conversation.collected_context as Record<string, unknown>) ?? {};
-      const hasCollectedData = Object.keys(collected).length > 0;
-      const collectedInfo = hasCollectedData
-        ? `\nDados já coletados em turnos anteriores: ${JSON.stringify(collected)}`
-        : "";
       const answer = await callOpenAIMini(
         openaiKey,
-        `Dado o objetivo do passo: "${instruction}"\n\nMensagem do usuário: "${userMessage}"\nHouve chamada de ferramenta com sucesso neste turno: ${hadToolSuccess}${collectedInfo}\nResposta do assistente: "${botReply}"\n\nConsidere que ferramentas podem ter sido executadas com sucesso em turnos anteriores (verifique os dados coletados). O objetivo deste passo foi cumprido? Responda APENAS "sim" ou "não".`,
+        `Dado o objetivo do passo: "${instruction}"\n\nMensagem do usuário: "${userMessage}"\nHouve chamada de ferramenta com sucesso neste turno: ${hadToolSuccess}\nResposta do assistente: "${botReply}"\n\nO objetivo deste passo foi cumprido? Responda APENAS "sim" ou "não".`,
       );
       const result = answer.trim().toLowerCase().startsWith("sim");
-      console.log(`[procedure-runner] llm_judge: userMsg="${userMessage.slice(0, 50)}" toolSuccess=${lastToolSuccess} hasCollected=${hasCollectedData} result=${result}`);
+      console.log(`[procedure-runner] llm_judge: userMsg="${userMessage.slice(0, 50)}" toolSuccess=${lastToolSuccess} result=${result}`);
       return result;
     }
 
