@@ -161,6 +161,7 @@ export async function runProcedureStep(
   supabaseAdmin: SupabaseClient,
   conversationId: string,
   userMessage: string,
+  _depth = 0,
 ): Promise<RunResult> {
   const t0 = performance.now();
 
