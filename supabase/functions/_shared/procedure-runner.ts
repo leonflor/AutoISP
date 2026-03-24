@@ -177,10 +177,16 @@ export async function runProcedureStep(
   // 3. Detect procedure if none active
   const templateId = context.template.id as string;
   if (!context.procedure) {
+    // Get last bot message for context-aware detection
+    const lastBotMsg = [...(context.messages || [])]
+      .reverse()
+      .find((m: Record<string, unknown>) => m.role === "assistant")?.content as string | undefined;
+
     const detected = await detectProcedure(
       supabaseAdmin,
       userMessage,
       templateId,
+      lastBotMsg,
     );
     if (detected) {
       await supabaseAdmin
