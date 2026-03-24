@@ -79,26 +79,43 @@ export function ImageCropDialog({
           <DialogTitle>Recortar imagem</DialogTitle>
         </DialogHeader>
 
-        <div className="relative w-full h-72 bg-muted rounded-lg overflow-hidden">
+        <div className="relative w-full h-96 bg-muted rounded-lg overflow-hidden">
           <Cropper
             image={imageSrc}
             crop={crop}
             zoom={zoom}
             aspect={aspect}
+            cropSize={{ width: 280, height: 280 }}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropComplete}
             cropShape="round"
-            showGrid={false}
+            showGrid
+            objectFit="contain"
+            style={{
+              cropAreaStyle: {
+                border: '2px solid hsl(var(--primary))',
+                boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+              },
+            }}
           />
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </Button>
           <ZoomIn className="h-4 w-4 text-muted-foreground shrink-0" />
           <Label className="sr-only">Zoom</Label>
           <Slider
             min={1}
-            max={3}
+            max={4}
             step={0.05}
             value={[zoom]}
             onValueChange={([v]) => setZoom(v)}
@@ -107,6 +124,15 @@ export function ImageCropDialog({
           <span className="text-xs text-muted-foreground font-mono w-10 text-right">
             {zoom.toFixed(1)}x
           </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
         </div>
 
         <DialogFooter>
