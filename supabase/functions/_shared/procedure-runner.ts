@@ -450,11 +450,14 @@ async function evaluateAdvanceCondition(
     case "llm_judge": {
       const step = context.currentStep;
       const instruction = step?.instruction ?? "";
+      const hadToolSuccess = lastToolSuccess ? "Sim" : "Não";
       const answer = await callOpenAIMini(
         openaiKey,
-        `Dado o objetivo do passo: "${instruction}"\n\nE a resposta do assistente: "${botReply}"\n\nO objetivo foi cumprido? Responda APENAS "sim" ou "não".`,
+        `Dado o objetivo do passo: "${instruction}"\n\nMensagem do usuário: "${userMessage}"\nHouve chamada de ferramenta com sucesso neste turno: ${hadToolSuccess}\nResposta do assistente: "${botReply}"\n\nO objetivo deste passo foi cumprido? Responda APENAS "sim" ou "não".`,
       );
-      return answer.trim().toLowerCase().startsWith("sim");
+      const result = answer.trim().toLowerCase().startsWith("sim");
+      console.log(`[procedure-runner] llm_judge: userMsg="${userMessage.slice(0, 50)}" toolSuccess=${lastToolSuccess} result=${result}`);
+      return result;
     }
 
     default:
