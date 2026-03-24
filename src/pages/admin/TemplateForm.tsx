@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useDropzone } from 'react-dropzone';
+import { ImageCropDialog } from '@/components/ui/image-crop-dialog';
 const TYPES = [
   { value: 'atendente_geral', label: 'Atendente Geral' },
   { value: 'suporte_n2', label: 'Suporte N2' },
