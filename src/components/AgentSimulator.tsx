@@ -296,6 +296,7 @@ export function AgentSimulator({
                     </div>
                   </div>
                 )}
+                <div ref={bottomRef} />
               </div>
             </ScrollArea>
 
