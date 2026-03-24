@@ -214,12 +214,18 @@ export async function runProcedureStep(
   const hasErp = !!context.erpConfig;
   const temperature = (context.template.temperature as number) ?? 0.4;
 
-  // 4. Save user message
+  // 4. Try to resolve contract selection from user message (before saving)
+  await resolveContractSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
+
+  // 4b. Save user message
   await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
     role: "user",
     content: userMessage,
   });
+
+  // 4c. Re-build context if contract was resolved (so system prompt reflects it)
+  context = await buildRuntimeContext(supabaseAdmin, conversationId);
 
   // 5. Build system prompt + message history + tools
   const systemPrompt = buildSystemPrompt(context);
