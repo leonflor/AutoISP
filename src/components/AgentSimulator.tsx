@@ -54,15 +54,13 @@ export function AgentSimulator({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(initialShowDebug);
   const [lastDebug, setLastDebug] = useState<SimulatorMessage['debug'] | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll on new messages
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sending]);
 
   // Focus input on open
   useEffect(() => {
