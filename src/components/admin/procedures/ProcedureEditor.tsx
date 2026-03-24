@@ -97,7 +97,7 @@ const AVAILABLE_FUNCTIONS = [
   { handler: 'send_invoice_by_email', label: 'Enviar fatura por email' },
 ];
 
-const EMPTY_STEP: ProcedureStep = {
+const EMPTY_STEP: UIStep = {
   name: '',
   instruction: '',
   available_functions: [],
@@ -135,7 +135,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
   const [minConfidence, setMinConfidence] = useState(procedure?.definition?.triggers?.min_confidence ?? 70);
 
   // Steps
-  const [steps, setSteps] = useState<ProcedureStep[]>(
+  const [steps, setSteps] = useState<UIStep[]>(
     normalizeSteps(procedure?.definition?.steps)
   );
   const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({ 0: true });
@@ -165,7 +165,7 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 
   const removeKeyword = (kw: string) => setKeywords(keywords.filter(k => k !== kw));
 
-  const updateStep = useCallback((idx: number, patch: Partial<ProcedureStep>) => {
+  const updateStep = useCallback((idx: number, patch: Partial<UIStep>) => {
     setSteps(prev => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }, []);
 
@@ -376,12 +376,12 @@ export function ProcedureEditor({ open, onOpenChange, procedure, templates, onSa
 function StepCard({
   step, index, total, isOpen, onToggle, onChange, onRemove, onMove, onToggleFunction, onToggleFnRequired,
 }: {
-  step: ProcedureStep;
+  step: UIStep;
   index: number;
   total: number;
   isOpen: boolean;
   onToggle: () => void;
-  onChange: (patch: Partial<ProcedureStep>) => void;
+  onChange: (patch: Partial<UIStep>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   onToggleFunction: (handler: string) => void;
@@ -480,7 +480,7 @@ function StepCard({
               <Select
                 value={step.advance_condition.type}
                 onValueChange={v =>
-                  onChange({ advance_condition: { type: v as ProcedureStep['advance_condition']['type'] } })
+                  onChange({ advance_condition: { type: v as string } })
                 }
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -539,7 +539,7 @@ function StepCard({
               <Select
                 value={step.on_complete.type}
                 onValueChange={v =>
-                  onChange({ on_complete: { type: v as ProcedureStep['on_complete']['type'] } })
+                  onChange({ on_complete: { type: v as string } })
                 }
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -603,7 +603,7 @@ function StepCard({
                   <Select
                     value={step.stuck_config.action}
                     onValueChange={v =>
-                      onChange({ stuck_config: { ...step.stuck_config, action: v as ProcedureStep['stuck_config']['action'] } })
+                      onChange({ stuck_config: { ...step.stuck_config, action: v as string } })
                     }
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
