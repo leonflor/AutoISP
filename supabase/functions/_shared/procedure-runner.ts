@@ -691,6 +691,71 @@ export async function detectProcedure(
   return bestMatch;
 }
 
+// ─── tryResolveContractSelection ────────────────────────────────────
+// When user sends a numeric choice and we have contract items in context,
+// resolve and persist the selected contract as structured data.
+
+async function tryResolveContractSelection(
+  supabaseAdmin: SupabaseClient,
+  conversationId: string,
+  userMessage: string,
+  _toolData: Record<string, unknown>,
+): Promise<void> {
+  // This runs right after erp_contract_lookup returns. The items are already
+  // in collected_context via mergeToContext. We don't need to do anything yet;
+  // the actual selection happens on the NEXT user turn (user sends "8").
+  // So we register a hook: on subsequent turns, check if user sent a number.
+  // Actually, let's handle it differently: we check on EVERY user message
+  // whether there are unresolved contract items in the context.
+}
+
+// Called before the OpenAI call to check if the user is selecting a contract
+async function resolveContractSelectionFromMessage(
+  supabaseAdmin: SupabaseClient,
+  conversationId: string,
+  userMessage: string,
+): Promise<void> {
+  const trimmed = userMessage.trim();
+  const num = parseInt(trimmed, 10);
+  if (isNaN(num) || num < 1) return;
+
+  // Read current context
+  const { data: conv } = await supabaseAdmin
+    .from("conversations")
+    .select("collected_context")
+    .eq("id", conversationId)
+    .single();
+
+  const ctx = (conv?.collected_context as Record<string, unknown>) ?? {};
+
+  // Already resolved
+  if (ctx.selected_contract_id) return;
+
+  // Look for contract items (from erp_contract_lookup result)
+  const itens = ctx.itens as Array<Record<string, unknown>> | undefined;
+  if (!itens?.length) return;
+
+  // Find the item matching the user's numeric choice
+  const selected = itens.find(
+    (item) => Number(item.opcao) === num,
+  );
+  if (!selected) return;
+
+  // Persist structured selection
+  const selection = {
+    selected_contract_option: num,
+    selected_contract_id: selected.contrato_id ?? selected.id ?? null,
+    selected_contract_address: selected.endereco ?? null,
+    selected_contract_plan: selected.plano ?? null,
+  };
+
+  console.log(
+    `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}`,
+  );
+
+  await mergeToContext(supabaseAdmin, conversationId, selection);
+}
+
 // ─── mergeToContext ─────────────────────────────────────────────────
 
 async function mergeToContext(
