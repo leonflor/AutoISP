@@ -313,6 +313,16 @@ export async function runProcedureStep(
         await mergeToContext(supabaseAdmin, conversationId, result.data);
       }
 
+      // If this was a contract lookup, try to resolve a numeric selection from the user message
+      if (tc.function.name === "erp_contract_lookup" && result.success && result.data) {
+        await tryResolveContractSelection(
+          supabaseAdmin,
+          conversationId,
+          userMessage,
+          result.data as Record<string, unknown>,
+        );
+      }
+
       // Add tool result to history for re-call
       historyMessages.push({
         role: "tool",
