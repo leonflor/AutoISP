@@ -315,5 +315,14 @@ export default function TemplateForm() {
         </CardContent>
       </Card>
     </div>
-  );
+
+    {cropSrc && (
+      <ImageCropDialog
+        open
+        imageSrc={cropSrc}
+        onClose={() => setCropSrc(null)}
+        onConfirm={handleCropConfirm}
+      />
+    )}
+  </>;
 }
