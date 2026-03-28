@@ -23,19 +23,19 @@ import {
 
 const ImplementacaoTab = () => {
   const backendConfig = {
-    projectUrl: "Lovable Cloud (gerenciado automaticamente)",
-    projectId: "Lovable Cloud",
+    projectUrl: "https://zvxcwwhsjtdliihlvvof.supabase.co",
+    projectId: "zvxcwwhsjtdliihlvvof",
     clientFile: "src/integrations/supabase/client.ts",
     typesFile: "src/integrations/supabase/types.ts",
-    deployMode: "Migrations via Lovable Cloud (automático)",
+    deployMode: "Migrations via Supabase (projeto externo)",
   };
 
   const consolidacao = [
-    { aspecto: "Backend", decisao: "Lovable Cloud (Supabase gerenciado)" },
+    { aspecto: "Backend", decisao: "Supabase (projeto externo — zvxcwwhsjtdliihlvvof)" },
     { aspecto: "Rodadas por Fase", decisao: "Máximo 15" },
     { aspecto: "Seeds", decisao: "Mínimos (usuário master + dados essenciais)" },
     { aspecto: "Integrações", decisao: "Core primeiro (Asaas → OpenAI → WhatsApp)" },
-    { aspecto: "Ambiente Dev", decisao: "Lovable Cloud (automático)" },
+    { aspecto: "Ambiente Dev", decisao: "Supabase externo + Lovable preview" },
     { aspecto: "Ordem Plataformas", decisao: "Admin primeiro → Cliente → Landing" },
     { aspecto: "Complexidade IA", decisao: "Sistema multi-agente (Atendente, Cobrador, Vendedor, Analista, Suporte)" },
     { aspecto: "Teste Pagamentos", decisao: "Sandbox Asaas" },
@@ -52,10 +52,13 @@ const ImplementacaoTab = () => {
   ];
 
   const secrets = [
+    { nome: "SUPABASE_SERVICE_ROLE_KEY", fase: "F1", descricao: "Chave service role para operações administrativas nas Edge Functions ✅ Configurado" },
+    { nome: "SUPABASE_URL", fase: "F1", descricao: "URL do projeto Supabase ✅ Configurado" },
+    { nome: "SUPABASE_ANON_KEY", fase: "F1", descricao: "Chave anônima do Supabase ✅ Configurado" },
+    { nome: "ENCRYPTION_KEY", fase: "F1", descricao: "Chave AES-GCM para criptografia de dados sensíveis (ERP, WhatsApp) ✅ Configurado" },
     { nome: "OPENAI_API_KEY", fase: "F2", descricao: "Criptografada em platform_config, configurada via painel Admin → Integrações" },
-    { nome: "ENCRYPTION_KEY", fase: "F1", descricao: "Chave para criptografia de dados sensíveis do ERP" },
-    { nome: "WHATSAPP_APP_SECRET", fase: "F2", descricao: "Segredo para validação de webhooks do Meta" },
-    { nome: "ASAAS_API_KEY", fase: "F2", descricao: "Chave da API Asaas (a configurar)" },
+    { nome: "WHATSAPP_APP_SECRET", fase: "F2", descricao: "Segredo para validação de webhooks do Meta ✅ Configurado" },
+    { nome: "ASAAS_API_KEY", fase: "F2", descricao: "Chave da API Asaas para pagamentos (a configurar)" },
     { nome: "ASAAS_WEBHOOK_TOKEN", fase: "F2", descricao: "Token para validar webhooks Asaas (a configurar)" },
     { nome: "RESEND_API_KEY", fase: "F2", descricao: "Chave da API Resend para emails (a configurar)" },
   ];
@@ -69,25 +72,25 @@ const ImplementacaoTab = () => {
   ];
 
   const edgeFunctions = [
-    "ai-chat",
-    "ai-usage",
     "asaas-customer",
     "asaas-subscription",
     "asaas-webhook",
-    "audit-prompt",
     "check-integration",
+    "embed-content",
     "fetch-erp-clients",
-    
     "invite-admin",
-    "process-document",
+    "resolve-conversation",
     "save-erp-config",
     "save-integration",
     "save-whatsapp-config",
     "send-email",
+    "send-human-reply",
     "send-whatsapp",
+    "simulate-agent",
     "test-erp",
     "test-integration",
     "test-whatsapp-connection",
+    "transfer-conversation",
     "whatsapp-webhook",
   ];
 
@@ -126,8 +129,8 @@ const ImplementacaoTab = () => {
               <Server className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle>Configuração Backend — Lovable Cloud</CardTitle>
-              <CardDescription>Backend gerenciado automaticamente pelo Lovable Cloud</CardDescription>
+              <CardTitle>Configuração Backend — Supabase (Externo)</CardTitle>
+              <CardDescription>Backend via projeto Supabase externo (ref: zvxcwwhsjtdliihlvvof)</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -141,8 +144,8 @@ const ImplementacaoTab = () => {
                   <code className="text-xs font-mono text-primary">{backendConfig.projectId}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">Gerenciamento</span>
-                  <span className="text-xs font-mono text-primary">Automático (Lovable Cloud)</span>
+                  <span className="text-sm text-muted-foreground">URL</span>
+                  <code className="text-xs font-mono text-primary">{backendConfig.projectUrl}</code>
                 </div>
               </div>
             </div>
@@ -165,9 +168,9 @@ const ImplementacaoTab = () => {
             <h4 className="mb-3 font-semibold text-foreground">Processo de Migrations</h4>
             <div className="rounded-lg border border-border bg-muted/30 p-4">
               <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-                <li>Migrations são executadas via <strong>Lovable Cloud</strong> (automático)</li>
-                <li>Gerenciar dados via <strong>Cloud View → Database</strong></li>
-                <li>Executar SQL customizado via <strong>Cloud View → Run SQL</strong></li>
+                <li>Migrations são executadas via <strong>Supabase Dashboard</strong> ou Lovable migration tool</li>
+                <li>Gerenciar dados via <strong>Supabase Dashboard → Table Editor</strong></li>
+                <li>Executar SQL customizado via <strong>Supabase Dashboard → SQL Editor</strong></li>
                 <li>Types são atualizados automaticamente em <code className="font-mono text-xs">{backendConfig.typesFile}</code></li>
               </ol>
             </div>
@@ -176,7 +179,7 @@ const ImplementacaoTab = () => {
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 p-3">
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             <p className="text-sm text-emerald-700 dark:text-emerald-300">
-              <strong>Lovable Cloud:</strong> Migrations e deploy de Edge Functions são gerenciados automaticamente.
+              <strong>Supabase:</strong> Migrations via Lovable e deploy de Edge Functions são automáticos ao salvar.
             </p>
           </div>
         </CardContent>
@@ -765,16 +768,18 @@ const ImplementacaoTab = () => {
             ))}
           </div>
           <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/) — 8 módulos</h4>
+            <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/) — 11 módulos</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
-              <li><code className="rounded bg-muted px-1">_shared/tool-handlers.ts</code> — Registry de handlers para function calling (mapeia handler_type → função executável)</li>
-              <li><code className="rounded bg-muted px-1">_shared/tool-catalog.ts</code> — Catálogo de tools para function calling (definições OpenAI)</li>
+              <li><code className="rounded bg-muted px-1">_shared/procedure-runner.ts</code> — Motor de execução de procedures JSONB (detecção de keywords, avanço de steps, controle de intent_attempts, pending_handover)</li>
+              <li><code className="rounded bg-muted px-1">_shared/context-builder.ts</code> — Construtor de contexto para o LLM (monta system prompt com collected_context, histórico e instruções do step)</li>
+              <li><code className="rounded bg-muted px-1">_shared/tool-handlers.ts</code> — Registry de handlers para function calling (mapeia tool name → função executável)</li>
+              <li><code className="rounded bg-muted px-1">_shared/tool-catalog.ts</code> — Catálogo de tools para function calling (definições OpenAI: erp_client_lookup, erp_contract_lookup, erp_invoice_search, transfer_to_human)</li>
+              <li><code className="rounded bg-muted px-1">_shared/response-models.ts</code> — Contratos de resposta (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)</li>
+              <li><code className="rounded bg-muted px-1">_shared/field-maps.ts</code> — Mapeamento de campos ERP para nomes canônicos</li>
+              <li><code className="rounded bg-muted px-1">_shared/crypto.ts</code> — Utilitários AES-GCM para criptografia/descriptografia de chaves sensíveis</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-types.ts</code> — Tipos padrão de ERP (ErpClient, ErpInvoice, InternetStatus, RawFatura, ErpProviderDriver)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Orquestrador: composição granular, normalização status_internet, fetchInvoices, decrypt AES-256-GCM</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/index.ts</code> — Registry de providers ERP (IXC, SGP, MK)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/ixc.ts</code> — Conector IXC Soft — 5 funções granulares (clientes, contratos, radusuarios, fibra, faturas)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/sgp.ts</code> — Conector SGP — clientes + stubs para contratos/faturas</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/mk.ts</code> — Conector MK-Solutions — clientes + stubs para contratos/faturas</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Orquestrador: composição granular, normalização status_internet, buscarFaturas por contrato_id, decrypt AES-256-GCM</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/</code> — Conectores ERP: IXC (5 funções granulares), SGP (clientes + stubs), MK (clientes + stubs)</li>
               <li><code className="rounded bg-muted px-1">_shared/onu-signal-analyzer.ts</code> — Análise de qualidade de sinal ONU (rx/tx)</li>
             </ul>
           </div>
