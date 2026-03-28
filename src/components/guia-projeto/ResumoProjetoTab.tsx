@@ -40,7 +40,7 @@ const ResumoProjetoTab = () => {
     { nome: "ERP Multi-Provider", icon: Database, categoria: "IXC, SGP, MK" },
     { nome: "Supabase Storage", icon: Database, categoria: "Arquivos" },
     { nome: "Supabase Auth", icon: Users, categoria: "Autenticação" },
-    { nome: "Lovable Cloud", icon: Database, categoria: "Backend" },
+    { nome: "Supabase", icon: Database, categoria: "Backend (externo)" },
     { nome: "LGPD", icon: Shield, categoria: "Conformidade" }
   ];
 
@@ -341,9 +341,9 @@ const ResumoProjetoTab = () => {
           <p className="text-muted-foreground">
             O <strong className="text-foreground">AutoISP</strong> é uma plataforma SaaS de automação inteligente para provedores de internet brasileiros, 
             combinando agentes de IA (via OpenAI API — GPT-4o/GPT-4o-mini), integração multi-ERP (IXC, SGP, MK-Solutions — Hubsoft planejado), 
-            diagnóstico ONU em tempo real, auditoria de prompts dinâmicos e sistema de fluxos conversacionais para oferecer atendimento 24h, 
-            automação de cobranças e suporte técnico proativo. Com conformidade LGPD, sistema RBAC granular, arquitetura simplificada de agentes 
-            (Agent → Flow Links → Flows → Steps → tool_handler via catálogo hardcoded) e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
+            diagnóstico ONU em tempo real e sistema de procedures conversacionais para oferecer atendimento 24h, 
+            automação de cobranças e suporte técnico proativo. A arquitetura de agentes utiliza <code className="text-xs font-mono">agent_templates</code> → <code className="text-xs font-mono">procedures</code> (JSONB com triggers/steps) → <code className="text-xs font-mono">procedure-runner.ts</code> + <code className="text-xs font-mono">context-builder.ts</code> + <code className="text-xs font-mono">tool-handlers.ts</code>, 
+            com ferramentas canônicas (erp_client_lookup, erp_contract_lookup, erp_invoice_search, transfer_to_human). Com conformidade LGPD, sistema RBAC granular, backend via Supabase externo e modelo de cobrança recorrente via Asaas, a solução atende ISPs de todos os portes com trial configurável sem necessidade de cartão.
           </p>
         </CardContent>
       </Card>
