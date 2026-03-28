@@ -32,12 +32,33 @@ async function ixcFetch(
   baseUrl: string,
   headers: Record<string, string>,
   endpoint: string,
-  filter?: { qtype: string; query: string; oper: string }
+  filter?: { qtype: string; query: string; oper: string },
+  gridParam?: Array<{ TB: string; OP: string; P: string }>,
+  options?: { rp?: string; sortname?: string; sortorder?: string }
 ): Promise<any[]> {
   try {
-    const body = filter
-      ? { qtype: filter.qtype, query: filter.query, oper: filter.oper, page: "1", rp: "5000" }
-      : { qtype: `${endpoint}.id`, query: "1", oper: ">", page: "1", rp: "5000" };
+    const body: Record<string, string> = {
+      page: "1",
+      rp: options?.rp ?? "5000",
+    };
+
+    if (filter) {
+      body.qtype = filter.qtype;
+      body.query = filter.query;
+      body.oper = filter.oper;
+    } else {
+      body.qtype = `${endpoint}.id`;
+      body.query = "1";
+      body.oper = ">";
+    }
+
+    if (options?.sortname) body.sortname = options.sortname;
+    if (options?.sortorder) body.sortorder = options.sortorder;
+
+    if (gridParam && gridParam.length > 0) {
+      body.grid_param = JSON.stringify(gridParam);
+    }
+
     const resp = await fetch(`${baseUrl}/webservice/v1/${endpoint}`, {
       method: "POST",
       headers,
@@ -83,17 +104,22 @@ async function ixc_client_lookup(
   const headers = buildAuth(creds.username || "", creds.password || "");
 
   if (!filtro?.cpf_cnpj) {
-    return ixcFetch(baseUrl, headers, "cliente");
+    // Busca em massa: apenas clientes ativos
+    return ixcFetch(baseUrl, headers, "cliente", {
+      qtype: "cliente.ativo", query: "S", oper: "=",
+    });
   }
 
-  // Try multiple format variants with early return
+  // Try multiple format variants with early return, filtering by ativo=S via grid_param
   const variants = buildDocVariants(filtro.cpf_cnpj);
   console.log(`[IXC] ixc_client_lookup tentando ${variants.length} variante(s) de documento`);
 
   for (const variant of variants) {
-    const recs = await ixcFetch(baseUrl, headers, "cliente", {
-      qtype: "cliente.cnpj_cpf", query: variant, oper: "=",
-    });
+    const recs = await ixcFetch(
+      baseUrl, headers, "cliente",
+      { qtype: "cliente.ativo", query: "S", oper: "=" },
+      [{ TB: "cliente.cnpj_cpf", OP: "=", P: variant }],
+    );
     if (recs.length > 0) {
       console.log(`[IXC] ixc_client_lookup: encontrado com variante "${variant}"`);
       return recs;
@@ -111,16 +137,19 @@ async function ixc_contract_lookup(
   const baseUrl = normalizeUrl(creds.apiUrl);
   const headers = buildAuth(creds.username || "", creds.password || "");
 
-  const filter = filtro?.id_cliente
-    ? { qtype: "cliente_contrato.id_cliente", query: filtro.id_cliente, oper: "=" }
-    : { qtype: "cliente_contrato.status", query: "A", oper: "=" };
+  if (filtro?.id_cliente) {
+    // Busca por id_cliente + status ativo via grid_param (sem filtro JS)
+    return ixcFetch(
+      baseUrl, headers, "cliente_contrato",
+      { qtype: "cliente_contrato.id_cliente", query: filtro.id_cliente, oper: "=" },
+      [{ TB: "cliente_contrato.status", OP: "=", P: "A" }],
+    );
+  }
 
-  const recs = await ixcFetch(baseUrl, headers, "cliente_contrato", filter);
-
-  // Filtra ativos quando veio por id_cliente (pode ter inativos)
-  return filtro?.id_cliente
-    ? recs.filter((ct: any) => ct.status === "A")
-    : recs;
+  // Sem filtro de cliente: apenas contratos ativos
+  return ixcFetch(baseUrl, headers, "cliente_contrato", {
+    qtype: "cliente_contrato.status", query: "A", oper: "=",
+  });
 }
 
 
@@ -143,14 +172,12 @@ async function ixc_invoice_search(
   const baseUrl = normalizeUrl(creds.apiUrl);
   const headers = buildAuth(creds.username || "", creds.password || "");
 
-  const recs = await ixcFetch(baseUrl, headers, "fn_areceber", {
-    qtype: "fn_areceber.id_contrato",
-    query: filtro.id_contrato,
-    oper: "=",
-  });
-
-  // Filtra apenas faturas com status 'A' (a receber / em aberto)
-  return recs.filter((f: any) => f.status === "A");
+  // Combina id_contrato + status=A via grid_param (sem filtro JS)
+  return ixcFetch(
+    baseUrl, headers, "fn_areceber",
+    { qtype: "fn_areceber.id_contrato", query: filtro.id_contrato, oper: "=" },
+    [{ TB: "fn_areceber.status", OP: "=", P: "A" }],
+  );
 }
 
 // ── Provider Export ──
@@ -176,7 +203,10 @@ export const ixcProvider: ErpProviderDriver = {
       console.log(`[IXC] Response status: ${response.status}`);
 
       if (response.status === 401) return { success: false, message: "Login ou senha inválidos. Verifique as credenciais no IXC." };
-      if (response.status === 404) return { success: false, message: "Endpoint não encontrado. Verifique a URL do servidor." };
+      if (response.status === 403) return { success: false, message: "Acesso proibido. Verifique se o token foi recriado após migração de servidor ou se o IP está liberado." };
+      if (response.status === 404) return { success: false, message: "Endpoint não encontrado. Verifique a URL do servidor e se o header 'ixcsoft:listar' está presente." };
+      if (response.status === 500) return { success: false, message: "Erro interno no servidor IXC. Verifique se o endpoint e os campos estão corretos." };
+      if (response.status === 504) return { success: false, message: "Timeout do servidor IXC. Verifique o estado do servidor (RAM/disco) ou tente novamente." };
       if (!response.ok) return { success: false, message: `Erro HTTP ${response.status}` };
 
       const data = await response.json();
@@ -185,6 +215,12 @@ export const ixcProvider: ErpProviderDriver = {
       console.error("[IXC] Error:", error);
       if (error instanceof Error && error.message?.includes("certificate")) {
         return { success: false, message: 'Erro de certificado SSL. Marque "Certificado Self-Signed" se aplicável.' };
+      }
+      if (error instanceof Error && error.message?.includes("ENOTFOUND")) {
+        return { success: false, message: "URL não encontrada. Verifique se o domínio está correto e acessível." };
+      }
+      if (error instanceof Error && error.message?.includes("ECONNREFUSED")) {
+        return { success: false, message: "Conexão recusada. O servidor pode estar indisponível — verifique RAM, disco e status do banco." };
       }
       return { success: false, message: error instanceof Error ? error.message : "Erro de conexão" };
     }
