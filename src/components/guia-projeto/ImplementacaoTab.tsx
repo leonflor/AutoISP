@@ -144,8 +144,8 @@ const ImplementacaoTab = () => {
                   <code className="text-xs font-mono text-primary">{backendConfig.projectId}</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">Gerenciamento</span>
-                  <span className="text-xs font-mono text-primary">Automático (Lovable Cloud)</span>
+                  <span className="text-sm text-muted-foreground">URL</span>
+                  <code className="text-xs font-mono text-primary">{backendConfig.projectUrl}</code>
                 </div>
               </div>
             </div>
