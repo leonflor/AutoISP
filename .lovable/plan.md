@@ -1,43 +1,41 @@
 
 
-# Correcao: buscar faturas por contrato_id em vez de endereco
+# Atualizar Guia de Projeto com estado real da implementacao
 
-## Problema
+## Discrepancias identificadas
 
-Quando o usuario seleciona um contrato (ex: "5"), o sistema salva `selected_contract_id` no contexto. Porem, a ferramenta `erp_invoice_search` so aceita `cpf_cnpj` e `endereco` como parametros. Se o contrato nao tem endereco, o LLM nao consegue filtrar e pede o endereco ao usuario — mesmo ja tendo o `contrato_id` no contexto.
+### 1. ImplementacaoTab — Edge Functions desatualizadas (linha 71-92)
+**Guia lista:** `ai-chat`, `ai-usage`, `audit-prompt`, `process-document` (nao existem)
+**Faltam:** `simulate-agent`, `resolve-conversation`, `send-human-reply`, `transfer-conversation`, `embed-content`
+**Real (21 funcoes):** asaas-customer, asaas-subscription, asaas-webhook, check-integration, embed-content, fetch-erp-clients, invite-admin, resolve-conversation, save-erp-config, save-integration, save-whatsapp-config, send-email, send-human-reply, send-whatsapp, simulate-agent, test-erp, test-integration, test-whatsapp-connection, transfer-conversation, whatsapp-webhook
 
-O driver (`buscarFaturas`) ja itera por `contratoId` internamente (linha 346-347). So falta expor esse filtro como parametro da ferramenta.
+### 2. ImplementacaoTab — Shared modules desatualizados (linha 768-779)
+**Guia diz:** 8 modulos
+**Real:** 11 modulos. Faltam: `context-builder.ts`, `procedure-runner.ts`, `field-maps.ts`, `response-models.ts`. O `crypto.ts` tambem esta ausente da lista.
 
-## Mudancas
+### 3. ImplementacaoTab — Referencias a "Lovable Cloud" (varias linhas)
+O projeto usa **Supabase externo** (ref: zvxcwwhsjtdliihlvvof). Toda a secao "Configuracao Backend" (linhas 122-183) referencia "Lovable Cloud" incorretamente. Deve dizer "Supabase (projeto externo)".
 
-### 1. `_shared/tool-catalog.ts` — adicionar parametro `contrato_id`
-Adicionar `contrato_id` como parametro opcional em `erp_invoice_search`, com descricao clara de que deve ser usado quando disponivel no contexto (tem prioridade sobre endereco).
+### 4. ResumoProjetoTab — Resumo Executivo desatualizado (linha 342-346)
+Menciona arquitetura "Agent → Flow Links → Flows → Steps → tool_handler via catalogo hardcoded". A arquitetura real e: `agent_templates` → `procedures` (JSONB com triggers/steps) → `procedure-runner.ts` + `context-builder.ts` + `tool-handlers.ts`. Tambem menciona "Lovable Cloud".
 
-### 2. `_shared/tool-handlers.ts` — passar `contrato_id` ao driver
-Extrair `args.contrato_id` e passar para `buscarFaturas`.
+### 5. ResumoProjetoTab — Tecnologias (linha 43)
+Lista "Lovable Cloud" como backend. Deve ser "Supabase" com nota de projeto externo.
 
-### 3. `_shared/erp-driver.ts` — aceitar `contrato_id` em `buscarFaturas`
-Adicionar parametro opcional `contratoId?: string`. Quando fornecido, filtrar diretamente por esse ID sem precisar resolver via endereco. Logica simples: se `contratoId` foi passado, `allowedContratoIds = new Set([contratoId])`.
+### 6. ImplementacaoTab — Secrets (linha 54-61)
+Falta `SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_URL` (ja configurados). `ASAAS_API_KEY` e `RESEND_API_KEY` marcados como "a configurar" — verificar se ja estao nos secrets.
 
-### 4. `_shared/procedure-runner.ts` — nao persistir campos nulos
-Filtrar valores `null` em `resolveContractSelectionFromMessage` para que o LLM nunca veja `selected_contract_address: null` no contexto.
+## Mudancas por arquivo
 
-## Resultado esperado
+### `src/components/guia-projeto/ImplementacaoTab.tsx`
+- **Edge Functions:** Atualizar lista para as 20 funcoes reais (sem `_shared/`)
+- **Shared modules:** Atualizar para 11 modulos com descricoes corretas incluindo `context-builder.ts`, `procedure-runner.ts`, `field-maps.ts`, `response-models.ts`, `crypto.ts`
+- **Backend config:** Trocar "Lovable Cloud" por "Supabase (projeto externo)" com ref `zvxcwwhsjtdliihlvvof`
+- **Secrets:** Atualizar lista com os secrets reais configurados
 
-```text
-Usuario: 5
-→ contexto: { selected_contract_id: "12345", selected_contract_plan: "Plano Plus 500/100" }
-→ LLM chama erp_invoice_search(cpf_cnpj="12.059.400/0001-51", contrato_id="12345")
-→ driver filtra faturas apenas do contrato 12345
-→ retorna faturas sem pedir endereco
-```
+### `src/components/guia-projeto/ResumoProjetoTab.tsx`
+- **Tecnologias:** Trocar "Lovable Cloud" por "Supabase (externo)"
+- **Resumo Executivo:** Atualizar descricao da arquitetura para refletir o sistema real de procedures JSONB, procedure-runner, context-builder e tool-handlers
 
-## Arquivos alterados
-
-| Arquivo | Mudanca |
-|---|---|
-| `supabase/functions/_shared/tool-catalog.ts` | Adicionar `contrato_id` opcional em `erp_invoice_search` |
-| `supabase/functions/_shared/tool-handlers.ts` | Passar `contrato_id` para `buscarFaturas` |
-| `supabase/functions/_shared/erp-driver.ts` | Aceitar `contratoId` e filtrar direto por ele |
-| `supabase/functions/_shared/procedure-runner.ts` | Nao salvar campos nulos no `collected_context` |
+Nenhuma migration necessaria — apenas atualizacoes de conteudo estatico em componentes React.
 
