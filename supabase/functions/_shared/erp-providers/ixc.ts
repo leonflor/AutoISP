@@ -317,4 +317,5 @@ export const ixcProvider: ErpProviderDriver = {
   fetchFaturas: ixc_invoice_search,
   fetchPix: ixc_pix_lookup,
   fetchBoleto: ixc_boleto_lookup,
+  fetchBoletoSms: ixc_boleto_sms,
 };

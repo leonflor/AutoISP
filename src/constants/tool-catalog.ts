@@ -79,6 +79,17 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     requires_erp: true,
   },
   {
+    handler: "erp_boleto_sms",
+    display_name: "Enviar Boleto por SMS",
+    description:
+      "Envia o boleto de uma fatura por SMS para o celular cadastrado do cliente no ERP.",
+    parameters: [
+      { name: "fatura_id", type: "string", description: "ID da fatura (id_areceber) no ERP", required: true },
+    ],
+    response_description: "Confirma se o boleto foi enviado por SMS com sucesso.",
+    requires_erp: true,
+  },
+  {
     handler: "transfer_to_human",
     display_name: "Transferir para Atendente Humano",
     description:

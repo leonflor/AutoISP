@@ -559,6 +559,55 @@ export async function buscarBoleto(
 }
 
 // ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarBoletoSms (erp_boleto_sms) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarBoletoSms(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  faturaId: string
+): Promise<ToolEnvelope<BoletoSmsResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: BoletoSmsResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      if (!driver.fetchBoletoSms) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+      const raw = await driver.fetchBoletoSms(creds, faturaId);
+
+      // IXC retorna objeto — verificar se houve sucesso
+      const enviado = raw?.type === "success" || (typeof raw === "object" && !raw?.error);
+
+      itens.push({
+        fatura_id: faturaId,
+        enviado,
+        erp: providerName,
+      });
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0
+      ? "Envio de boleto por SMS não disponível."
+      : (itens[0].enviado
+        ? "Boleto enviado por SMS para o número cadastrado no sistema."
+        : "Falha ao enviar boleto por SMS — verifique o cadastro do cliente no ERP."),
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
 // ── Funções de monitoramento em massa (usadas pelo frontend, NÃO pela IA)
 // ══════════════════════════════════════════════════════════════
 
