@@ -13,7 +13,7 @@ import type {
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 import { mapCliente, mapContrato, mapFatura, mapRadusuario, mapFibra } from "./field-maps.ts";
-import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, ToolEnvelope } from "./response-models.ts";
+import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, ToolEnvelope } from "./response-models.ts";
 
 // ══════════════════════════════════════════════════════════════
 // ── Decrypt Helper ──
