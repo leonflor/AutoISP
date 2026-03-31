@@ -55,6 +55,30 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     requires_erp: true,
   },
   {
+    handler: "erp_pix_lookup",
+    display_name: "Consulta PIX",
+    description:
+      "Recupera o código PIX copia-e-cola de uma fatura em aberto pelo ID da fatura no ERP.",
+    parameters: [
+      { name: "fatura_id", type: "string", description: "ID da fatura (id_areceber) no ERP", required: true },
+    ],
+    response_description:
+      "Código PIX copia-e-cola (qrcode), URL da imagem QR, gateway e status de expiração.",
+    requires_erp: true,
+  },
+  {
+    handler: "erp_boleto_lookup",
+    display_name: "Segunda Via Boleto",
+    description:
+      "Gera segunda via do boleto em PDF de uma fatura e retorna link para download.",
+    parameters: [
+      { name: "fatura_id", type: "string", description: "ID da fatura (id_areceber) no ERP", required: true },
+    ],
+    response_description:
+      "Link temporário (1h) para download do boleto PDF atualizado.",
+    requires_erp: true,
+  },
+  {
     handler: "transfer_to_human",
     display_name: "Transferir para Atendente Humano",
     description:

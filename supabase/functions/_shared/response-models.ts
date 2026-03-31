@@ -39,6 +39,23 @@ export interface FaturaResponse {
   erp: string;
 }
 
+/** Modelo: erp_pix_lookup */
+export interface PixResponse {
+  fatura_id: string;
+  qrcode: string | null;
+  qrcode_imagem: string | null;
+  gateway: string | null;
+  expirado: boolean;
+  erp: string;
+}
+
+/** Modelo: erp_boleto_lookup */
+export interface BoletoResponse {
+  fatura_id: string;
+  boleto_url: string | null;
+  erp: string;
+}
+
 /** Envelope padrão que toda ferramenta retorna */
 export interface ToolEnvelope<T> {
   encontrados: number;
