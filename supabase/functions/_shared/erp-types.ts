@@ -71,4 +71,5 @@ export interface ErpProviderDriver {
   fetchFaturas?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
   fetchPix?(creds: ErpCredentials, idAreceber: string): Promise<any>;
   fetchBoleto?(creds: ErpCredentials, idAreceber: string): Promise<any>;
+  fetchBoletoSms?(creds: ErpCredentials, idAreceber: string): Promise<any>;
 }

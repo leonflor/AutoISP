@@ -56,6 +56,13 @@ export interface BoletoResponse {
   erp: string;
 }
 
+/** Modelo: erp_boleto_sms */
+export interface BoletoSmsResponse {
+  fatura_id: string;
+  enviado: boolean;
+  erp: string;
+}
+
 /** Envelope padrão que toda ferramenta retorna */
 export interface ToolEnvelope<T> {
   encontrados: number;

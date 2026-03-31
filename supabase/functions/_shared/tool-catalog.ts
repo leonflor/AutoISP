@@ -149,6 +149,27 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       "Link temporário (1h) para download do boleto PDF atualizado.",
     requires_erp: true,
   },
+
+  erp_boleto_sms: {
+    handler: "erp_boleto_sms",
+    display_name: "Enviar Boleto por SMS",
+    description:
+      "Envia o boleto de uma fatura por SMS para o celular cadastrado do cliente no ERP.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        fatura_id: {
+          type: "string",
+          description: "ID da fatura (id_areceber) no ERP",
+        },
+      },
+      required: ["fatura_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Confirma se o boleto foi enviado por SMS com sucesso.",
+    requires_erp: true,
+  },
 };
 
 /**

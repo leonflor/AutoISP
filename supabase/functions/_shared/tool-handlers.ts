@@ -2,7 +2,7 @@
 // Valida input, chama Driver (Camada 2), retorna ToolResult com envelope padronizado.
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buscarCliente, buscarContratos, buscarFaturas, buscarPix, buscarBoleto } from "./erp-driver.ts";
+import { buscarCliente, buscarContratos, buscarFaturas, buscarPix, buscarBoleto, buscarBoletoSms } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -106,6 +106,16 @@ const erpBoletoLookupHandler: ToolHandler = async (ctx, args) => {
   return { success: true, data: result };
 };
 
+// ── Handler: erp_boleto_sms ──
+
+const erpBoletoSmsHandler: ToolHandler = async (ctx, args) => {
+  const faturaId = String(args.fatura_id || "").trim();
+  if (!faturaId) return { success: false, error: "Informe o ID da fatura (fatura_id)" };
+
+  const result = await buscarBoletoSms(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, faturaId);
+  return { success: true, data: result };
+};
+
 // ── Registry ──
 
 const handlers: Record<string, ToolHandler> = {
@@ -115,6 +125,7 @@ const handlers: Record<string, ToolHandler> = {
   transfer_to_human: transferToHumanHandler,
   erp_pix_lookup: erpPixLookupHandler,
   erp_boleto_lookup: erpBoletoLookupHandler,
+  erp_boleto_sms: erpBoletoSmsHandler,
 };
 
 /**
