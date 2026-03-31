@@ -69,4 +69,6 @@ export interface ErpProviderDriver {
   fetchRadusuarios?(creds: ErpCredentials): Promise<any[]>;
   fetchFibra?(creds: ErpCredentials): Promise<any[]>;
   fetchFaturas?(creds: ErpCredentials, filtro: Record<string, string>): Promise<any[]>;
+  fetchPix?(creds: ErpCredentials, idAreceber: string): Promise<any>;
+  fetchBoleto?(creds: ErpCredentials, idAreceber: string): Promise<any>;
 }
