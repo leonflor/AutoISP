@@ -86,6 +86,26 @@ const transferToHumanHandler: ToolHandler = async (ctx, args) => {
   return { success: true, data: { transferred: true, reason } };
 };
 
+// ── Handler: erp_pix_lookup ──
+
+const erpPixLookupHandler: ToolHandler = async (ctx, args) => {
+  const faturaId = String(args.fatura_id || "").trim();
+  if (!faturaId) return { success: false, error: "Informe o ID da fatura (fatura_id)" };
+
+  const result = await buscarPix(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, faturaId);
+  return { success: true, data: result };
+};
+
+// ── Handler: erp_boleto_lookup ──
+
+const erpBoletoLookupHandler: ToolHandler = async (ctx, args) => {
+  const faturaId = String(args.fatura_id || "").trim();
+  if (!faturaId) return { success: false, error: "Informe o ID da fatura (fatura_id)" };
+
+  const result = await buscarBoleto(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, faturaId);
+  return { success: true, data: result };
+};
+
 // ── Registry ──
 
 const handlers: Record<string, ToolHandler> = {
@@ -93,6 +113,8 @@ const handlers: Record<string, ToolHandler> = {
   erp_contract_lookup: erpContractLookupHandler,
   erp_invoice_search: erpInvoiceSearchHandler,
   transfer_to_human: transferToHumanHandler,
+  erp_pix_lookup: erpPixLookupHandler,
+  erp_boleto_lookup: erpBoletoLookupHandler,
 };
 
 /**

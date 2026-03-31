@@ -107,6 +107,48 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       "Confirma que a conversa foi transferida para modo humano.",
     requires_erp: false,
   },
+
+  erp_pix_lookup: {
+    handler: "erp_pix_lookup",
+    display_name: "Consulta PIX",
+    description:
+      "Recupera o código PIX copia-e-cola de uma fatura em aberto pelo ID da fatura no ERP.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        fatura_id: {
+          type: "string",
+          description: "ID da fatura (id_areceber) no ERP",
+        },
+      },
+      required: ["fatura_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Código PIX copia-e-cola (qrcode), URL da imagem QR, gateway e status de expiração.",
+    requires_erp: true,
+  },
+
+  erp_boleto_lookup: {
+    handler: "erp_boleto_lookup",
+    display_name: "Segunda Via Boleto",
+    description:
+      "Gera segunda via do boleto em PDF de uma fatura e retorna link para download.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        fatura_id: {
+          type: "string",
+          description: "ID da fatura (id_areceber) no ERP",
+        },
+      },
+      required: ["fatura_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Link temporário (1h) para download do boleto PDF atualizado.",
+    requires_erp: true,
+  },
 };
 
 /**

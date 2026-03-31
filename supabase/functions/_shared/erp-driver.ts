@@ -399,6 +399,166 @@ export async function buscarFaturas(
 }
 
 // ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarPix (erp_pix_lookup) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarPix(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  faturaId: string
+): Promise<ToolEnvelope<PixResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: PixResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      if (!driver.fetchPix) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+      const raw = await driver.fetchPix(creds, faturaId);
+
+      if (raw?.type === "success" || raw?.pix) {
+        const pixData = raw.pix || {};
+        const qrCode = pixData.qrCode || {};
+        const dadosPix = pixData.dadosPix || {};
+
+        // Detectar expiração
+        let expirado = false;
+        if (dadosPix.expiracaoPix) {
+          const expStr = String(dadosPix.expiracaoPix);
+          // Formato IXC: DD/MM/YYYY HH:mm:ss
+          const parts = expStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
+          if (parts) {
+            const expDate = new Date(
+              parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]),
+              parseInt(parts[4]), parseInt(parts[5]), parseInt(parts[6])
+            );
+            expirado = expDate.getTime() < Date.now();
+          }
+        }
+
+        const qrcodeText = qrCode.qrcode && String(qrCode.qrcode).trim() !== "" ? String(qrCode.qrcode) : null;
+
+        itens.push({
+          fatura_id: faturaId,
+          qrcode: qrcodeText,
+          qrcode_imagem: qrCode.imagemSrc || null,
+          gateway: raw.gateway?.gatewayNome || null,
+          expirado: expirado || !qrcodeText,
+          erp: providerName,
+        });
+      } else {
+        erros.push(`${providerName}: PIX não disponível para esta fatura`);
+      }
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0
+      ? "PIX não disponível para esta fatura."
+      : (itens[0].expirado ? "PIX expirado — utilize linha digitável ou boleto." : undefined),
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarBoleto (erp_boleto_lookup) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarBoleto(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  faturaId: string
+): Promise<ToolEnvelope<BoletoResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: BoletoResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      if (!driver.fetchBoleto) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+      const raw = await driver.fetchBoleto(creds, faturaId);
+
+      // raw é base64 do PDF ou objeto com conteúdo
+      let base64Content: string | null = null;
+
+      if (typeof raw === "string") {
+        base64Content = raw;
+      } else if (raw?.ContentType?.includes("pdf") || raw?.content) {
+        base64Content = raw.content || raw.base64 || null;
+      } else if (typeof raw === "object") {
+        // IXC pode retornar o base64 diretamente na resposta
+        const str = JSON.stringify(raw);
+        // Se a resposta contiver dados binários codificados
+        if (raw.type === "success" && raw.base64) {
+          base64Content = raw.base64;
+        } else {
+          // Tentar extrair base64 bruto (IXC retorna PDF direto)
+          base64Content = str.length > 1000 ? null : null;
+        }
+      }
+
+      if (base64Content) {
+        // Decode e upload para Storage
+        try {
+          const binaryStr = atob(base64Content);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+
+          const storagePath = `${ispId}/${faturaId}.pdf`;
+          await supabaseAdmin.storage
+            .from("invoices")
+            .upload(storagePath, bytes, {
+              contentType: "application/pdf",
+              upsert: true,
+            });
+
+          const { data: signedData } = await supabaseAdmin.storage
+            .from("invoices")
+            .createSignedUrl(storagePath, 3600); // 1h
+
+          itens.push({
+            fatura_id: faturaId,
+            boleto_url: signedData?.signedUrl || null,
+            erp: providerName,
+          });
+        } catch (uploadErr) {
+          erros.push(`${providerName}: Erro ao processar PDF — ${uploadErr instanceof Error ? uploadErr.message : "desconhecido"}`);
+        }
+      } else {
+        erros.push(`${providerName}: Boleto PDF não disponível para esta fatura`);
+      }
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0 ? "Boleto PDF não disponível para esta fatura." : undefined,
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
 // ── Funções de monitoramento em massa (usadas pelo frontend, NÃO pela IA)
 // ══════════════════════════════════════════════════════════════
 
