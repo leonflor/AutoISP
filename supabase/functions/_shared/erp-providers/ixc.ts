@@ -235,6 +235,35 @@ async function ixc_boleto_lookup(
   return resp.json();
 }
 
+async function ixc_boleto_sms(
+  creds: ErpCredentials,
+  idAreceber: string
+): Promise<any> {
+  const baseUrl = normalizeUrl(creds.apiUrl);
+  const token = btoa(`${creds.username || ""}:${creds.password || ""}`);
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Basic ${token}`,
+  };
+
+  const resp = await fetch(`${baseUrl}/webservice/v1/get_boleto`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      boletos: idAreceber,
+      juro: "S",
+      multa: "S",
+      atualiza_boleto: "S",
+      tipo_boleto: "sms",
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`IXC get_boleto (sms) HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
 // ── Provider Export ──
 
 export const ixcProvider: ErpProviderDriver = {
