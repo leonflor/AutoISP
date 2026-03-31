@@ -2,7 +2,7 @@
 // Valida input, chama Driver (Camada 2), retorna ToolResult com envelope padronizado.
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buscarCliente, buscarContratos, buscarFaturas, buscarPix, buscarBoleto } from "./erp-driver.ts";
+import { buscarCliente, buscarContratos, buscarFaturas, buscarPix, buscarBoleto, buscarBoletoSms } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
