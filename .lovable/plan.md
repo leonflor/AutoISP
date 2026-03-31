@@ -1,83 +1,164 @@
 
 
-# Otimizar conector IXC usando `grid_param` e filtro combinado
+# Ferramentas PIX e Boleto + Atualização do Procedimento de Cobrança
 
-## Problema atual
+## Resumo
 
-A funcao `ixcFetch` so suporta um filtro simples (`qtype/query/oper`). Isso causa:
+Criar duas novas ferramentas (`erp_pix_lookup` e `erp_boleto_lookup`) e atualizar o passo 3 do procedimento "Cobrança de fatura" para que o agente ofereça ao cliente três opções de pagamento: linha digitável, PIX copia-e-cola, ou boleto PDF.
 
-1. **Lookup por CPF**: faz query por CPF mas nao filtra `ativo=S`, retornando clientes inativos desnecessariamente
-2. **Fetch em massa**: busca todos os 5000 registros sem filtro de ativos — o frontend filtra depois
-3. **Faturas**: busca uma fatura por contrato de cada vez (N queries sequenciais) em vez de usar `grid_param` para combinar filtros
-4. **Sem paginacao real**: usa `rp=5000` fixo, se houver mais registros perde dados
+## Arquitetura das mudanças
 
-## Solucao
+```text
+Camada 3 (Provider)     → ixc.ts: ixc_pix_lookup, ixc_boleto_lookup
+Camada 1 (Tipos)        → erp-types.ts: fetchPix, fetchBoleto
+Camada 1 (Modelos)      → response-models.ts: PixResponse, BoletoResponse
+Camada 2 (Driver)       → erp-driver.ts: buscarPix, buscarBoleto
+Catálogo                → tool-catalog.ts: 2 novas ferramentas
+Handlers                → tool-handlers.ts: 2 novos handlers
+Frontend                → src/constants/tool-catalog.ts: mirror
+Procedimento            → Migration SQL: atualizar steps do procedimento v13
+```
 
-Refatorar `ixcFetch` para suportar `grid_param` e usar filtros combinados conforme a documentacao da API IXC.
+## Mudanças por arquivo
 
-### Mudancas
+### 1. `erp-providers/ixc.ts` — Duas novas funções HTTP
 
-#### 1. `_shared/erp-providers/ixc.ts` — Refatorar `ixcFetch`
+**`ixc_pix_lookup(creds, idAreceber)`**
+- POST `/webservice/v1/get_pix` com body `{"id_areceber": "ID"}`
+- Sem header `ixcsoft:listar` (não é listagem)
+- Retorna objeto bruto com `pix.qrCode.qrcode`, `pix.qrCode.imagemSrc`, `pix.dadosPix.expiracaoPix`, `gateway.gatewayNome`
 
-Adicionar suporte a `grid_param` como parametro opcional:
+**`ixc_boleto_lookup(creds, idAreceber)`**
+- POST `/webservice/v1/get_boleto` com body:
+```json
+{"boletos":"ID","juro":"S","multa":"S","atualiza_boleto":"S","tipo_boleto":"arquivo","base64":"S"}
+```
+- Retorna PDF em base64
+
+Registrar ambas no `ixcProvider`: `fetchPix`, `fetchBoleto`
+
+### 2. `erp-types.ts` — Interface do provider
+
+Adicionar ao `ErpProviderDriver`:
+```typescript
+fetchPix?(creds: ErpCredentials, idAreceber: string): Promise<any>;
+fetchBoleto?(creds: ErpCredentials, idAreceber: string): Promise<any>;
+```
+
+### 3. `response-models.ts` — Modelos de resposta
 
 ```typescript
-async function ixcFetch(
-  baseUrl: string,
-  headers: Record<string, string>,
-  endpoint: string,
-  filter?: { qtype: string; query: string; oper: string },
-  gridParam?: Array<{ TB: string; OP: string; P: string }>,
-  options?: { rp?: string; sortname?: string; sortorder?: string }
-): Promise<any[]>
+export interface PixResponse {
+  fatura_id: string;
+  qrcode: string | null;
+  qrcode_imagem: string | null;
+  gateway: string | null;
+  expirado: boolean;
+  erp: string;
+}
+
+export interface BoletoResponse {
+  fatura_id: string;
+  boleto_url: string | null;
+  erp: string;
+}
 ```
 
-Quando `gridParam` for fornecido, serializa como `JSON.stringify(gridParam)` no campo `grid_param` do body.
+### 4. `erp-driver.ts` — Funções de orquestração
 
-#### 2. `ixc_client_lookup` — Filtrar ativos + CPF com grid_param
+**`buscarPix(supabaseAdmin, ispId, encryptionKey, faturaId)`**
+- Resolve configs/credenciais
+- Chama `driver.fetchPix(creds, faturaId)`
+- Mapeia para `PixResponse`: extrai `qrCode.qrcode`, `qrCode.imagemSrc`, detecta expiração comparando `expiracaoPix` com `now()`
+- Retorna `ToolEnvelope<PixResponse>`
 
-Quando buscar por CPF, usar `grid_param` para combinar `ativo=S` com o filtro de documento, como na documentacao:
+**`buscarBoleto(supabaseAdmin, ispId, encryptionKey, faturaId)`**
+- Resolve configs/credenciais
+- Chama `driver.fetchBoleto(creds, faturaId)`
+- Decodifica base64 → upload para Supabase Storage bucket `invoices` path `{ispId}/{faturaId}.pdf`
+- Gera signed URL (1h de validade)
+- Retorna `ToolEnvelope<BoletoResponse>`
+
+### 5. `tool-catalog.ts` (backend) — Duas novas entradas
+
+**`erp_pix_lookup`**: parâmetro `fatura_id` (obrigatório), `requires_erp: true`
+Descrição: "Recupera o código PIX copia-e-cola de uma fatura em aberto pelo ID da fatura"
+
+**`erp_boleto_lookup`**: parâmetro `fatura_id` (obrigatório), `requires_erp: true`
+Descrição: "Gera segunda via do boleto em PDF e retorna link para download"
+
+### 6. `tool-handlers.ts` — Dois novos handlers
+
+`erpPixLookupHandler` e `erpBoletoLookupHandler` — validam `fatura_id`, chamam `buscarPix`/`buscarBoleto`, registram no `handlers`.
+
+### 7. `src/constants/tool-catalog.ts` (frontend) — Mirror
+
+Adicionar as duas ferramentas para exibição no catálogo do painel admin.
+
+### 8. Migration SQL — Atualizar procedimento de cobrança
+
+Inserir nova versão (v13) do procedimento "Cobrança de fatura" com a seguinte mudança no passo 3 (Consultar boletos → Oferecer forma de pagamento):
+
+**Passo 2 (Consultar boletos)** — mantém igual, mas o `on_complete` avança para o novo passo 3.
+
+**Passo 3 (novo: Oferecer forma de pagamento)** — substitui o antigo "Oferecer segunda via":
+```
+instruction: |
+  Após apresentar as faturas em aberto, ofereça as opções de pagamento:
+  1. Linha digitável (código de barras) — já disponível nos dados da fatura
+  2. PIX copia-e-cola — use erp_pix_lookup com o id da fatura
+  3. Boleto PDF (segunda via) — use erp_boleto_lookup com o id da fatura
+  
+  Pergunte: "Como deseja receber os dados para pagamento?"
+  
+  Quando o cliente escolher:
+  - Linha digitável: envie o campo linha_digitavel já retornado pela consulta de faturas
+  - PIX: chame erp_pix_lookup com fatura_id e envie o código qrcode (copia-e-cola)
+  - Boleto: chame erp_boleto_lookup com fatura_id e envie o link de download
+  
+  Se o PIX estiver expirado, informe e ofereça as outras opções.
+  Após enviar os dados, pergunte se precisa de mais alguma coisa.
+
+available_functions: [erp_pix_lookup, erp_boleto_lookup]
+advance_condition: user_confirmation
+stuck_after_turns: 5
+```
+
+A migration marcará a v12 como `is_current = false` e inserirá v13 com `is_current = true`.
+
+## Dados: de onde vem cada informação
+
+| Dado | Fonte | Endpoint | Campo |
+|---|---|---|---|
+| Linha digitável | `erp_invoice_search` (já existe) | `/fn_areceber` | `linha_digitavel` |
+| PIX copia-e-cola | `erp_pix_lookup` (novo) | `/get_pix` | `pix.qrCode.qrcode` |
+| Boleto PDF | `erp_boleto_lookup` (novo) | `/get_boleto` | base64 → Storage URL |
+
+## Fluxo conversacional esperado
 
 ```text
-qtype: "cliente.ativo", query: "S", oper: "="
-grid_param: [{"TB":"cliente.cnpj_cpf", "OP":"=", "P":"627.105.245-20"}]
+Cliente: quero pagar meu boleto
+→ Passo 0: identifica cliente (CPF/CNPJ + confirmação)
+→ Passo 1: lista contratos, cliente seleciona
+→ Passo 2: busca faturas em aberto, apresenta valores
+→ Passo 3: "Como deseja receber os dados para pagamento?
+            1. Linha digitável  2. PIX  3. Boleto PDF"
+  Cliente: pix
+  → IA chama erp_pix_lookup(fatura_id)
+  → IA envia: "Aqui está seu código PIX: 00020126..."
+  → "Precisa de mais alguma coisa?"
 ```
 
-Manter a logica de variantes (CPF formatado/sem formato) mas agora cada tentativa ja filtra por ativos.
+## Arquivos alterados (total: 8)
 
-Para busca em massa (sem filtro de CPF), adicionar `qtype: "cliente.ativo", query: "S"` para trazer apenas ativos.
-
-#### 3. `ixc_invoice_search` — Usar grid_param para status + contrato
-
-Combinar `status=A` com `id_contrato` na mesma query em vez de filtrar no JavaScript:
-
-```text
-qtype: "fn_areceber.id_contrato", query: "123", oper: "="
-grid_param: [{"TB":"fn_areceber.status", "OP":"=", "P":"A"}]
-```
-
-Remove o `.filter(f => f.status === "A")` pos-fetch.
-
-#### 4. `ixc_contract_lookup` — Filtrar ativos via grid_param
-
-Quando buscar por `id_cliente`, combinar com `status=A` via grid_param em vez de filtrar pos-fetch:
-
-```text
-qtype: "cliente_contrato.id_cliente", query: "42", oper: "="
-grid_param: [{"TB":"cliente_contrato.status", "OP":"=", "P":"A"}]
-```
-
-Remove o `.filter(ct => ct.status === "A")` pos-fetch.
-
-## Resultado esperado
-
-- Menos dados trafegados (API retorna apenas registros relevantes)
-- Menos processamento no servidor (filtros aplicados no banco do ERP)
-- Mesma interface publica — nenhuma mudanca no Driver (Camada 2) ou tool-handlers
-
-## Arquivo alterado
-
-| Arquivo | Mudanca |
+| Arquivo | Mudança |
 |---|---|
-| `supabase/functions/_shared/erp-providers/ixc.ts` | Adicionar `grid_param` ao `ixcFetch`, otimizar 4 funcoes de busca |
+| `erp-types.ts` | `fetchPix`, `fetchBoleto` na interface |
+| `erp-providers/ixc.ts` | 2 novas funções HTTP |
+| `response-models.ts` | `PixResponse`, `BoletoResponse` |
+| `erp-driver.ts` | `buscarPix`, `buscarBoleto` |
+| `tool-catalog.ts` (backend) | 2 novas ferramentas |
+| `tool-handlers.ts` | 2 novos handlers |
+| `src/constants/tool-catalog.ts` | Mirror frontend |
+| Migration SQL | Procedimento v13 com passo de opções de pagamento |
 
