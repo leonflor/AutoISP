@@ -1,100 +1,47 @@
 
 
-# Adicionar envio de boleto por SMS ao fluxo de cobrança
+# Corrigir: IA oferece linha digitável antes da seleção de modalidade
 
-## Resumo
+## Causa raiz
 
-Nova ferramenta `erp_boleto_sms` que aciona o endpoint IXC `/get_boleto` com `tipo_boleto: "sms"` para enviar o boleto diretamente por SMS ao cliente. Atualizar o procedimento de cobrança (v14) para incluir essa quarta opção.
+O campo `linha_digitavel` é retornado dentro do `FaturaResponse` pela ferramenta `erp_invoice_search` (executada no Passo 2). Quando o LLM recebe o resultado da tool call com esse campo visível, ele interpreta como informação relevante e a oferece proativamente — pulando o Passo 3 onde as opções de pagamento deveriam ser apresentadas.
 
-## Mudanças por arquivo (6 arquivos + 1 migration)
+O problema tem duas camadas:
 
-### 1. `erp-providers/ixc.ts` — Nova função HTTP
+1. **Dados vazando para o LLM cedo demais**: o `FaturaResponse` inclui `linha_digitavel` no resultado do Passo 2, e o LLM "vê" o dado e age sobre ele
+2. **Instrução do Passo 2 não proíbe**: a instrução do passo de consulta financeira não diz explicitamente para NÃO apresentar formas de pagamento
 
-```typescript
-async function ixc_boleto_sms(creds, idAreceber): Promise<any>
-```
-- POST `/webservice/v1/get_boleto` com `{ boletos: ID, juro: "S", multa: "S", atualiza_boleto: "S", tipo_boleto: "sms" }`
-- Sem header `ixcsoft:listar`
-- Registrar no `ixcProvider`: `fetchBoletoSms`
+## Solução (2 mudanças)
 
-### 2. `erp-types.ts` — Interface
+### 1. Omitir `linha_digitavel` do `FaturaResponse` retornado ao LLM
 
-Adicionar ao `ErpProviderDriver`:
-```typescript
-fetchBoletoSms?(creds: ErpCredentials, idAreceber: string): Promise<any>;
-```
+Em `erp-driver.ts`, na função `buscarFaturas`, remover o campo `linha_digitavel` do objeto montado para a IA. Esse dado será consultado apenas quando necessário no Passo 3 via `erp_boleto_lookup` (que já retorna `linha_digitavel`).
 
-### 3. `response-models.ts` — Novo modelo
+**Arquivo**: `supabase/functions/_shared/erp-driver.ts`
+- Na construção do `FaturaResponse`, substituir `linha_digitavel: mapped.linha_digitavel` por omissão do campo (ou setar `null`)
+- O campo continua existindo na interface `FaturaResponse` para compatibilidade, mas não será preenchido no passo de listagem
 
-```typescript
-export interface BoletoSmsResponse {
-  fatura_id: string;
-  enviado: boolean;
-  erp: string;
-}
-```
+### 2. Atualizar instrução do Passo 2 do procedimento (migration v15)
 
-### 4. `erp-driver.ts` — Nova função de orquestração
+Adicionar guardrail explícito na instrução do Passo 2:
 
-`buscarBoletoSms(supabaseAdmin, ispId, encryptionKey, faturaId)` → `ToolEnvelope<BoletoSmsResponse>`
-- Resolve credenciais, chama `driver.fetchBoletoSms(creds, faturaId)`
-- Verifica resposta do IXC (sucesso/falha) e retorna `enviado: true/false`
+> "NÃO ofereça formas de pagamento, linha digitável, PIX ou boleto neste passo. Apenas liste as faturas encontradas com valor e vencimento. As opções de pagamento serão apresentadas no próximo passo."
 
-### 5. `tool-catalog.ts` (backend) — Nova entrada
+**Arquivo**: Nova migration SQL
+- Marcar v14 como `is_current = false`
+- Inserir v15 com instrução do Passo 2 atualizada incluindo o guardrail
 
-```
-erp_boleto_sms: {
-  handler: "erp_boleto_sms",
-  display_name: "Enviar Boleto por SMS",
-  description: "Envia o boleto de uma fatura por SMS para o celular cadastrado do cliente no ERP",
-  parameters: { fatura_id: obrigatório },
-  requires_erp: true
-}
-```
-
-### 6. `tool-handlers.ts` — Novo handler
-
-`erpBoletoSmsHandler` — valida `fatura_id`, chama `buscarBoletoSms`, registra no `handlers`.
-
-### 7. `src/constants/tool-catalog.ts` — Mirror frontend
-
-Adicionar entrada para exibição no catálogo admin.
-
-### 8. Migration SQL — Procedimento v14
-
-Atualizar o passo 3 do procedimento "Cobrança de fatura" para incluir 4 opções:
-
-```
-1. Linha digitável (código de barras)
-2. PIX copia-e-cola
-3. Boleto PDF (segunda via)
-4. Enviar boleto por SMS
-
-available_functions: [erp_pix_lookup, erp_boleto_lookup, erp_boleto_sms]
-```
-
-Marca v13 como `is_current = false`, insere v14 com `is_current = true`.
-
-## Fluxo esperado
+## Resultado esperado
 
 ```text
-IA: Como deseja receber os dados para pagamento?
-    1. Linha digitável  2. PIX  3. Boleto PDF  4. Receber por SMS
-Cliente: sms
-→ IA chama erp_boleto_sms(fatura_id)
-→ IA: "Boleto enviado por SMS para o número cadastrado no sistema!"
+Passo 2: IA lista faturas (valor, vencimento, dias atraso) — SEM linha digitável
+Passo 3: IA pergunta modalidade → cliente escolhe → IA executa ferramenta correspondente
 ```
 
-## Arquivos alterados (total: 8)
+## Arquivos alterados (2)
 
 | Arquivo | Mudança |
 |---|---|
-| `erp-types.ts` | `fetchBoletoSms` na interface |
-| `erp-providers/ixc.ts` | `ixc_boleto_sms` + registro no provider |
-| `response-models.ts` | `BoletoSmsResponse` |
-| `erp-driver.ts` | `buscarBoletoSms` |
-| `tool-catalog.ts` (backend) | Nova ferramenta `erp_boleto_sms` |
-| `tool-handlers.ts` | Novo handler |
-| `src/constants/tool-catalog.ts` | Mirror frontend |
-| Migration SQL | Procedimento v14 com 4 opções de pagamento |
+| `erp-driver.ts` | Omitir `linha_digitavel` do retorno de `buscarFaturas` |
+| Migration SQL | Procedimento v15 com guardrail no Passo 2 |
 
