@@ -284,7 +284,6 @@ export async function buscarFaturas(
 
   const itens: FaturaResponse[] = [];
   const erros: string[] = [];
-  const today = new Date();
   const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
 
   // Filtro por contrato: contrato_id tem prioridade sobre endereco
@@ -598,6 +597,50 @@ export async function buscarBoletoSms(
       : (itens[0].enviado
         ? "Boleto enviado por SMS para o número cadastrado no sistema."
         : "Falha ao enviar boleto por SMS — verifique o cadastro do cliente no ERP."),
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarLinhaDigitavel (erp_linha_digitavel) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarLinhaDigitavel(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  faturaId: string
+): Promise<ToolEnvelope<LinhaDigitavelResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: LinhaDigitavelResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      if (!driver.fetchLinhaDigitavel) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+      const raw = await driver.fetchLinhaDigitavel(creds, faturaId);
+
+      itens.push({
+        fatura_id: faturaId,
+        linha_digitavel: raw?.linha_digitavel || null,
+        erp: providerName,
+      });
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0 || !itens[0]?.linha_digitavel
+      ? "Linha digitável não disponível para esta fatura."
+      : undefined,
     erros,
   };
 }
