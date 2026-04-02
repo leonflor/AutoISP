@@ -92,9 +92,10 @@ function formatMessagesForOpenAI(
   messages: Array<Record<string, unknown>>,
 ): OpenAIMessage[] {
   return messages.map((m) => {
+    const hasToolCalls = Array.isArray(m.tool_calls) && (m.tool_calls as unknown[]).length > 0;
     const msg: OpenAIMessage = {
       role: m.role as string,
-      content: m.content as string | null,
+      content: hasToolCalls ? null : (m.content as string | null),
     };
     if (m.tool_call_id) {
       msg.tool_call_id = m.tool_call_id as string;
@@ -232,7 +233,6 @@ export async function runProcedureStep(
   // 5. Build system prompt + message history + tools
   const systemPrompt = buildSystemPrompt(context);
   const historyMessages = formatMessagesForOpenAI(context.messages);
-  historyMessages.push({ role: "user", content: userMessage });
   const tools = buildStepTools(step, hasErp, !!context.procedure);
 
   // 6. Call OpenAI
