@@ -1,42 +1,39 @@
 
 
-# Corrigir encerramento do procedimento de cobrança
+# Implementar V17 do procedimento "Cobrança de fatura"
 
-## Problema
+## O que será feito
 
-Quando o último passo (entrega do pagamento) é concluído com sucesso, o procedimento termina via `end_procedure` e o `active_procedure_id` é anulado. Porém:
+Duas mudanças já aprovadas:
 
-1. A resposta do LLM nesse passo não inclui "precisa de algo mais?" porque a instrução do passo 4 não orienta isso
-2. O `collected_context` não é limpo — dados de cobrança anteriores permanecem na conversa
-3. A próxima mensagem do usuário (ex: "2") cai em `detectProcedure` que re-ativa o procedimento do zero, gerando a saudação inicial novamente
+### 1. Migration SQL — Procedimento v17
 
-## Correção (2 mudanças)
+- Marcar v16 (`c0c349c2-...`) como `is_current = false`
+- Inserir v17 com o **Passo 5** atualizado para incluir:
 
-### 1. `procedure-runner.ts` — Limpar `collected_context` ao encerrar procedimento
+> *"Após entregar a informação com sucesso, pergunte ao cliente se precisa de algo mais."*
 
-No case `end_procedure` (linha 598), adicionar `collected_context: {}` ao update. Isso garante que a próxima interação comece com contexto limpo.
+A instrução completa do Passo 5 será:
 
-No case `next_step` quando `currentIndex + 1 >= totalSteps` (linha 576), fazer o mesmo — pois esse caminho também encerra o procedimento.
-
-### 2. Migration SQL (v17) — Adicionar instrução de fechamento no passo 4
-
-Atualizar a instrução do último passo para incluir ao final:
-> "Após entregar a informação com sucesso, pergunte se o cliente precisa de algo mais."
-
-Isso garante que o LLM encerre a conversa de cobrança de forma natural antes do procedimento ser desativado.
-
-## Resultado esperado
-
-```text
-Passo 4: entrega linha digitável → "Aqui está: 0399... Posso ajudar com mais alguma coisa?"
-→ Procedimento encerra, contexto limpo
-→ Próxima mensagem do usuário é tratada como conversa livre ou novo procedimento
+```
+Execute APENAS a ferramenta correspondente à modalidade escolhida...
+[mesma lógica atual]
+...NÃO tente outra modalidade automaticamente.
+Após entregar a informação com sucesso, pergunte ao cliente se precisa de algo mais.
 ```
 
-## Arquivos alterados (2)
+### 2. procedure-runner.ts — Já aplicado
 
-| Arquivo | Mudança |
+A limpeza de `collected_context: {}` no encerramento já foi implementada na mensagem anterior.
+
+### 3. Deploy das Edge Functions
+
+Redeployar `simulate-agent` e `whatsapp-webhook` para garantir que o runner atualizado esteja ativo.
+
+## Arquivos alterados
+
+| Arquivo | Ação |
 |---|---|
-| `procedure-runner.ts` | Limpar `collected_context` em `end_procedure` e no fim natural do procedimento |
-| Migration SQL | Passo 4 com instrução de fechamento amigável |
+| Migration SQL | INSERT v17 + UPDATE v16 `is_current = false` |
+| Edge Functions | Redeploy (código do runner já atualizado) |
 
