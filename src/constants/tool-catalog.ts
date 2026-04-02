@@ -29,7 +29,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       { name: "endereco", type: "string", description: "Endereço parcial para filtrar o contrato desejado (opcional)", required: false },
     ],
     response_description:
-      "Faturas em aberto com valor, vencimento, dias de atraso, contrato_id, endereço e total em aberto.",
+      "Faturas em aberto com id, valor, vencimento, contrato_id e total em aberto.",
     requires_erp: true,
   },
   {
@@ -87,6 +87,17 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       { name: "fatura_id", type: "string", description: "ID da fatura (id_areceber) no ERP", required: true },
     ],
     response_description: "Confirma se o boleto foi enviado por SMS com sucesso.",
+    requires_erp: true,
+  },
+  {
+    handler: "erp_linha_digitavel",
+    display_name: "Consulta Linha Digitável",
+    description:
+      "Recupera a linha digitável (código de barras) de uma fatura em aberto pelo ID da fatura no ERP.",
+    parameters: [
+      { name: "fatura_id", type: "string", description: "ID da fatura (id_areceber) no ERP", required: true },
+    ],
+    response_description: "Linha digitável do boleto para pagamento via código de barras.",
     requires_erp: true,
   },
   {
