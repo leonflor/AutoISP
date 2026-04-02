@@ -27,15 +27,13 @@ export interface ContratoResponse {
   erp: string;
 }
 
-/** Modelo: erp_invoice_search */
+/** Modelo: erp_invoice_search — SEM dias_atraso e SEM linha_digitavel */
 export interface FaturaResponse {
   id: string;
   contrato_id: string | null;
   endereco: string | null;
   valor: number;
   vencimento: string;
-  dias_atraso: number;
-  linha_digitavel: string | null;
   erp: string;
 }
 
@@ -60,6 +58,13 @@ export interface BoletoResponse {
 export interface BoletoSmsResponse {
   fatura_id: string;
   enviado: boolean;
+  erp: string;
+}
+
+/** Modelo: erp_linha_digitavel */
+export interface LinhaDigitavelResponse {
+  fatura_id: string;
+  linha_digitavel: string | null;
   erp: string;
 }
 

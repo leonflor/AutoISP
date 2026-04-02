@@ -13,7 +13,7 @@ import type {
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 import { mapCliente, mapContrato, mapFatura, mapRadusuario, mapFibra } from "./field-maps.ts";
-import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, ToolEnvelope } from "./response-models.ts";
+import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, LinhaDigitavelResponse, ToolEnvelope } from "./response-models.ts";
 
 // ══════════════════════════════════════════════════════════════
 // ── Decrypt Helper ──
@@ -354,9 +354,6 @@ export async function buscarFaturas(
 
         for (const raw of rawFaturas) {
           const mapped = mapFatura(providerKey, raw, { id_cliente: clienteId, id_contrato: contratoId });
-          const vencimento = new Date(mapped.data_vencimento);
-          const diffMs = today.getTime() - vencimento.getTime();
-          const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 
           faturas.push({
             id: mapped.id,
@@ -364,8 +361,6 @@ export async function buscarFaturas(
             endereco: contratoEnderecoMap.get(contratoId) || null,
             valor: mapped.valor,
             vencimento: mapped.data_vencimento,
-            dias_atraso: diasAtraso,
-            linha_digitavel: null,
             erp: providerName,
           });
         }
