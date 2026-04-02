@@ -574,13 +574,14 @@ async function resolveStepOutcome(
       const totalSteps = def?.steps?.length ?? 0;
 
       if (currentIndex + 1 >= totalSteps) {
-        // End of procedure
+        // End of procedure — clean context
         await supabaseAdmin
           .from("conversations")
           .update({
             active_procedure_id: null,
             step_index: 0,
             turns_on_current_step: 0,
+            collected_context: {},
           })
           .eq("id", conversationId);
       } else {
@@ -602,6 +603,7 @@ async function resolveStepOutcome(
           active_procedure_id: null,
           step_index: 0,
           turns_on_current_step: 0,
+          collected_context: {},
         })
         .eq("id", conversationId);
       break;
