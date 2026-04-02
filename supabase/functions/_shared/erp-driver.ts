@@ -13,7 +13,7 @@ import type {
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 import { mapCliente, mapContrato, mapFatura, mapRadusuario, mapFibra } from "./field-maps.ts";
-import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, ToolEnvelope } from "./response-models.ts";
+import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, LinhaDigitavelResponse, ToolEnvelope } from "./response-models.ts";
 
 // ══════════════════════════════════════════════════════════════
 // ── Decrypt Helper ──
@@ -284,7 +284,6 @@ export async function buscarFaturas(
 
   const itens: FaturaResponse[] = [];
   const erros: string[] = [];
-  const today = new Date();
   const cleanCpf = cpfCnpj.replace(/[\.\-\/]/g, "");
 
   // Filtro por contrato: contrato_id tem prioridade sobre endereco
@@ -354,9 +353,6 @@ export async function buscarFaturas(
 
         for (const raw of rawFaturas) {
           const mapped = mapFatura(providerKey, raw, { id_cliente: clienteId, id_contrato: contratoId });
-          const vencimento = new Date(mapped.data_vencimento);
-          const diffMs = today.getTime() - vencimento.getTime();
-          const diasAtraso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 
           faturas.push({
             id: mapped.id,
@@ -364,8 +360,6 @@ export async function buscarFaturas(
             endereco: contratoEnderecoMap.get(contratoId) || null,
             valor: mapped.valor,
             vencimento: mapped.data_vencimento,
-            dias_atraso: diasAtraso,
-            linha_digitavel: null,
             erp: providerName,
           });
         }
@@ -603,6 +597,50 @@ export async function buscarBoletoSms(
       : (itens[0].enviado
         ? "Boleto enviado por SMS para o número cadastrado no sistema."
         : "Falha ao enviar boleto por SMS — verifique o cadastro do cliente no ERP."),
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarLinhaDigitavel (erp_linha_digitavel) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarLinhaDigitavel(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  faturaId: string
+): Promise<ToolEnvelope<LinhaDigitavelResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: LinhaDigitavelResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      if (!driver.fetchLinhaDigitavel) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+      const raw = await driver.fetchLinhaDigitavel(creds, faturaId);
+
+      itens.push({
+        fatura_id: faturaId,
+        linha_digitavel: raw?.linha_digitavel || null,
+        erp: providerName,
+      });
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0 || !itens[0]?.linha_digitavel
+      ? "Linha digitável não disponível para esta fatura."
+      : undefined,
     erros,
   };
 }

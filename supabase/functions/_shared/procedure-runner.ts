@@ -214,8 +214,10 @@ export async function runProcedureStep(
   const hasErp = !!context.erpConfig;
   const temperature = (context.template.temperature as number) ?? 0.4;
 
-  // 4. Try to resolve contract selection from user message (before saving)
+  // 4. Try to resolve structured selections from user message (before saving)
   await resolveContractSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
+  await resolveInvoiceSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
+  await resolvePaymentMethodFromMessage(supabaseAdmin, conversationId, userMessage);
 
   // 4b. Save user message
   await supabaseAdmin.from("messages").insert({
@@ -316,7 +318,7 @@ export async function runProcedureStep(
 
       // Merge relevant data into collected_context
       if (result.success && result.data) {
-        await mergeToContext(supabaseAdmin, conversationId, result.data);
+        await mergeToContext(supabaseAdmin, conversationId, result.data, tc.function.name);
       }
 
       // If this was a contract lookup, try to resolve a numeric selection from the user message
@@ -710,9 +712,6 @@ async function tryResolveContractSelection(
   // This runs right after erp_contract_lookup returns. The items are already
   // in collected_context via mergeToContext. We don't need to do anything yet;
   // the actual selection happens on the NEXT user turn (user sends "8").
-  // So we register a hook: on subsequent turns, check if user sent a number.
-  // Actually, let's handle it differently: we check on EVERY user message
-  // whether there are unresolved contract items in the context.
 }
 
 // Called before the OpenAI call to check if the user is selecting a contract
@@ -737,8 +736,8 @@ async function resolveContractSelectionFromMessage(
   // Already resolved
   if (ctx.selected_contract_id) return;
 
-  // Look for contract items (from erp_contract_lookup result)
-  const itens = ctx.itens as Array<Record<string, unknown>> | undefined;
+  // Look for contract items (namespaced key from erp_contract_lookup)
+  const itens = (ctx.contract_options ?? ctx.itens) as Array<Record<string, unknown>> | undefined;
   if (!itens?.length) return;
 
   // Find the item matching the user's numeric choice
@@ -762,12 +761,93 @@ async function resolveContractSelectionFromMessage(
   await mergeToContext(supabaseAdmin, conversationId, selection);
 }
 
+// Called before the OpenAI call to check if the user is selecting an invoice
+async function resolveInvoiceSelectionFromMessage(
+  supabaseAdmin: SupabaseClient,
+  conversationId: string,
+  userMessage: string,
+): Promise<void> {
+  const trimmed = userMessage.trim();
+  const num = parseInt(trimmed, 10);
+  if (isNaN(num) || num < 1) return;
+
+  const { data: conv } = await supabaseAdmin
+    .from("conversations")
+    .select("collected_context")
+    .eq("id", conversationId)
+    .single();
+
+  const ctx = (conv?.collected_context as Record<string, unknown>) ?? {};
+
+  // Only resolve if we have invoice_options and no selected_invoice_id yet
+  if (ctx.selected_invoice_id) return;
+  if (!ctx.selected_contract_id) return; // contract must be selected first
+
+  const invoices = ctx.invoice_options as Array<Record<string, unknown>> | undefined;
+  if (!invoices?.length || invoices.length <= 1) return; // single invoice is auto-selected
+
+  // Match by position (1-indexed)
+  if (num > invoices.length) return;
+  const selected = invoices[num - 1];
+  if (!selected) return;
+
+  console.log(`[procedure-runner] Resolved invoice selection: option=${num}, id=${selected.id}`);
+  await mergeToContext(supabaseAdmin, conversationId, { selected_invoice_id: selected.id });
+}
+
+// Called before the OpenAI call to check if the user is choosing a payment method
+async function resolvePaymentMethodFromMessage(
+  supabaseAdmin: SupabaseClient,
+  conversationId: string,
+  userMessage: string,
+): Promise<void> {
+  const { data: conv } = await supabaseAdmin
+    .from("conversations")
+    .select("collected_context")
+    .eq("id", conversationId)
+    .single();
+
+  const ctx = (conv?.collected_context as Record<string, unknown>) ?? {};
+
+  // Only resolve if invoice is selected and payment method is not yet chosen
+  if (ctx.selected_payment_method) return;
+  if (!ctx.selected_invoice_id) return;
+
+  const msg = userMessage.toLowerCase().trim();
+
+  // Map user input to payment method
+  const methodMap: Record<string, string> = {
+    "1": "linha_digitavel",
+    "linha": "linha_digitavel",
+    "linha digitavel": "linha_digitavel",
+    "linha digitável": "linha_digitavel",
+    "codigo de barras": "linha_digitavel",
+    "código de barras": "linha_digitavel",
+    "barras": "linha_digitavel",
+    "2": "pix",
+    "pix": "pix",
+    "3": "boleto_pdf",
+    "boleto": "boleto_pdf",
+    "pdf": "boleto_pdf",
+    "segunda via": "boleto_pdf",
+    "4": "boleto_sms",
+    "sms": "boleto_sms",
+  };
+
+  const method = methodMap[msg];
+  if (!method) return;
+
+  console.log(`[procedure-runner] Resolved payment method: ${method}`);
+  await mergeToContext(supabaseAdmin, conversationId, { selected_payment_method: method });
+}
+
 // ─── mergeToContext ─────────────────────────────────────────────────
 
 async function mergeToContext(
   supabaseAdmin: SupabaseClient,
   conversationId: string,
   data: unknown,
+  toolName?: string,
 ): Promise<void> {
   if (!data || typeof data !== "object") return;
 
@@ -778,10 +858,37 @@ async function mergeToContext(
     .single();
 
   const existing = (conv?.collected_context as Record<string, unknown>) ?? {};
-  const merged = { ...existing, ...(data as Record<string, unknown>) };
+  const envelope = data as Record<string, unknown>;
+
+  // Namespace tool results to prevent key collisions between contract and invoice data
+  if (toolName === "erp_contract_lookup" && Array.isArray(envelope.itens)) {
+    existing.contract_options = envelope.itens;
+    // Clear stale downstream data when re-querying contracts
+    delete existing.invoice_options;
+    delete existing.invoice_summary;
+    delete existing.selected_contract_id;
+    delete existing.selected_contract_address;
+    delete existing.selected_contract_plan;
+    delete existing.selected_contract_option;
+    delete existing.selected_invoice_id;
+    delete existing.selected_payment_method;
+  } else if (toolName === "erp_invoice_search" && Array.isArray(envelope.itens)) {
+    existing.invoice_options = envelope.itens;
+    existing.invoice_summary = envelope.mensagem;
+    delete existing.selected_invoice_id;
+    delete existing.selected_payment_method;
+    // Auto-select if single invoice
+    if (envelope.itens.length === 1) {
+      const inv = envelope.itens[0] as Record<string, unknown>;
+      existing.selected_invoice_id = inv.id;
+    }
+  } else {
+    // Generic merge for other tools (client lookup, selection fields, etc.)
+    Object.assign(existing, envelope);
+  }
 
   await supabaseAdmin
     .from("conversations")
-    .update({ collected_context: merged })
+    .update({ collected_context: existing })
     .eq("id", conversationId);
 }

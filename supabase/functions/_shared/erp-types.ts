@@ -72,4 +72,5 @@ export interface ErpProviderDriver {
   fetchPix?(creds: ErpCredentials, idAreceber: string): Promise<any>;
   fetchBoleto?(creds: ErpCredentials, idAreceber: string): Promise<any>;
   fetchBoletoSms?(creds: ErpCredentials, idAreceber: string): Promise<any>;
+  fetchLinhaDigitavel?(creds: ErpCredentials, idAreceber: string): Promise<any>;
 }

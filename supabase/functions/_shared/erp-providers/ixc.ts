@@ -264,6 +264,23 @@ async function ixc_boleto_sms(
   return resp.json();
 }
 
+// ── Linha Digitável (busca pontual em fn_areceber por ID) ──
+
+async function ixc_linha_digitavel(
+  creds: ErpCredentials,
+  idAreceber: string
+): Promise<any> {
+  const baseUrl = normalizeUrl(creds.apiUrl);
+  const headers = buildAuth(creds.username || "", creds.password || "");
+
+  const recs = await ixcFetch(baseUrl, headers, "fn_areceber", {
+    qtype: "fn_areceber.id", query: idAreceber, oper: "=",
+  });
+
+  if (recs.length === 0) return { linha_digitavel: null };
+  return { linha_digitavel: recs[0].linha_digitavel || null };
+}
+
 // ── Provider Export ──
 
 export const ixcProvider: ErpProviderDriver = {
@@ -318,4 +335,5 @@ export const ixcProvider: ErpProviderDriver = {
   fetchPix: ixc_pix_lookup,
   fetchBoleto: ixc_boleto_lookup,
   fetchBoletoSms: ixc_boleto_sms,
+  fetchLinhaDigitavel: ixc_linha_digitavel,
 };
