@@ -1,47 +1,107 @@
 
+Objetivo
 
-# Corrigir: IA oferece linha digitável antes da seleção de modalidade
+Corrigir 3 regressões do fluxo de cobrança:
+1. a fatura não pode aparecer antes da escolha explícita do contrato;
+2. o SMS não pode ser tentado automaticamente;
+3. `dias_atraso` não deve mais ser mostrado ao cliente.
 
-## Causa raiz
+O que eu encontrei no código
 
-O campo `linha_digitavel` é retornado dentro do `FaturaResponse` pela ferramenta `erp_invoice_search` (executada no Passo 2). Quando o LLM recebe o resultado da tool call com esse campo visível, ele interpreta como informação relevante e a oferece proativamente — pulando o Passo 3 onde as opções de pagamento deveriam ser apresentadas.
+- `procedure-runner.ts` faz auto-avanço recursivo entre passos. Isso é útil, mas hoje o fluxo de cobrança não está travado por dados estruturados suficientes.
+- A migration atual (`v15`) só endureceu o texto do passo financeiro. Ela não corrigiu o passo de seleção de contrato nem a exposição precoce das tools de pagamento.
+- `mergeToContext()` grava envelopes completos no `collected_context` e sobrescreve a chave genérica `itens`. Resultado: quando `erp_invoice_search` roda cedo, ele apaga do contexto a lista de contratos; depois disso, um `"7"` deixa de ser interpretado como contrato.
+- `FaturaResponse`, `erp-driver.ts` e os catálogos de tools ainda expõem `dias_atraso`, então o LLM continua vendo esse campo como dado válido para renderizar.
+- O passo de pagamento ainda deixa `erp_boleto_sms` disponível cedo demais, então o modelo pode disparar SMS sem intenção explícita do usuário.
 
-O problema tem duas camadas:
-
-1. **Dados vazando para o LLM cedo demais**: o `FaturaResponse` inclui `linha_digitavel` no resultado do Passo 2, e o LLM "vê" o dado e age sobre ele
-2. **Instrução do Passo 2 não proíbe**: a instrução do passo de consulta financeira não diz explicitamente para NÃO apresentar formas de pagamento
-
-## Solução (2 mudanças)
-
-### 1. Omitir `linha_digitavel` do `FaturaResponse` retornado ao LLM
-
-Em `erp-driver.ts`, na função `buscarFaturas`, remover o campo `linha_digitavel` do objeto montado para a IA. Esse dado será consultado apenas quando necessário no Passo 3 via `erp_boleto_lookup` (que já retorna `linha_digitavel`).
-
-**Arquivo**: `supabase/functions/_shared/erp-driver.ts`
-- Na construção do `FaturaResponse`, substituir `linha_digitavel: mapped.linha_digitavel` por omissão do campo (ou setar `null`)
-- O campo continua existindo na interface `FaturaResponse` para compatibilidade, mas não será preenchido no passo de listagem
-
-### 2. Atualizar instrução do Passo 2 do procedimento (migration v15)
-
-Adicionar guardrail explícito na instrução do Passo 2:
-
-> "NÃO ofereça formas de pagamento, linha digitável, PIX ou boleto neste passo. Apenas liste as faturas encontradas com valor e vencimento. As opções de pagamento serão apresentadas no próximo passo."
-
-**Arquivo**: Nova migration SQL
-- Marcar v14 como `is_current = false`
-- Inserir v15 com instrução do Passo 2 atualizada incluindo o guardrail
-
-## Resultado esperado
+Fluxo alvo
 
 ```text
-Passo 2: IA lista faturas (valor, vencimento, dias atraso) — SEM linha digitável
-Passo 3: IA pergunta modalidade → cliente escolhe → IA executa ferramenta correspondente
+Identificar cliente
+  -> Listar contratos e esperar escolha explícita
+  -> Consultar faturas do contrato escolhido
+  -> Se houver 1 fatura, selecionar automaticamente
+     Se houver várias, esperar escolha da fatura
+  -> Oferecer modalidades e esperar escolha explícita
+  -> Executar somente a modalidade escolhida
 ```
 
-## Arquivos alterados (2)
+Plano de implementação
 
-| Arquivo | Mudança |
-|---|---|
-| `erp-driver.ts` | Omitir `linha_digitavel` do retorno de `buscarFaturas` |
-| Migration SQL | Procedimento v15 com guardrail no Passo 2 |
+1. Estruturar o contexto da cobrança para não haver colisão entre contratos e faturas
+- Em `procedure-runner.ts`, parar de depender da chave genérica `itens`.
+- Salvar dados em chaves nomeadas, por exemplo:
+  - `contract_options`
+  - `selected_contract_id`
+  - `invoice_options`
+  - `selected_invoice_id`
+  - `selected_payment_method`
+- Atualizar `resolveContractSelectionFromMessage()` para ler `contract_options`, não `ctx.itens`.
+- Adicionar um resolvedor semelhante para:
+  - seleção de fatura, quando houver mais de uma;
+  - seleção de modalidade (`linha_digitavel`, `pix`, `boleto_pdf`, `boleto_sms`).
+- Limpar chaves antigas da cobrança ao iniciar o procedimento ou ao reconsultar cliente/contratos, para evitar estado sobrando de turnos anteriores.
 
+2. Colocar travas determinísticas antes da execução das tools
+- Em `procedure-runner.ts`, bloquear `erp_invoice_search` se houver múltiplos contratos e `selected_contract_id` ainda não estiver definido.
+- Bloquear tools de pagamento se `selected_payment_method` não estiver definido.
+- No passo final, permitir somente a tool que corresponde exatamente à modalidade escolhida:
+  - PIX -> `erp_pix_lookup`
+  - PDF -> `erp_boleto_lookup`
+  - SMS -> `erp_boleto_sms`
+  - Linha digitável -> lookup dedicado/on-demand
+- Se a tool falhar, responder com erro amigável e voltar a pedir outra modalidade; sem fallback automático para SMS, PIX ou PDF.
+
+3. Reescrever o procedimento “Cobrança de fatura” em uma nova migration completa (v16)
+- Em vez de mais um patch parcial com `jsonb_set`, inserir uma nova versão inteira do procedimento, para evitar herdar regras quebradas.
+- Fluxo proposto:
+  - Passo 0: identificar cliente
+  - Passo 1: listar contratos e só avançar com `required_fields: ["selected_contract_id"]`
+  - Passo 2: consultar faturas do contrato escolhido; se houver só 1, preencher `selected_invoice_id`; se houver várias, pedir escolha explícita
+  - Passo 3: oferecer modalidades e só avançar com `required_fields: ["selected_payment_method"]`
+  - Passo 4: executar apenas a entrega escolhida
+- No passo 2, instrução explícita para mostrar somente valor e vencimento.
+- No passo 3, instrução explícita para não chamar nenhuma tool ainda.
+- No passo 4, instrução explícita para nunca tentar SMS sem escolha literal do usuário.
+
+4. Remover `dias_atraso` da superfície entregue ao modelo
+- Em `supabase/functions/_shared/response-models.ts`, remover `dias_atraso` de `FaturaResponse`.
+- Em `supabase/functions/_shared/erp-driver.ts`, parar de calcular e retornar `dias_atraso`.
+- Em `supabase/functions/_shared/tool-catalog.ts` e `src/constants/tool-catalog.ts`, atualizar a descrição de `erp_invoice_search` para refletir o contrato real: valor, vencimento e identificação técnica da fatura, sem `dias_atraso` e sem linha digitável.
+
+5. Fechar a lacuna da linha digitável sem voltar a vazá-la cedo demais
+- Hoje a linha digitável não deve ficar no `erp_invoice_search`, mas o fluxo ainda precisa entregá-la depois da escolha da modalidade.
+- Vou resolver isso de forma on-demand no IXC:
+  - ou generalizando a busca em `fn_areceber` por `fatura_id`;
+  - ou estendendo o fluxo de boleto para também hidratar `linha_digitavel` apenas no passo final.
+- Arquivos prováveis: `supabase/functions/_shared/erp-providers/ixc.ts`, `erp-driver.ts` e `response-models.ts`.
+- Resultado: a linha digitável continua disponível para o cliente, mas só aparece depois da escolha do contrato e da modalidade.
+
+6. Validação do cenário exato que você reportou
+- Revalidar o transcript real:
+  1. `boleto` -> pede CPF/CNPJ
+  2. documento -> confirma identidade
+  3. `sim` -> mostra apenas contratos
+  4. `7` -> mostra apenas fatura(s) do contrato 7, sem `dias_atraso`
+  5. se houver 1 fatura -> oferece modalidades
+  6. `2`/`pix` -> chama somente `erp_pix_lookup`
+  7. `sms` -> chama somente `erp_boleto_sms`
+  8. falha no SMS -> pede outra modalidade, sem disparar nada sozinho
+
+Arquivos que pretendo alterar
+
+- `supabase/functions/_shared/procedure-runner.ts`
+- `supabase/functions/_shared/context-builder.ts` (tipagem de `required_fields`, se necessário)
+- `supabase/functions/_shared/erp-driver.ts`
+- `supabase/functions/_shared/response-models.ts`
+- `supabase/functions/_shared/tool-catalog.ts`
+- `src/constants/tool-catalog.ts`
+- `supabase/functions/_shared/erp-providers/ixc.ts`
+- `supabase/migrations/<nova_migration_v16>.sql`
+
+Detalhes técnicos importantes
+
+- A correção principal não é só “mexer no prompt”; ela precisa de trava de estado no runner.
+- O ponto mais crítico hoje é a sobrescrita de `collected_context.itens`, porque ela destrói a memória da lista de contratos assim que a busca de faturas roda cedo.
+- A nova migration deve ser uma versão completa do procedimento, não mais um ajuste incremental em cima da v15.
+- Não vou mexer em UI do React para isso; o problema é de engine/procedimento/modelo de resposta.
