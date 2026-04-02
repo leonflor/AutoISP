@@ -1,43 +1,42 @@
 
 
-# Fluxo de Cobrança v16 — Implementado
+# Corrigir encerramento do procedimento de cobrança
 
-## Mudanças realizadas
+## Problema
 
-### 1. Context Namespacing (procedure-runner.ts)
-- `mergeToContext` agora aceita `toolName` e salva resultados em chaves nomeadas:
-  - `erp_contract_lookup` → `contract_options`
-  - `erp_invoice_search` → `invoice_options` + auto-seleção se 1 fatura
-- Resolvers adicionados: `resolveInvoiceSelectionFromMessage`, `resolvePaymentMethodFromMessage`
-- Limpeza automática de chaves downstream ao re-consultar contratos
+Quando o último passo (entrega do pagamento) é concluído com sucesso, o procedimento termina via `end_procedure` e o `active_procedure_id` é anulado. Porém:
 
-### 2. Remoção de `dias_atraso` e `linha_digitavel` do FaturaResponse
-- `response-models.ts`: campos removidos
-- `erp-driver.ts`: cálculo de `dias_atraso` removido, `linha_digitavel` não mais populado
+1. A resposta do LLM nesse passo não inclui "precisa de algo mais?" porque a instrução do passo 4 não orienta isso
+2. O `collected_context` não é limpo — dados de cobrança anteriores permanecem na conversa
+3. A próxima mensagem do usuário (ex: "2") cai em `detectProcedure` que re-ativa o procedimento do zero, gerando a saudação inicial novamente
 
-### 3. Nova ferramenta `erp_linha_digitavel`
-- `ixc.ts`: `ixc_linha_digitavel` busca `fn_areceber` por ID
-- `erp-driver.ts`: `buscarLinhaDigitavel`
-- `tool-catalog.ts` e `tool-handlers.ts`: registrada
-- `src/constants/tool-catalog.ts`: mirror frontend
+## Correção (2 mudanças)
 
-### 4. Procedimento v16 (5 passos)
-- Passo 0: Identificar cliente (user_confirmation)
-- Passo 1: Listar contratos (data_collected: selected_contract_id)
-- Passo 2: Consultar faturas (data_collected: selected_invoice_id)
-- Passo 3: Oferecer modalidades (data_collected: selected_payment_method)
-- Passo 4: Executar entrega (function_success → end_procedure)
+### 1. `procedure-runner.ts` — Limpar `collected_context` ao encerrar procedimento
 
-## Arquivos alterados (8 + migration)
+No case `end_procedure` (linha 598), adicionar `collected_context: {}` ao update. Isso garante que a próxima interação comece com contexto limpo.
+
+No case `next_step` quando `currentIndex + 1 >= totalSteps` (linha 576), fazer o mesmo — pois esse caminho também encerra o procedimento.
+
+### 2. Migration SQL (v17) — Adicionar instrução de fechamento no passo 4
+
+Atualizar a instrução do último passo para incluir ao final:
+> "Após entregar a informação com sucesso, pergunte se o cliente precisa de algo mais."
+
+Isso garante que o LLM encerre a conversa de cobrança de forma natural antes do procedimento ser desativado.
+
+## Resultado esperado
+
+```text
+Passo 4: entrega linha digitável → "Aqui está: 0399... Posso ajudar com mais alguma coisa?"
+→ Procedimento encerra, contexto limpo
+→ Próxima mensagem do usuário é tratada como conversa livre ou novo procedimento
+```
+
+## Arquivos alterados (2)
 
 | Arquivo | Mudança |
 |---|---|
-| `response-models.ts` | Removido `dias_atraso`/`linha_digitavel`, adicionado `LinhaDigitavelResponse` |
-| `erp-driver.ts` | Removido cálculo `dias_atraso`, adicionado `buscarLinhaDigitavel` |
-| `erp-types.ts` | Adicionado `fetchLinhaDigitavel` na interface |
-| `erp-providers/ixc.ts` | Adicionado `ixc_linha_digitavel` |
-| `tool-catalog.ts` (backend) | Adicionado `erp_linha_digitavel`, atualizado `erp_invoice_search` |
-| `tool-handlers.ts` | Adicionado handler `erp_linha_digitavel` |
-| `procedure-runner.ts` | Context namespacing, 3 resolvers, mergeToContext com toolName |
-| `src/constants/tool-catalog.ts` | Mirror frontend atualizado |
-| Migration SQL | Procedimento v16 com 5 passos e `required_fields` |
+| `procedure-runner.ts` | Limpar `collected_context` em `end_procedure` e no fim natural do procedimento |
+| Migration SQL | Passo 4 com instrução de fechamento amigável |
+
