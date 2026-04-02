@@ -603,6 +603,7 @@ async function resolveStepOutcome(
           active_procedure_id: null,
           step_index: 0,
           turns_on_current_step: 0,
+          collected_context: {},
         })
         .eq("id", conversationId);
       break;
