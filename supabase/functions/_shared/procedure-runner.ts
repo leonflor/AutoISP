@@ -210,10 +210,6 @@ export async function runProcedureStep(
     }
   }
 
-  const step = context.currentStep;
-  const hasErp = !!context.erpConfig;
-  const temperature = (context.template.temperature as number) ?? 0.4;
-
   // 4. Try to resolve structured selections from user message (before saving)
   await resolveContractSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
   await resolveInvoiceSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
@@ -228,6 +224,10 @@ export async function runProcedureStep(
 
   // 4c. Re-build context if contract was resolved (so system prompt reflects it)
   context = await buildRuntimeContext(supabaseAdmin, conversationId);
+
+  let step = context.currentStep;
+  const hasErp = !!context.erpConfig;
+  const temperature = (context.template.temperature as number) ?? 0.4;
 
   // 5. Build system prompt + message history + tools
   const systemPrompt = buildSystemPrompt(context);
@@ -276,9 +276,13 @@ export async function runProcedureStep(
     toolIterations++;
 
     // Add assistant message with tool_calls to history
+    const assistantToolCallContent = assistantMsg.tool_calls?.length
+      ? null
+      : assistantMsg.content;
+
     historyMessages.push({
       role: "assistant",
-      content: assistantMsg.content,
+      content: assistantToolCallContent,
       tool_calls: assistantMsg.tool_calls,
     });
 
@@ -286,7 +290,7 @@ export async function runProcedureStep(
     await supabaseAdmin.from("messages").insert({
       conversation_id: conversationId,
       role: "assistant",
-      content: assistantMsg.content ?? "",
+      content: assistantToolCallContent,
       tool_calls: assistantMsg.tool_calls,
     });
 
@@ -349,6 +353,11 @@ export async function runProcedureStep(
       historyMessages,
       tools,
     );
+  }
+
+  if (toolIterations > 0) {
+    context = await buildRuntimeContext(supabaseAdmin, conversationId);
+    step = context.currentStep;
   }
 
   // 8. Extract final reply
