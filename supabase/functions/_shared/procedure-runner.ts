@@ -448,16 +448,10 @@ export async function runProcedureStep(
 
         const newStepIndex = refreshed?.step_index ?? 0;
 
-        // Check if the next step requires real user input
-        const procDef = context.procedure?.definition as { steps?: Array<{ advance_condition?: string }> } | undefined;
-        const nextStep = procDef?.steps?.[newStepIndex];
-        const nextNeedsUserInput = nextStep?.advance_condition === "user_confirmation";
-
         if (
           refreshed?.active_procedure_id &&
           refreshed?.mode === "bot" &&
-          newStepIndex !== oldStepIndex &&
-          !nextNeedsUserInput
+          newStepIndex !== oldStepIndex
         ) {
           console.log(
             `[procedure-runner] Auto-advance: step ${oldStepIndex} → ${newStepIndex} (depth=${_depth})`,
@@ -572,6 +566,9 @@ async function evaluateAdvanceCondition(
       return lastToolSuccess;
 
     case "user_confirmation": {
+      // Synthetic auto-advance message is never a real confirmation
+      if (userMessage.trim() === "[continuar]") return false;
+
       const answer = await callOpenAIMini(
         openaiKey,
         `Analise a seguinte mensagem do usuário e determine se é uma confirmação positiva (sim, ok, confirmo, pode fazer, etc). Responda APENAS "sim" ou "não".\n\nMensagem: "${userMessage}"`,
