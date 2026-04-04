@@ -566,6 +566,9 @@ async function evaluateAdvanceCondition(
       return lastToolSuccess;
 
     case "user_confirmation": {
+      // Synthetic auto-advance message is never a real confirmation
+      if (userMessage.trim() === "[continuar]") return false;
+
       const answer = await callOpenAIMini(
         openaiKey,
         `Analise a seguinte mensagem do usuário e determine se é uma confirmação positiva (sim, ok, confirmo, pode fazer, etc). Responda APENAS "sim" ou "não".\n\nMensagem: "${userMessage}"`,
