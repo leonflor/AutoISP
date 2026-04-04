@@ -1,58 +1,60 @@
 
 
-# Corrigir: transbordo prematuro por `stuck_after_turns` insuficiente
+# Corrigir: auto-advance atravessa passos que exigem interação do usuário
 
 ## Causa raiz
 
-O fluxo no simulador foi:
-1. "pix" → disparou o procedimento (keyword match) → step 0, turns=0
-2. step 0 pede CPF, advance_condition=`user_confirmation`. "pix" não é confirmação → turns=1
-3. "boleto" → procedimento já ativo, ainda step 0 → turns=2
-4. CPF → erp_client_lookup roda com sucesso, bot pergunta "É você?" → turns=3 → **stuck_after_turns=3 atingido** → mode=human
+O mecanismo de auto-advance (linha 441-485 do `procedure-runner.ts`) envia `[continuar]` como mensagem do usuário ao avançar para o próximo passo. Quando esse próximo passo tem `advance_condition: user_confirmation`, o GPT-4o-mini interpreta `[continuar]` como confirmação positiva, fazendo o passo avançar automaticamente sem interação real do usuário.
 
-O usuário nunca teve chance de dizer "sim" porque os 3 turnos se esgotaram antes da confirmação.
+Resultado observado no fluxo:
+1. Usuário diz "sim" → step 0 avança → auto-advance para step 1 com `[continuar]`
+2. Step 1: LLM chama `erp_contract_lookup`, lista contratos. `evaluateAdvanceCondition("user_confirmation", "[continuar]")` → GPT-4o-mini interpreta como "sim" → step 1 avança para step 2
+3. Step 2: LLM chama `erp_invoice_search` sem o usuário ter escolhido contrato → mostra fatura de contrato arbitrário
 
-## Correção (2 arquivos)
+O usuário nunca teve oportunidade de escolher o contrato.
 
-### 1. Migration SQL — Procedimento v18
+## Correção (1 arquivo)
 
-Aumentar `stuck_after_turns` de 3 para **5** nos passos que usam `user_confirmation` (passos 0, 1, 2). Isso dá margem para keywords de ativação + interação real + confirmação.
+### `procedure-runner.ts` — Bloquear auto-advance para passos com `user_confirmation`
 
-Passos afetados:
-- Passo 0 (Identificação): 3 → 5
-- Passo 1 (Contrato): 3 → 5
-- Passo 2 (Faturas): 3 → 5
+Na lógica de auto-advance (linha 441-485), antes de fazer a chamada recursiva, verificar se o **próximo passo** tem `advance_condition: "user_confirmation"`. Se sim, **não auto-avançar** — o passo precisa de input real do usuário.
 
-Passos 3 e 4 mantêm stuck_after_turns=3 (condições `always` e `function_success` não precisam de margem extra).
+```text
+Lógica atual:
+  if (refreshed.active_procedure_id && refreshed.mode === "bot" && newStepIndex !== oldStepIndex)
+    → auto-advance
 
-### 2. `procedure-runner.ts` — Usar `pending_handover` em vez de transbordo direto no stuck
+Lógica corrigida:
+  // Ler o próximo passo da definição
+  const nextStep = def.steps[newStepIndex]
+  const nextNeedsUserInput = nextStep?.advance_condition === "user_confirmation"
 
-Quando `turns_on_current_step >= stuckLimit` (linha 443-453), em vez de setar `mode: "human"` diretamente:
+  if (...mesmas condições... && !nextNeedsUserInput)
+    → auto-advance
+```
 
-1. Setar `mode: "pending_handover"` e salvar o motivo
-2. O LLM deve receber instrução para perguntar "Deseja falar com um atendente?"
-3. Na próxima mensagem, se o usuário confirmar → `mode: "human"`. Se negar → manter `mode: "bot"` e resetar turns.
+Isso garante que:
+- Passos com `advance_condition: "always"` ou `"function_success"` continuam auto-avançando (ex: passo 3 → passo 4)
+- Passos com `user_confirmation` (passos 0, 1, 2) **sempre** esperam a resposta do usuário
 
-Isso alinha com o fluxo de confirmação de transbordo já documentado na memória do projeto.
-
-**Implementação concreta no runner:**
-- Linha 443-453: trocar `mode: "human"` por `mode: "pending_handover"`
-- Adicionar handling no início de `runProcedureStep` (antes da chamada OpenAI): se `mode === "pending_handover"`, avaliar a mensagem do usuário como confirmação. Se "sim" → setar `mode: "human"` e retornar mensagem de transferência. Se "não" → setar `mode: "bot"`, resetar turns, e continuar normalmente.
+Nenhuma migration SQL é necessária — o procedimento v18 já está correto. O problema é exclusivamente no runner.
 
 ## Resultado esperado
 
-```
-Turn 1: "pix" → procedimento ativado, bot pede CPF
-Turn 2: CPF → tool roda, bot pergunta nome
-Turn 3: "sim" → avança para step 1
+```text
+Turn 1: "boleto" → procedimento ativado, bot pede CPF
+Turn 2: CPF → erp_client_lookup, bot pergunta "É você?"
+Turn 3: "sim" → step 0 avança → step 1 precisa de user_confirmation → NÃO auto-avança
+         → bot lista contratos e pede para escolher
+Turn 4: "8" → contract selecionado → step 1 avança → step 2 precisa user_confirmation → NÃO auto-avança
+         → bot busca faturas e apresenta modalidades
+Turn 5: "2" (pix) → step 2 avança → step 3 (always) → auto-avança para step 4
+         → bot executa erp_pix_lookup e entrega código
 ```
 
-Se o passo realmente travar após 5 turnos, o bot pergunta antes de transferir.
-
-## Arquivos alterados
+## Arquivo alterado
 
 | Arquivo | Mudança |
 |---|---|
-| Migration SQL | v18 com stuck_after_turns=5 nos passos 0-2 |
-| `procedure-runner.ts` | Lógica `pending_handover` no stuck handler |
+| `procedure-runner.ts` | Bloquear auto-advance quando próximo passo tem `advance_condition: "user_confirmation"` |
 
