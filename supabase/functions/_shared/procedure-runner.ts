@@ -211,7 +211,57 @@ export async function runProcedureStep(
     }
   }
 
-  // 4. Try to resolve structured selections from user message (before saving)
+  // 3b. Handle pending_handover confirmation
+  if (context.conversation.mode === "pending_handover") {
+    const msgLower = userMessage.trim().toLowerCase();
+    const confirmWords = ["sim", "yes", "quero", "pode", "ok", "por favor", "transfira", "atendente"];
+    const denyWords = ["não", "nao", "no", "nope", "continuar", "bot", "continua"];
+
+    const isConfirm = confirmWords.some((w) => msgLower.includes(w));
+    const isDeny = denyWords.some((w) => msgLower.includes(w));
+
+    if (isConfirm && !isDeny) {
+      // User confirmed handover
+      await supabaseAdmin
+        .from("conversations")
+        .update({
+          mode: "human",
+          handover_at: new Date().toISOString(),
+        })
+        .eq("id", conversationId);
+
+      await supabaseAdmin.from("messages").insert({
+        conversation_id: conversationId,
+        role: "user",
+        content: userMessage,
+      });
+
+      const transferMsg = "Entendido! Vou transferir você para um atendente humano. Aguarde um momento, por favor.";
+      await supabaseAdmin.from("messages").insert({
+        conversation_id: conversationId,
+        role: "assistant",
+        content: transferMsg,
+      });
+
+      return {
+        reply: transferMsg,
+        debug: { action: "handover_confirmed", elapsed_ms: Math.round(performance.now() - t0) },
+      };
+    } else {
+      // User denied handover — reset and continue
+      await supabaseAdmin
+        .from("conversations")
+        .update({
+          mode: "bot",
+          handover_reason: null,
+          turns_on_current_step: 0,
+        })
+        .eq("id", conversationId);
+
+      context = await buildRuntimeContext(supabaseAdmin, conversationId);
+    }
+  }
+
   await resolveContractSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
   await resolveInvoiceSelectionFromMessage(supabaseAdmin, conversationId, userMessage);
   await resolvePaymentMethodFromMessage(supabaseAdmin, conversationId, userMessage);
