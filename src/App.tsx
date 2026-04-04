@@ -114,6 +114,7 @@ const App = () => (
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="config" element={<AdminConfig />} />
+                <Route path="test-agent" element={<TestAgent />} />
               </Route>
               
               {/* Painel Cliente ISP Routes */}
