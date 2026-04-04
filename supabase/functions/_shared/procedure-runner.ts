@@ -448,10 +448,16 @@ export async function runProcedureStep(
 
         const newStepIndex = refreshed?.step_index ?? 0;
 
+        // Check if the next step requires real user input
+        const procDef = context.procedure?.definition as { steps?: Array<{ advance_condition?: string }> } | undefined;
+        const nextStep = procDef?.steps?.[newStepIndex];
+        const nextNeedsUserInput = nextStep?.advance_condition === "user_confirmation";
+
         if (
           refreshed?.active_procedure_id &&
           refreshed?.mode === "bot" &&
-          newStepIndex !== oldStepIndex
+          newStepIndex !== oldStepIndex &&
+          !nextNeedsUserInput
         ) {
           console.log(
             `[procedure-runner] Auto-advance: step ${oldStepIndex} → ${newStepIndex} (depth=${_depth})`,
