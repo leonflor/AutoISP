@@ -441,13 +441,12 @@ export async function runProcedureStep(
       const stuckLimit = step.stuck_after_turns ?? 5;
 
       if (currentTurns >= stuckLimit) {
-        // Stuck — escalate to human
+        // Stuck — set pending_handover instead of immediate transfer
         await supabaseAdmin
           .from("conversations")
           .update({
-            mode: "human",
+            mode: "pending_handover",
             handover_reason: `Stuck on step after ${stuckLimit} turns`,
-            handover_at: new Date().toISOString(),
             turns_on_current_step: currentTurns,
           })
           .eq("id", conversationId);
