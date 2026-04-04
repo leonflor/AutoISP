@@ -491,7 +491,7 @@ export async function runProcedureStep(
       const stuckLimit = step.stuck_after_turns ?? 5;
 
       if (currentTurns >= stuckLimit) {
-        // Stuck — set pending_handover instead of immediate transfer
+        // Stuck — set pending_handover and ask user for confirmation
         await supabaseAdmin
           .from("conversations")
           .update({
@@ -500,6 +500,9 @@ export async function runProcedureStep(
             turns_on_current_step: currentTurns,
           })
           .eq("id", conversationId);
+
+        // Override LLM reply with handover confirmation question
+        reply = "Parece que estou com dificuldade para avançar nesse passo. Deseja que eu transfira você para um atendente humano?";
       } else {
         await supabaseAdmin
           .from("conversations")
