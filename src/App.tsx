@@ -58,6 +58,7 @@ const SupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail
 const AdminWhatsApp = lazy(() => import("./pages/admin/WhatsApp"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const PainelAnalytics = lazy(() => import("./pages/painel/Analytics"));
+const TestAgent = lazy(() => import("./pages/admin/TestAgent"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,6 +114,7 @@ const App = () => (
                 <Route path="relatorios" element={<AdminReports />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="config" element={<AdminConfig />} />
+                <Route path="test-agent" element={<TestAgent />} />
               </Route>
               
               {/* Painel Cliente ISP Routes */}
