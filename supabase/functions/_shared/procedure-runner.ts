@@ -803,7 +803,7 @@ async function resolveContractSelectionFromMessage(
   if (ctx.selected_contract_id) return;
 
   // Look for contract items (namespaced key from erp_contract_lookup)
-  const itens = (ctx.contract_options ?? ctx.itens) as Array<Record<string, unknown>> | undefined;
+  const itens = ctx.contract_options as Array<Record<string, unknown>> | undefined;
   if (!itens?.length) return;
 
   // Find the item matching the user's numeric choice
