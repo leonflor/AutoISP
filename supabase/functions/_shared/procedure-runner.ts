@@ -285,6 +285,12 @@ export async function runProcedureStep(
   const historyMessages = formatMessagesForOpenAI(context.messages);
   const tools = buildStepTools(step, hasErp, !!context.procedure);
 
+  // 5b. Observability: log key context fields for debugging
+  const ctxSnap = (context.conversation.collected_context as Record<string, unknown>) ?? {};
+  console.log(
+    `[procedure-runner] Context snapshot — cpf=${ctxSnap.confirmed_cpf_cnpj ?? "∅"} client=${ctxSnap.selected_client_id ?? "∅"} contract=${ctxSnap.selected_contract_id ?? "∅"} invoice=${ctxSnap.selected_invoice_id ?? "∅"} payment=${ctxSnap.selected_payment_method ?? "∅"}`,
+  );
+
   // 6. Call OpenAI
   let response = await callOpenAI(
     openaiKey,
