@@ -926,8 +926,28 @@ async function mergeToContext(
   const existing = (conv?.collected_context as Record<string, unknown>) ?? {};
   const envelope = data as Record<string, unknown>;
 
-  // Namespace tool results to prevent key collisions between contract and invoice data
-  if (toolName === "erp_contract_lookup" && Array.isArray(envelope.itens)) {
+  // Namespace tool results to prevent key collisions
+  if (toolName === "erp_client_lookup" && Array.isArray(envelope.itens)) {
+    existing.client_options = envelope.itens;
+    // Extract explicit client keys from first result
+    const first = envelope.itens[0] as Record<string, unknown> | undefined;
+    if (first) {
+      existing.confirmed_cpf_cnpj = first.cpf_cnpj;
+      existing.confirmed_client_name = first.nome;
+      existing.confirmed_client_provider = first.provider;
+      existing.selected_client_id = first.id;
+    }
+    // Clear stale downstream data
+    delete existing.contract_options;
+    delete existing.invoice_options;
+    delete existing.invoice_summary;
+    delete existing.selected_contract_id;
+    delete existing.selected_contract_address;
+    delete existing.selected_contract_plan;
+    delete existing.selected_contract_option;
+    delete existing.selected_invoice_id;
+    delete existing.selected_payment_method;
+  } else if (toolName === "erp_contract_lookup" && Array.isArray(envelope.itens)) {
     existing.contract_options = envelope.itens;
     // Clear stale downstream data when re-querying contracts
     delete existing.invoice_options;
@@ -938,6 +958,15 @@ async function mergeToContext(
     delete existing.selected_contract_option;
     delete existing.selected_invoice_id;
     delete existing.selected_payment_method;
+    // Auto-select if single contract
+    if (envelope.itens.length === 1) {
+      const c = envelope.itens[0] as Record<string, unknown>;
+      existing.selected_contract_id = c.contrato_id ?? c.id;
+      if (c.endereco) existing.selected_contract_address = c.endereco;
+      if (c.plano) existing.selected_contract_plan = c.plano;
+      existing.selected_contract_option = 1;
+      console.log(`[procedure-runner] Auto-selected single contract: ${existing.selected_contract_id}`);
+    }
   } else if (toolName === "erp_invoice_search" && Array.isArray(envelope.itens)) {
     existing.invoice_options = envelope.itens;
     existing.invoice_summary = envelope.mensagem;
@@ -949,7 +978,7 @@ async function mergeToContext(
       existing.selected_invoice_id = inv.id;
     }
   } else {
-    // Generic merge for other tools (client lookup, selection fields, etc.)
+    // Generic merge for other tools (selection fields, etc.)
     Object.assign(existing, envelope);
   }
 
