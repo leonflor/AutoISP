@@ -68,8 +68,7 @@ async function testOpenAI(apiKey: string): Promise<TestResult> {
         message: `${errorMessage}`,
         details: {
           http_status: status,
-          error_code: errorCode,
-          raw_response: errorBody.substring(0, 200)
+          error_code: errorCode
         }
       };
     }
@@ -133,8 +132,7 @@ async function testResend(apiKey: string): Promise<TestResult> {
         message: errorMessage,
         details: {
           http_status: status,
-          error_code: errorCode,
-          raw_response: errorBody.substring(0, 200)
+          error_code: errorCode
         }
       };
     }
@@ -246,7 +244,6 @@ async function testAsaas(apiKey: string, environment: string = "production"): Pr
         details: {
           http_status: status,
           error_code: errorCode,
-          raw_response: errorBody.substring(0, 200),
           suggestion: suggestion || undefined,
           environment: environment
         }
@@ -367,7 +364,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: error instanceof Error ? error.message : "Erro interno do servidor",
+        message: "Erro interno do servidor",
         details: {
           error_type: "internal_error"
         }
