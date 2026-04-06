@@ -68,8 +68,7 @@ async function testOpenAI(apiKey: string): Promise<TestResult> {
         message: `${errorMessage}`,
         details: {
           http_status: status,
-          error_code: errorCode,
-          raw_response: errorBody.substring(0, 200)
+          error_code: errorCode
         }
       };
     }
