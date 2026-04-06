@@ -244,7 +244,6 @@ async function testAsaas(apiKey: string, environment: string = "production"): Pr
         details: {
           http_status: status,
           error_code: errorCode,
-          raw_response: errorBody.substring(0, 200),
           suggestion: suggestion || undefined,
           environment: environment
         }
