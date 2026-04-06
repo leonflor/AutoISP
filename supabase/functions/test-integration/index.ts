@@ -364,7 +364,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: error instanceof Error ? error.message : "Erro interno do servidor",
+        message: "Erro interno do servidor",
         details: {
           error_type: "internal_error"
         }
