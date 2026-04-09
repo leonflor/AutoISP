@@ -1,71 +1,55 @@
 
-Resposta curta
 
-- O ID do contrato está sendo salvo corretamente em `conversations.collected_context.selected_contract_id`.
-- O ID do cliente não está sendo salvo de forma dedicada. Hoje ele fica apenas dentro do envelope genérico de `erp_client_lookup`, em `conversations.collected_context.itens[0].id` (junto com `nome`, `cpf_cnpj`, `provider`).
+# Atualizar Guia de Projeto — Sincronizar com Estado Atual
 
-O que houve
+## Contexto
+O guia de projeto possui informações desatualizadas em relação a mudanças recentes: sistema de contexto explícito no procedure-runner (v19), novas ferramentas de entrega de fatura, medidas de segurança implementadas e descrições de módulos compartilhados.
 
-- O log já mostra `Resolved contract selection: option=8...`, então a escolha do contrato foi persistida.
-- Depois disso, o passo seguinte precisou chamar `erp_invoice_search`, mas esse passo depende de o modelo reencontrar o cliente/CPF dentro de `itens[0]`, que é um armazenamento genérico e frágil.
-- Além disso, o resolver de contrato ainda aceita `ctx.contract_options ?? ctx.itens`, misturando contexto de cliente com contexto de contrato.
-- Resultado: o runner não perdeu a escolha do contrato; ele ficou sem um “estado nomeado” confiável do cliente para continuar a cobrança.
+## Mudanças por arquivo
 
-Plano de correção
+### 1. `src/components/guia-projeto/ImplementacaoTab.tsx`
 
-1. `procedure-runner.ts`
-- Criar tratamento específico para `erp_client_lookup` em `mergeToContext()` e salvar chaves explícitas:
-  - `client_options`
-  - `selected_client_id`
-  - `confirmed_cpf_cnpj`
-  - `confirmed_client_name`
-  - `confirmed_client_provider`
-- Remover o fallback `ctx.itens` de `resolveContractSelectionFromMessage()`; usar só `contract_options`.
-- Manter `selected_contract_id`, `selected_contract_address` e `selected_contract_plan` como estão.
-- Se `erp_contract_lookup` retornar apenas 1 contrato, auto-preencher `selected_contract_id` para pular a escolha manual.
+**procedure-runner.ts description (linha 773)**: Atualizar para mencionar:
+- Contexto explícito com chaves nomeadas (`confirmed_cpf_cnpj`, `selected_client_id`, `confirmed_client_name`, `confirmed_client_provider`)
+- Auto-advance com guard `[continuar]` no `evaluateAdvanceCondition`
+- Auto-seleção de contrato quando `erp_contract_lookup` retorna apenas 1 resultado
 
-2. Nova migration do procedimento de cobrança
-- Criar uma nova versão do procedimento usando as chaves explícitas do contexto.
-- Ajustar o fluxo para ficar determinístico:
-  - passo 0: confirmar cliente
-  - passo 1: listar contratos e avançar quando houver `selected_contract_id`
-  - passo 2: consultar faturas do contrato selecionado
-  - passo 3: escolher modalidade
-  - passo 4: entregar PIX/linha/PDF/SMS e encerrar
-- Nas instruções, trocar referências vagas por nomes reais do contexto:
-  - usar `confirmed_cpf_cnpj`
-  - usar `selected_contract_id`
-  - usar `selected_invoice_id`
-  - usar `selected_payment_method`
+**tool-catalog.ts description (linha 776)**: Adicionar as 4 ferramentas de entrega de fatura que faltam:
+- `erp_pix_lookup`, `erp_boleto_lookup`, `erp_boleto_sms`, `erp_linha_digitavel`
+- Total de tools passa de 4 para 8
 
-3. Observabilidade
-- Adicionar log objetivo antes da consulta de faturas mostrando se o contexto contém:
-  - `confirmed_cpf_cnpj`
-  - `selected_client_id`
-  - `selected_contract_id`
-- Assim fica fácil provar em log se o problema é falta de cliente, de contrato, ou falha de decisão do modelo.
+**response-models.ts description (linha 777)**: Adicionar os novos tipos:
+- `PixResponse`, `BoletoResponse`, `BoletoSmsResponse`, `LinhaDigitavelResponse`
 
-Arquivos envolvidos
+**erp-driver.ts description (linha 781)**: Mencionar as funções granulares de entrega (buscarPix, buscarBoleto, buscarBoletoSms, buscarLinhaDigitavel)
 
-- `supabase/functions/_shared/procedure-runner.ts`
-- nova migration em `supabase/migrations/`
+**Riscos (linha 71)**: Atualizar mitigação de "Perda de contexto" para:
+- "Chaves canônicas explícitas (`confirmed_cpf_cnpj`, `selected_client_id`, `selected_contract_id`) + guard `[continuar]` no auto-advance"
 
-Resultado esperado
+### 2. `src/components/guia-projeto/ResumoProjetoTab.tsx`
 
-```text
-CPF/CNPJ consultado
-→ cliente salvo com chaves explícitas
+**Resumo Executivo (linha 345-346)**: Atualizar a lista de ferramentas canônicas para incluir as 8 tools reais:
+- `erp_client_lookup`, `erp_contract_lookup`, `erp_invoice_search`, `erp_pix_lookup`, `erp_boleto_lookup`, `erp_boleto_sms`, `erp_linha_digitavel`, `transfer_to_human`
 
-Escolha do contrato "8"
-→ selected_contract_id persistido
-→ próximo passo usa confirmed_cpf_cnpj + selected_contract_id
-→ chama erp_invoice_search
-→ mostra a fatura correta e oferece as modalidades
-```
+Mencionar o sistema de contexto determinístico com chaves nomeadas (v19).
 
-Detalhes técnicos
+### 3. `src/components/guia-projeto/seguranca/SecurityOverviewSection.tsx`
 
-- Hoje o problema principal não é “sumiu o contrato”; é “o cliente está guardado em um envelope genérico”.
-- O caminho atual do contrato está correto: `collected_context.selected_contract_id`.
-- O caminho atual do cliente é frágil: `collected_context.itens[0].id` / `itens[0].cpf_cnpj`.
-- A correção robusta precisa de estado nomeado no `collected_context`, não só ajuste de prompt.
+**Matriz de Segredos**: Adicionar `WHATSAPP_APP_SECRET` (tipo: Privado, escopo: Global, local: Supabase Secrets, uso: Validação HMAC-SHA256 de webhooks Meta)
+
+Adicionar `ENCRYPTION_KEY` (tipo: Privado, escopo: Global, local: Supabase Secrets, uso: AES-GCM para criptografia de dados sensíveis)
+
+**Checklist de Segurança**: Adicionar itens implementados:
+- Verificação HMAC-SHA256 em webhooks WhatsApp
+- Rate limiting por telefone (30 msg/min)
+- Sanitização de CSS em componentes de gráfico
+- Sanitização de respostas de erro em Edge Functions
+
+## Arquivos editados
+
+| Arquivo | Tipo de mudança |
+|---|---|
+| `ImplementacaoTab.tsx` | Atualizar descrições de 4 módulos _shared, riscos |
+| `ResumoProjetoTab.tsx` | Atualizar resumo executivo com tools + contexto v19 |
+| `SecurityOverviewSection.tsx` | Adicionar secrets e itens de checklist |
+
