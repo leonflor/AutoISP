@@ -158,6 +158,8 @@ const SecurityOverviewSection = () => {
                   { nome: "ASAAS_API_KEY", tipo: "Privado", escopo: "Global", local: "Supabase Secrets", uso: "Cobranças e faturas" },
                   { nome: "OPENAI_API_KEY", tipo: "Privado", escopo: "Global", local: "Supabase Secrets", uso: "Agentes IA" },
                   { nome: "RESEND_API_KEY", tipo: "Privado", escopo: "Global", local: "Supabase Secrets", uso: "Emails transacionais" },
+                  { nome: "WHATSAPP_APP_SECRET", tipo: "Privado", escopo: "Global", local: "Supabase Secrets", uso: "Validação HMAC-SHA256 de webhooks Meta" },
+                  { nome: "ENCRYPTION_KEY", tipo: "Privado", escopo: "Global", local: "Supabase Secrets", uso: "AES-GCM para criptografia de dados sensíveis" },
                   { nome: "SMS_API_KEY", tipo: "Privado", escopo: "Global", local: "Supabase Secrets", uso: "Disparos SMS" },
                   { nome: "ERP_API_TOKEN", tipo: "Privado", escopo: "Por ISP", local: "DB (AES-256)", uso: "Sincronização ERP" },
                   { nome: "WHATSAPP_TOKEN", tipo: "Privado", escopo: "Por ISP", local: "DB (AES-256)", uso: "WhatsApp Business" },
@@ -221,7 +223,10 @@ const SecurityOverviewSection = () => {
                 { item: "Segredos apenas em Edge Functions", status: "ok" },
                 { item: "Credenciais ERP criptografadas (AES-256)", status: "ok" },
                 { item: "Sanitização de inputs em todos os forms", status: "ok" },
-                { item: "Webhooks validados por assinatura", status: "ok" },
+                { item: "Webhooks validados por assinatura HMAC-SHA256", status: "ok" },
+                { item: "Rate limiting por telefone (30 msg/min)", status: "ok" },
+                { item: "Sanitização de CSS em componentes de gráfico", status: "ok" },
+                { item: "Sanitização de respostas de erro em Edge Functions", status: "ok" },
               ].map((check) => (
                 <div key={check.item} className="flex items-center gap-2 rounded-lg bg-muted/50 p-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
