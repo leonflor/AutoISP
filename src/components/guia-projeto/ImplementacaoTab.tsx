@@ -68,7 +68,7 @@ const ImplementacaoTab = () => {
     { risco: "Webhook Asaas falha", impacto: "Alto", mitigacao: "Log completo + retry manual" },
     { risco: "Rate limit OpenAI", impacto: "Médio", mitigacao: "Tratamento 429 + cache de respostas" },
     { risco: "Custo OpenAI", impacto: "Médio", mitigacao: "Usar gpt-4o-mini, limitar tokens" },
-    { risco: "Perda de contexto", impacto: "Médio", mitigacao: "Nomes canônicos + IDs estáveis" },
+    { risco: "Perda de contexto", impacto: "Médio", mitigacao: "Chaves canônicas explícitas (confirmed_cpf_cnpj, selected_client_id, selected_contract_id) + guard [continuar] no auto-advance" },
   ];
 
   const edgeFunctions = [
@@ -770,16 +770,16 @@ const ImplementacaoTab = () => {
           <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
             <h4 className="text-sm font-medium text-foreground mb-2">Módulos Compartilhados (_shared/) — 11 módulos</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
-              <li><code className="rounded bg-muted px-1">_shared/procedure-runner.ts</code> — Motor de execução de procedures JSONB (detecção de keywords, avanço de steps, controle de intent_attempts, pending_handover)</li>
+              <li><code className="rounded bg-muted px-1">_shared/procedure-runner.ts</code> — Motor de execução de procedures JSONB com contexto explícito (confirmed_cpf_cnpj, selected_client_id, confirmed_client_name, confirmed_client_provider, selected_contract_id), auto-seleção de contrato único, guard [continuar] no evaluateAdvanceCondition, controle de intent_attempts e pending_handover</li>
               <li><code className="rounded bg-muted px-1">_shared/context-builder.ts</code> — Construtor de contexto para o LLM (monta system prompt com collected_context, histórico e instruções do step)</li>
               <li><code className="rounded bg-muted px-1">_shared/tool-handlers.ts</code> — Registry de handlers para function calling (mapeia tool name → função executável)</li>
-              <li><code className="rounded bg-muted px-1">_shared/tool-catalog.ts</code> — Catálogo de tools para function calling (definições OpenAI: erp_client_lookup, erp_contract_lookup, erp_invoice_search, transfer_to_human)</li>
-              <li><code className="rounded bg-muted px-1">_shared/response-models.ts</code> — Contratos de resposta (ClienteResponse, ContratoResponse, FaturaResponse, ToolEnvelope)</li>
+              <li><code className="rounded bg-muted px-1">_shared/tool-catalog.ts</code> — Catálogo de 8 tools para function calling (erp_client_lookup, erp_contract_lookup, erp_invoice_search, erp_pix_lookup, erp_boleto_lookup, erp_boleto_sms, erp_linha_digitavel, transfer_to_human)</li>
+              <li><code className="rounded bg-muted px-1">_shared/response-models.ts</code> — Contratos de resposta (ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, LinhaDigitavelResponse, ToolEnvelope)</li>
               <li><code className="rounded bg-muted px-1">_shared/field-maps.ts</code> — Mapeamento de campos ERP para nomes canônicos</li>
               <li><code className="rounded bg-muted px-1">_shared/crypto.ts</code> — Utilitários AES-GCM para criptografia/descriptografia de chaves sensíveis</li>
               <li><code className="rounded bg-muted px-1">_shared/erp-types.ts</code> — Tipos padrão de ERP (ErpClient, ErpInvoice, InternetStatus, RawFatura, ErpProviderDriver)</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Orquestrador: composição granular, normalização status_internet, buscarFaturas por contrato_id, decrypt AES-256-GCM</li>
-              <li><code className="rounded bg-muted px-1">_shared/erp-providers/</code> — Conectores ERP: IXC (5 funções granulares), SGP (clientes + stubs), MK (clientes + stubs)</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-driver.ts</code> — Orquestrador: composição granular, normalização status_internet, buscarFaturas por contrato_id, buscarPix, buscarBoleto, buscarBoletoSms, buscarLinhaDigitavel, decrypt AES-256-GCM</li>
+              <li><code className="rounded bg-muted px-1">_shared/erp-providers/</code> — Conectores ERP: IXC (9 funções granulares incluindo entrega de fatura), SGP (clientes + stubs), MK (clientes + stubs)</li>
               <li><code className="rounded bg-muted px-1">_shared/onu-signal-analyzer.ts</code> — Análise de qualidade de sinal ONU (rx/tx)</li>
             </ul>
           </div>
