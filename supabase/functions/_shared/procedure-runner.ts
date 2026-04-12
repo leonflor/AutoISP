@@ -1055,7 +1055,13 @@ async function mergeToContext(
       if (c.endereco) existing.selected_contract_address = c.endereco;
       if (c.plano) existing.selected_contract_plan = c.plano;
       existing.selected_contract_option = 1;
-      console.log(`[procedure-runner] Auto-selected single contract: ${existing.selected_contract_id}`);
+      // Persist contract status for auto-selected contract
+      if (c.status) {
+        existing.selected_contract_status = c.status;
+        const blockedStatuses = ["bloqueado", "financeiro_em_atraso"];
+        existing.contract_is_blocked = blockedStatuses.includes(String(c.status));
+      }
+      console.log(`[procedure-runner] Auto-selected single contract: ${existing.selected_contract_id} status=${c.status ?? "∅"}`);
     }
   } else if (toolName === "erp_invoice_search" && Array.isArray(envelope.itens)) {
     existing.invoice_options = envelope.itens;
