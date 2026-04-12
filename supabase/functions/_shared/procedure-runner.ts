@@ -691,7 +691,29 @@ async function resolveStepOutcome(
         unknown
       >) ?? {};
 
+      // First try deterministic context checks before falling back to LLM
       for (const cond of conditions) {
+        // Deterministic check: "context_key == value"
+        const deterministicMatch = cond.if_context.match(/^(\w+)\s*==\s*(.+)$/);
+        if (deterministicMatch) {
+          const [, key, expectedRaw] = deterministicMatch;
+          const expected = expectedRaw.trim().replace(/^["']|["']$/g, "");
+          const actual = String(collected[key] ?? "");
+          if (actual === expected) {
+            console.log(`[procedure-runner] Conditional match (deterministic): ${key}==${expected}`);
+            await resolveStepOutcome(
+              cond.then,
+              supabaseAdmin,
+              conversationId,
+              context,
+              openaiKey,
+            );
+            return;
+          }
+          continue;
+        }
+
+        // Fallback to LLM judge
         const answer = await callOpenAIMini(
           openaiKey,
           `Dado este contexto: ${JSON.stringify(collected)}\n\n${cond.if_context}\n\nResponda APENAS "sim" ou "não".`,
@@ -715,6 +737,57 @@ async function resolveStepOutcome(
         context,
         openaiKey,
       );
+      break;
+    }
+
+    case "chain_procedure": {
+      const procedureName = outcome.procedure_name as string;
+      const startAt = (outcome.start_at_step as number) ?? 0;
+
+      if (!procedureName) {
+        console.warn(`[procedure-runner] chain_procedure: missing procedure_name`);
+        break;
+      }
+
+      // Find the target procedure by name
+      const templateId = (context.template.id as string);
+      const { data: procedures } = await supabaseAdmin
+        .from("procedures")
+        .select("id, name")
+        .eq("template_id", templateId)
+        .eq("is_current", true)
+        .eq("is_active", true);
+
+      const target = procedures?.find(
+        (p) => p.name.toLowerCase() === procedureName.toLowerCase(),
+      );
+
+      if (!target) {
+        console.warn(`[procedure-runner] chain_procedure: procedure "${procedureName}" not found`);
+        // Fallback to next_step
+        await resolveStepOutcome(
+          { action: "next_step" },
+          supabaseAdmin,
+          conversationId,
+          context,
+          openaiKey,
+        );
+        break;
+      }
+
+      console.log(
+        `[procedure-runner] Chain procedure: → "${procedureName}" (id=${target.id}) at step ${startAt}`,
+      );
+
+      // Switch procedure, preserve collected_context
+      await supabaseAdmin
+        .from("conversations")
+        .update({
+          active_procedure_id: target.id,
+          step_index: startAt,
+          turns_on_current_step: 0,
+        })
+        .eq("id", conversationId);
       break;
     }
 
