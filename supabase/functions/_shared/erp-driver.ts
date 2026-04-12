@@ -13,7 +13,9 @@ import type {
 } from "./erp-types.ts";
 import { PROVIDER_DISPLAY_NAMES } from "./erp-types.ts";
 import { mapCliente, mapContrato, mapFatura, mapRadusuario, mapFibra } from "./field-maps.ts";
-import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, LinhaDigitavelResponse, ToolEnvelope } from "./response-models.ts";
+import type { ClienteResponse, ContratoResponse, FaturaResponse, PixResponse, BoletoResponse, BoletoSmsResponse, LinhaDigitavelResponse, ConnectionStatusResponse, SignalDiagnosisResponse, ToolEnvelope } from "./response-models.ts";
+import { analyzeOnuSignal } from "./onu-signal-analyzer.ts";
+import { mapRadusuario, mapFibra } from "./field-maps.ts";
 
 // ══════════════════════════════════════════════════════════════
 // ── Decrypt Helper ──
@@ -641,6 +643,150 @@ export async function buscarLinhaDigitavel(
     mensagem: itens.length === 0 || !itens[0]?.linha_digitavel
       ? "Linha digitável não disponível para esta fatura."
       : undefined,
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarStatusConexao (erp_connection_status) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarStatusConexao(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  contratoId: string
+): Promise<ToolEnvelope<ConnectionStatusResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: ConnectionStatusResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+      if (!driver.fetchRadusuariosByContract) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+      const rawRads = await driver.fetchRadusuariosByContract(creds, contratoId);
+
+      if (rawRads.length === 0) {
+        itens.push({
+          contrato_id: contratoId,
+          online: false,
+          login: null,
+          erp: providerName,
+        });
+        continue;
+      }
+
+      // Use priority logic: online='S' wins
+      const mapped = rawRads.map((r: any) => mapRadusuario[providerKey](r));
+      const best = mapped.reduce((a, b) => {
+        const priority = (r: typeof a) => r.online === "S" ? 2 : r.online === "N" ? 1 : 0;
+        return priority(b) > priority(a) ? b : a;
+      });
+
+      itens.push({
+        contrato_id: contratoId,
+        online: best.online === "S",
+        login: best.login || null,
+        erp: providerName,
+      });
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0
+      ? "Não foi possível consultar o status de conexão."
+      : (itens[0].online ? "Conexão ONLINE" : "Conexão OFFLINE"),
+    erros,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── TOOL: buscarDiagnosticoSinal (erp_signal_diagnosis) ──
+// ══════════════════════════════════════════════════════════════
+
+export async function buscarDiagnosticoSinal(
+  supabaseAdmin: SupabaseClient,
+  ispId: string,
+  encryptionKey: string,
+  contratoId: string
+): Promise<ToolEnvelope<SignalDiagnosisResponse>> {
+  const configs = await resolveActiveConfigs(supabaseAdmin, ispId);
+  const erros: string[] = [];
+  const itens: SignalDiagnosisResponse[] = [];
+
+  for (const config of configs) {
+    try {
+      const providerKey = config.provider as ErpProvider;
+      const providerName = PROVIDER_DISPLAY_NAMES[providerKey] || config.display_name || config.provider;
+      const driver = getProvider(providerKey);
+
+      if (!driver.fetchRadusuariosByContract || !driver.fetchFibraByLogin) continue;
+
+      const creds = await resolveCredentials(config, encryptionKey);
+
+      // Step 1: Get RADIUS login for this contract
+      const rawRads = await driver.fetchRadusuariosByContract(creds, contratoId);
+      if (rawRads.length === 0) {
+        itens.push({
+          contrato_id: contratoId,
+          rx_value: null, rx_level: null,
+          tx_value: null, tx_level: null,
+          diagnosis: "Nenhum login RADIUS encontrado para este contrato",
+          recommended_action: "Verificar configuração do contrato no ERP",
+          severity: 2,
+          erp: providerName,
+        });
+        continue;
+      }
+
+      const bestRad = rawRads.map((r: any) => mapRadusuario[providerKey](r))
+        .reduce((a, b) => {
+          const p = (r: typeof a) => r.online === "S" ? 2 : r.online === "N" ? 1 : 0;
+          return p(b) > p(a) ? b : a;
+        });
+
+      // Step 2: Get fiber signal for this login
+      const rawFibra = await driver.fetchFibraByLogin(creds, bestRad.id);
+      const fibraList = rawFibra.map((r: any) => mapFibra[providerKey](r));
+      const fibra = fibraList[0] || null;
+
+      // Step 3: Analyze signal
+      const analysis = analyzeOnuSignal({
+        rx: fibra?.sinal_rx ?? null,
+        tx: fibra?.sinal_tx ?? null,
+      });
+
+      itens.push({
+        contrato_id: contratoId,
+        rx_value: analysis.rx?.value ?? null,
+        rx_level: analysis.rx?.level ?? null,
+        tx_value: analysis.tx?.value ?? null,
+        tx_level: analysis.tx?.level ?? null,
+        diagnosis: analysis.diagnosis,
+        recommended_action: analysis.recommendedAction,
+        severity: analysis.severity,
+        erp: providerName,
+      });
+    } catch (err) {
+      erros.push(`${config.display_name || config.provider}: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+    }
+  }
+
+  return {
+    encontrados: itens.length,
+    itens,
+    mensagem: itens.length === 0
+      ? "Não foi possível realizar diagnóstico de sinal."
+      : itens[0].diagnosis,
     erros,
   };
 }
