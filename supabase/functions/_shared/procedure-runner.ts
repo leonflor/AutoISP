@@ -115,35 +115,35 @@ function buildStepTools(
   hasErp: boolean,
   hasProcedure: boolean,
 ): unknown[] | undefined {
-  // Only include transfer_to_human when:
-  // - No procedure is active (free conversation), OR
-  // - The step explicitly lists it in available_functions
-  const shouldIncludeTransfer =
-    !hasProcedure || (step?.available_functions?.includes("transfer_to_human") ?? false);
+  // Universal tools: available when no procedure is active, or when explicitly listed
+  const universalToolNames = ["transfer_to_human", "transfer_to_agent"];
 
-  const transferTool = TOOL_CATALOG["transfer_to_human"];
-  const alwaysAvailable =
-    shouldIncludeTransfer && transferTool
-      ? [
-          {
-            type: "function" as const,
-            function: {
-              name: transferTool.handler,
-              description: transferTool.description,
-              parameters: transferTool.parameters_schema,
-            },
-          },
-        ]
-      : [];
+  const universalTools = universalToolNames
+    .filter((name) => {
+      if (!hasProcedure) return true; // always available in free conversation
+      return step?.available_functions?.includes(name) ?? false;
+    })
+    .map((name) => {
+      const tool = TOOL_CATALOG[name];
+      if (!tool) return null;
+      return {
+        type: "function" as const,
+        function: {
+          name: tool.handler,
+          description: tool.description,
+          parameters: tool.parameters_schema,
+        },
+      };
+    })
+    .filter(Boolean);
 
   if (!step?.available_functions?.length) {
-    // No procedure step — only transfer_to_human (if allowed)
-    return alwaysAvailable.length > 0 ? alwaysAvailable : undefined;
+    return universalTools.length > 0 ? universalTools : undefined;
   }
 
   const stepTools = step.available_functions
     .filter((name) => {
-      if (name === "transfer_to_human") return false; // already handled above
+      if (universalToolNames.includes(name)) return false; // already handled above
       const tool = TOOL_CATALOG[name];
       return tool && (!tool.requires_erp || hasErp);
     })
@@ -159,7 +159,7 @@ function buildStepTools(
       };
     });
 
-  const allTools = [...alwaysAvailable, ...stepTools];
+  const allTools = [...universalTools, ...stepTools];
   return allTools.length > 0 ? allTools : undefined;
 }
 
