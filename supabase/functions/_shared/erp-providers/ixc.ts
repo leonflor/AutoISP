@@ -281,6 +281,32 @@ async function ixc_linha_digitavel(
   return { linha_digitavel: recs[0].linha_digitavel || null };
 }
 
+// ── Granular queries for AI tools ──
+
+async function ixc_radusuarios_by_contract(
+  creds: ErpCredentials,
+  contratoId: string
+): Promise<any[]> {
+  const baseUrl = normalizeUrl(creds.apiUrl);
+  const headers = buildAuth(creds.username || "", creds.password || "");
+  return ixcFetch(
+    baseUrl, headers, "radusuarios",
+    { qtype: "radusuarios.id_contrato", query: contratoId, oper: "=" },
+  );
+}
+
+async function ixc_fibra_by_login(
+  creds: ErpCredentials,
+  loginId: string
+): Promise<any[]> {
+  const baseUrl = normalizeUrl(creds.apiUrl);
+  const headers = buildAuth(creds.username || "", creds.password || "");
+  return ixcFetch(
+    baseUrl, headers, "radpop_radio_cliente_fibra",
+    { qtype: "radpop_radio_cliente_fibra.id_login", query: loginId, oper: "=" },
+  );
+}
+
 // ── Provider Export ──
 
 export const ixcProvider: ErpProviderDriver = {
@@ -336,4 +362,6 @@ export const ixcProvider: ErpProviderDriver = {
   fetchBoleto: ixc_boleto_lookup,
   fetchBoletoSms: ixc_boleto_sms,
   fetchLinhaDigitavel: ixc_linha_digitavel,
+  fetchRadusuariosByContract: ixc_radusuarios_by_contract,
+  fetchFibraByLogin: ixc_fibra_by_login,
 };

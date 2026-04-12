@@ -101,6 +101,28 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
     requires_erp: true,
   },
   {
+    handler: "erp_connection_status",
+    display_name: "Status de Conexão RADIUS",
+    description:
+      "Consulta o status de conexão RADIUS (online/offline) de um contrato no ERP pelo ID do contrato.",
+    parameters: [
+      { name: "contrato_id", type: "string", description: "ID do contrato no ERP", required: true },
+    ],
+    response_description: "Status da conexão (online/offline) e login do contrato.",
+    requires_erp: true,
+  },
+  {
+    handler: "erp_signal_diagnosis",
+    display_name: "Diagnóstico de Sinal Óptico",
+    description:
+      "Realiza diagnóstico do sinal óptico (RX/TX) de um contrato no ERP. Retorna valores, classificação e ação recomendada.",
+    parameters: [
+      { name: "contrato_id", type: "string", description: "ID do contrato no ERP", required: true },
+    ],
+    response_description: "Valores RX/TX em dBm, classificação de qualidade, diagnóstico textual, ação recomendada e severidade (0-3).",
+    requires_erp: true,
+  },
+  {
     handler: "transfer_to_human",
     display_name: "Transferir para Atendente Humano",
     description:
@@ -109,6 +131,18 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       { name: "reason", type: "string", description: "Motivo resumido da transferência", required: true },
     ],
     response_description: "Confirma que a conversa foi transferida para modo humano.",
+    requires_erp: false,
+  },
+  {
+    handler: "transfer_to_agent",
+    display_name: "Transferir para Agente IA",
+    description:
+      "Transfere a conversa para outro agente de IA especializado do mesmo provedor, preservando todo o contexto coletado.",
+    parameters: [
+      { name: "target_agent_name", type: "string", description: "Nome do agente de destino", required: true },
+      { name: "reason", type: "string", description: "Motivo resumido da transferência", required: true },
+    ],
+    response_description: "Confirma que a conversa foi transferida para o agente especializado.",
     requires_erp: false,
   },
 ];

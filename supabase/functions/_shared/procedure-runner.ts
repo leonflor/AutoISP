@@ -115,35 +115,35 @@ function buildStepTools(
   hasErp: boolean,
   hasProcedure: boolean,
 ): unknown[] | undefined {
-  // Only include transfer_to_human when:
-  // - No procedure is active (free conversation), OR
-  // - The step explicitly lists it in available_functions
-  const shouldIncludeTransfer =
-    !hasProcedure || (step?.available_functions?.includes("transfer_to_human") ?? false);
+  // Universal tools: available when no procedure is active, or when explicitly listed
+  const universalToolNames = ["transfer_to_human", "transfer_to_agent"];
 
-  const transferTool = TOOL_CATALOG["transfer_to_human"];
-  const alwaysAvailable =
-    shouldIncludeTransfer && transferTool
-      ? [
-          {
-            type: "function" as const,
-            function: {
-              name: transferTool.handler,
-              description: transferTool.description,
-              parameters: transferTool.parameters_schema,
-            },
-          },
-        ]
-      : [];
+  const universalTools = universalToolNames
+    .filter((name) => {
+      if (!hasProcedure) return true; // always available in free conversation
+      return step?.available_functions?.includes(name) ?? false;
+    })
+    .map((name) => {
+      const tool = TOOL_CATALOG[name];
+      if (!tool) return null;
+      return {
+        type: "function" as const,
+        function: {
+          name: tool.handler,
+          description: tool.description,
+          parameters: tool.parameters_schema,
+        },
+      };
+    })
+    .filter(Boolean);
 
   if (!step?.available_functions?.length) {
-    // No procedure step — only transfer_to_human (if allowed)
-    return alwaysAvailable.length > 0 ? alwaysAvailable : undefined;
+    return universalTools.length > 0 ? universalTools : undefined;
   }
 
   const stepTools = step.available_functions
     .filter((name) => {
-      if (name === "transfer_to_human") return false; // already handled above
+      if (universalToolNames.includes(name)) return false; // already handled above
       const tool = TOOL_CATALOG[name];
       return tool && (!tool.requires_erp || hasErp);
     })
@@ -159,7 +159,7 @@ function buildStepTools(
       };
     });
 
-  const allTools = [...alwaysAvailable, ...stepTools];
+  const allTools = [...universalTools, ...stepTools];
   return allTools.length > 0 ? allTools : undefined;
 }
 
@@ -691,7 +691,29 @@ async function resolveStepOutcome(
         unknown
       >) ?? {};
 
+      // First try deterministic context checks before falling back to LLM
       for (const cond of conditions) {
+        // Deterministic check: "context_key == value"
+        const deterministicMatch = cond.if_context.match(/^(\w+)\s*==\s*(.+)$/);
+        if (deterministicMatch) {
+          const [, key, expectedRaw] = deterministicMatch;
+          const expected = expectedRaw.trim().replace(/^["']|["']$/g, "");
+          const actual = String(collected[key] ?? "");
+          if (actual === expected) {
+            console.log(`[procedure-runner] Conditional match (deterministic): ${key}==${expected}`);
+            await resolveStepOutcome(
+              cond.then,
+              supabaseAdmin,
+              conversationId,
+              context,
+              openaiKey,
+            );
+            return;
+          }
+          continue;
+        }
+
+        // Fallback to LLM judge
         const answer = await callOpenAIMini(
           openaiKey,
           `Dado este contexto: ${JSON.stringify(collected)}\n\n${cond.if_context}\n\nResponda APENAS "sim" ou "não".`,
@@ -715,6 +737,57 @@ async function resolveStepOutcome(
         context,
         openaiKey,
       );
+      break;
+    }
+
+    case "chain_procedure": {
+      const procedureName = outcome.procedure_name as string;
+      const startAt = (outcome.start_at_step as number) ?? 0;
+
+      if (!procedureName) {
+        console.warn(`[procedure-runner] chain_procedure: missing procedure_name`);
+        break;
+      }
+
+      // Find the target procedure by name
+      const templateId = (context.template.id as string);
+      const { data: procedures } = await supabaseAdmin
+        .from("procedures")
+        .select("id, name")
+        .eq("template_id", templateId)
+        .eq("is_current", true)
+        .eq("is_active", true);
+
+      const target = procedures?.find(
+        (p) => p.name.toLowerCase() === procedureName.toLowerCase(),
+      );
+
+      if (!target) {
+        console.warn(`[procedure-runner] chain_procedure: procedure "${procedureName}" not found`);
+        // Fallback to next_step
+        await resolveStepOutcome(
+          { action: "next_step" },
+          supabaseAdmin,
+          conversationId,
+          context,
+          openaiKey,
+        );
+        break;
+      }
+
+      console.log(
+        `[procedure-runner] Chain procedure: → "${procedureName}" (id=${target.id}) at step ${startAt}`,
+      );
+
+      // Switch procedure, preserve collected_context
+      await supabaseAdmin
+        .from("conversations")
+        .update({
+          active_procedure_id: target.id,
+          step_index: startAt,
+          turns_on_current_step: 0,
+        })
+        .eq("id", conversationId);
       break;
     }
 
@@ -826,8 +899,15 @@ async function resolveContractSelectionFromMessage(
   if (selected.endereco) selection.selected_contract_address = selected.endereco;
   if (selected.plano) selection.selected_contract_plan = selected.plano;
 
+  // Persist contract status and blocked flag
+  if (selected.status) {
+    selection.selected_contract_status = selected.status;
+    const blockedStatuses = ["bloqueado", "financeiro_em_atraso"];
+    selection.contract_is_blocked = blockedStatuses.includes(String(selected.status));
+  }
+
   console.log(
-    `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}`,
+    `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}, status=${selection.selected_contract_status ?? "∅"}`,
   );
 
   await mergeToContext(supabaseAdmin, conversationId, selection);
@@ -951,6 +1031,8 @@ async function mergeToContext(
     delete existing.selected_contract_address;
     delete existing.selected_contract_plan;
     delete existing.selected_contract_option;
+    delete existing.selected_contract_status;
+    delete existing.contract_is_blocked;
     delete existing.selected_invoice_id;
     delete existing.selected_payment_method;
   } else if (toolName === "erp_contract_lookup" && Array.isArray(envelope.itens)) {
@@ -962,6 +1044,8 @@ async function mergeToContext(
     delete existing.selected_contract_address;
     delete existing.selected_contract_plan;
     delete existing.selected_contract_option;
+    delete existing.selected_contract_status;
+    delete existing.contract_is_blocked;
     delete existing.selected_invoice_id;
     delete existing.selected_payment_method;
     // Auto-select if single contract
@@ -971,7 +1055,13 @@ async function mergeToContext(
       if (c.endereco) existing.selected_contract_address = c.endereco;
       if (c.plano) existing.selected_contract_plan = c.plano;
       existing.selected_contract_option = 1;
-      console.log(`[procedure-runner] Auto-selected single contract: ${existing.selected_contract_id}`);
+      // Persist contract status for auto-selected contract
+      if (c.status) {
+        existing.selected_contract_status = c.status;
+        const blockedStatuses = ["bloqueado", "financeiro_em_atraso"];
+        existing.contract_is_blocked = blockedStatuses.includes(String(c.status));
+      }
+      console.log(`[procedure-runner] Auto-selected single contract: ${existing.selected_contract_id} status=${c.status ?? "∅"}`);
     }
   } else if (toolName === "erp_invoice_search" && Array.isArray(envelope.itens)) {
     existing.invoice_options = envelope.itens;

@@ -68,6 +68,27 @@ export interface LinhaDigitavelResponse {
   erp: string;
 }
 
+/** Modelo: erp_connection_status */
+export interface ConnectionStatusResponse {
+  contrato_id: string;
+  online: boolean;
+  login: string | null;
+  erp: string;
+}
+
+/** Modelo: erp_signal_diagnosis */
+export interface SignalDiagnosisResponse {
+  contrato_id: string;
+  rx_value: number | null;
+  rx_level: string | null;
+  tx_value: number | null;
+  tx_level: string | null;
+  diagnosis: string;
+  recommended_action: string;
+  severity: number;
+  erp: string;
+}
+
 /** Envelope padrão que toda ferramenta retorna */
 export interface ToolEnvelope<T> {
   encontrados: number;
