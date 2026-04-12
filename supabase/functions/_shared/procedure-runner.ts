@@ -899,8 +899,15 @@ async function resolveContractSelectionFromMessage(
   if (selected.endereco) selection.selected_contract_address = selected.endereco;
   if (selected.plano) selection.selected_contract_plan = selected.plano;
 
+  // Persist contract status and blocked flag
+  if (selected.status) {
+    selection.selected_contract_status = selected.status;
+    const blockedStatuses = ["bloqueado", "financeiro_em_atraso"];
+    selection.contract_is_blocked = blockedStatuses.includes(String(selected.status));
+  }
+
   console.log(
-    `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}`,
+    `[procedure-runner] Resolved contract selection: option=${num}, address=${selection.selected_contract_address}, status=${selection.selected_contract_status ?? "∅"}`,
   );
 
   await mergeToContext(supabaseAdmin, conversationId, selection);
@@ -1024,6 +1031,8 @@ async function mergeToContext(
     delete existing.selected_contract_address;
     delete existing.selected_contract_plan;
     delete existing.selected_contract_option;
+    delete existing.selected_contract_status;
+    delete existing.contract_is_blocked;
     delete existing.selected_invoice_id;
     delete existing.selected_payment_method;
   } else if (toolName === "erp_contract_lookup" && Array.isArray(envelope.itens)) {
@@ -1035,6 +1044,8 @@ async function mergeToContext(
     delete existing.selected_contract_address;
     delete existing.selected_contract_plan;
     delete existing.selected_contract_option;
+    delete existing.selected_contract_status;
+    delete existing.contract_is_blocked;
     delete existing.selected_invoice_id;
     delete existing.selected_payment_method;
     // Auto-select if single contract
