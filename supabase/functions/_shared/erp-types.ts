@@ -73,4 +73,7 @@ export interface ErpProviderDriver {
   fetchBoleto?(creds: ErpCredentials, idAreceber: string): Promise<any>;
   fetchBoletoSms?(creds: ErpCredentials, idAreceber: string): Promise<any>;
   fetchLinhaDigitavel?(creds: ErpCredentials, idAreceber: string): Promise<any>;
+  // Granular queries for AI tools (filtered by contract)
+  fetchRadusuariosByContract?(creds: ErpCredentials, contratoId: string): Promise<any[]>;
+  fetchFibraByLogin?(creds: ErpCredentials, loginId: string): Promise<any[]>;
 }

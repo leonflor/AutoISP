@@ -191,6 +191,73 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
       "Linha digitável do boleto para pagamento via código de barras.",
     requires_erp: true,
   },
+
+  erp_connection_status: {
+    handler: "erp_connection_status",
+    display_name: "Status de Conexão RADIUS",
+    description:
+      "Consulta o status de conexão RADIUS (online/offline) de um contrato no ERP pelo ID do contrato.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        contrato_id: {
+          type: "string",
+          description: "ID do contrato no ERP",
+        },
+      },
+      required: ["contrato_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Status da conexão (online/offline) e login do contrato.",
+    requires_erp: true,
+  },
+
+  erp_signal_diagnosis: {
+    handler: "erp_signal_diagnosis",
+    display_name: "Diagnóstico de Sinal Óptico",
+    description:
+      "Realiza diagnóstico do sinal óptico (RX/TX) de um contrato no ERP. Retorna valores, classificação e ação recomendada.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        contrato_id: {
+          type: "string",
+          description: "ID do contrato no ERP",
+        },
+      },
+      required: ["contrato_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Valores RX/TX em dBm, classificação de qualidade, diagnóstico textual, ação recomendada e severidade (0=ok, 1=atenção, 2=problema, 3=crítico).",
+    requires_erp: true,
+  },
+
+  transfer_to_agent: {
+    handler: "transfer_to_agent",
+    display_name: "Transferir para Agente IA",
+    description:
+      "Transfere a conversa para outro agente de IA especializado do mesmo provedor. Use para escalonar para um agente com capacidades específicas.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        target_agent_name: {
+          type: "string",
+          description: "Nome do agente de destino (ex: 'Suporte Técnico Avançado')",
+        },
+        reason: {
+          type: "string",
+          description: "Motivo resumido da transferência",
+        },
+      },
+      required: ["target_agent_name", "reason"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Confirma que a conversa foi transferida para o agente especializado.",
+    requires_erp: false,
+  },
 };
 
 /**
