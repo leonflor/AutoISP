@@ -205,6 +205,57 @@ async function ixc_pix_lookup(
   return resp.json();
 }
 
+// Helper: extrai base64 do PDF de uma resposta IXC heterogênea.
+// Tenta chaves conhecidas, depois varredura recursiva (≤2 níveis).
+// Remove prefixo data: e whitespace. Lança erro claro se nada encontrado.
+function extractBase64FromIxcResponse(raw: any): string {
+  const KNOWN_KEYS = ["boleto", "arquivo", "pdf", "base64", "file", "data", "content"];
+  const BASE64_RE = /^[A-Za-z0-9+/=\s]+$/;
+
+  const clean = (s: string): string => {
+    let v = s.trim();
+    const m = v.match(/^data:application\/pdf;base64,(.*)$/i);
+    if (m) v = m[1];
+    return v.replace(/\s+/g, "");
+  };
+
+  const looksLikeB64 = (s: unknown): s is string =>
+    typeof s === "string" && s.length > 1000 && BASE64_RE.test(s);
+
+  // 1) String direta
+  if (typeof raw === "string" && raw.length > 0) return clean(raw);
+
+  if (raw && typeof raw === "object") {
+    // 2) Chaves conhecidas (nível 1)
+    for (const k of KNOWN_KEYS) {
+      const v = raw[k];
+      if (typeof v === "string" && v.length > 0) return clean(v);
+    }
+
+    // 3) Varredura recursiva (profundidade ≤ 2) por strings que pareçam base64
+    const scan = (obj: any, depth: number): string | null => {
+      if (depth > 2 || !obj || typeof obj !== "object") return null;
+      for (const val of Object.values(obj)) {
+        if (looksLikeB64(val)) return clean(val);
+      }
+      for (const val of Object.values(obj)) {
+        if (val && typeof val === "object") {
+          const found = scan(val, depth + 1);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const found = scan(raw, 0);
+    if (found) return found;
+  }
+
+  const shape = raw && typeof raw === "object" ? Object.keys(raw) : typeof raw;
+  console.error(`[IXC] get_boleto: PDF base64 não encontrado. Shape: ${JSON.stringify(shape)}`);
+  throw new Error("Resposta IXC não contém PDF base64");
+}
+
 async function ixc_boleto_lookup(
   creds: ErpCredentials,
   idAreceber: string
@@ -232,7 +283,21 @@ async function ixc_boleto_lookup(
   if (!resp.ok) {
     throw new Error(`IXC get_boleto HTTP ${resp.status}`);
   }
-  return resp.json();
+
+  const raw = await resp.json();
+  const base64 = extractBase64FromIxcResponse(raw);
+
+  // Validação leve: assinatura PDF (%PDF) nos primeiros bytes
+  try {
+    const head = atob(base64.slice(0, 8));
+    if (!head.startsWith("%PDF")) {
+      console.warn(`[IXC] get_boleto: assinatura PDF ausente (head=${JSON.stringify(head)}). Prosseguindo mesmo assim.`);
+    }
+  } catch {
+    console.warn(`[IXC] get_boleto: falha ao validar assinatura PDF (decode parcial).`);
+  }
+
+  return { base64, fatura_id: idAreceber };
 }
 
 async function ixc_boleto_sms(
