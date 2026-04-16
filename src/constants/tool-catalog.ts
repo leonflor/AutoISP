@@ -90,6 +90,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       "Confirma o envio do PDF inline no WhatsApp. No simulador ou sem WhatsApp configurado, retorna o link como fallback.",
     requires_erp: true,
   },
+  {
     handler: "erp_boleto_sms",
     display_name: "Enviar Boleto por SMS",
     description:
