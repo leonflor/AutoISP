@@ -150,7 +150,27 @@ export const TOOL_CATALOG: Record<string, ToolDefinition> = {
     requires_erp: true,
   },
 
-  erp_boleto_sms: {
+  erp_boleto_send_pdf: {
+    handler: "erp_boleto_send_pdf",
+    display_name: "Enviar Boleto PDF no Chat",
+    description:
+      "Envia o boleto em PDF como anexo (mensagem do tipo document) diretamente no chat do WhatsApp do cliente. Use quando o cliente preferir receber o PDF inline em vez de um link de download.",
+    parameters_schema: {
+      type: "object",
+      properties: {
+        fatura_id: {
+          type: "string",
+          description: "ID da fatura (id_areceber) no ERP",
+        },
+      },
+      required: ["fatura_id"],
+      additionalProperties: false,
+    },
+    response_description:
+      "Confirma o envio do PDF inline no WhatsApp ({ sent, fatura_id, wamid }). No simulador ou se não houver WhatsApp configurado, retorna o link como fallback.",
+    requires_erp: true,
+  },
+
     handler: "erp_boleto_sms",
     display_name: "Enviar Boleto por SMS",
     description:
