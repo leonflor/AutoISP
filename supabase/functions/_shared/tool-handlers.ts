@@ -2,7 +2,7 @@
 // Valida input, chama Driver (Camada 2), retorna ToolResult com envelope padronizado.
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buscarCliente, buscarContratos, buscarFaturas, buscarPix, buscarBoleto, buscarBoletoSms, buscarLinhaDigitavel, buscarStatusConexao, buscarDiagnosticoSinal } from "./erp-driver.ts";
+import { buscarCliente, buscarContratos, buscarFaturas, buscarPix, buscarBoleto, buscarBoletoSms, buscarLinhaDigitavel, buscarStatusConexao, buscarDiagnosticoSinal, decrypt } from "./erp-driver.ts";
 
 export interface ToolExecutionContext {
   supabaseAdmin: SupabaseClient;
@@ -104,6 +104,152 @@ const erpBoletoLookupHandler: ToolHandler = async (ctx, args) => {
 
   const result = await buscarBoleto(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, faturaId);
   return { success: true, data: result };
+};
+
+// ── Handler: erp_boleto_send_pdf ──
+// Reaproveita buscarBoleto (signed URL 24h) e envia o PDF como mensagem
+// do tipo "document" no WhatsApp para o usuário da conversa.
+
+const erpBoletoSendPdfHandler: ToolHandler = async (ctx, args) => {
+  const faturaId = String(args.fatura_id || "").trim();
+  if (!faturaId) return { success: false, error: "Informe o ID da fatura (fatura_id)" };
+  if (!ctx.conversationId) {
+    return { success: false, error: "conversation_id não disponível no contexto" };
+  }
+
+  // 1. Gera/recupera o boleto (parsing Base64 robusto + signed URL 24h)
+  const boletoResult = await buscarBoleto(ctx.supabaseAdmin, ctx.ispId, ctx.encryptionKey, faturaId);
+  const boletoItem = boletoResult.itens?.[0];
+  const boletoUrl = boletoItem?.boleto_url;
+
+  if (!boletoUrl) {
+    return {
+      success: false,
+      error: boletoResult.mensagem || boletoResult.erros?.[0] || "Boleto PDF não disponível",
+    };
+  }
+
+  // 2. Recupera dados da conversa (canal, telefone, ISP)
+  const { data: conv } = await ctx.supabaseAdmin
+    .from("conversations")
+    .select("user_phone, channel, isp_id")
+    .eq("id", ctx.conversationId)
+    .single();
+
+  if (!conv) return { success: false, error: "Conversa não encontrada" };
+
+  // 3. Simulador / canais não-WhatsApp: retorna apenas a URL (fallback gracioso)
+  if (conv.channel === "simulator") {
+    return {
+      success: true,
+      data: {
+        sent: false,
+        fatura_id: faturaId,
+        boleto_url: boletoUrl,
+        mensagem: "Modo simulador: PDF disponível via link (envio inline só ocorre no WhatsApp real).",
+      },
+    };
+  }
+
+  // 4. Resolve credenciais do WhatsApp do ISP
+  const { data: waConfig } = await ctx.supabaseAdmin
+    .from("whatsapp_configs")
+    .select("*")
+    .eq("isp_id", conv.isp_id)
+    .maybeSingle();
+
+  if (!waConfig?.api_key_encrypted || !waConfig?.encryption_iv) {
+    return {
+      success: true,
+      data: {
+        sent: false,
+        fatura_id: faturaId,
+        boleto_url: boletoUrl,
+        mensagem: "WhatsApp não configurado — envie o link manualmente.",
+      },
+    };
+  }
+
+  let accessToken: string;
+  try {
+    accessToken = await decrypt(waConfig.api_key_encrypted, waConfig.encryption_iv, ctx.encryptionKey);
+  } catch (err) {
+    return { success: false, error: `Falha ao descriptografar token WhatsApp: ${err instanceof Error ? err.message : "desconhecido"}` };
+  }
+
+  const settings = waConfig.settings as Record<string, any> | null;
+  const phoneNumberId = settings?.phone_number_id || waConfig.instance_name || "";
+  if (!phoneNumberId) {
+    return { success: false, error: "phone_number_id não configurado no WhatsApp do provedor" };
+  }
+
+  // 5. Envia documento via Graph API
+  const caption = "Segue seu boleto em PDF. Toque para abrir.";
+  const filename = `boleto-${faturaId}.pdf`;
+
+  const t0 = Date.now();
+  const waResponse = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: conv.user_phone,
+      type: "document",
+      document: {
+        link: boletoUrl,
+        filename,
+        caption,
+      },
+    }),
+  });
+
+  const waResult = await waResponse.json().catch(() => ({}));
+  const latencyMs = Date.now() - t0;
+  const wamid = waResult?.messages?.[0]?.id || null;
+  const sentOk = waResponse.ok && !!wamid;
+
+  console.log("[erp_boleto_send_pdf]", {
+    ispId: ctx.ispId,
+    faturaId,
+    sentOk,
+    latencyMs,
+    error: sentOk ? undefined : waResult?.error,
+  });
+
+  if (!sentOk) {
+    const apiErr = waResult?.error?.message || `HTTP ${waResponse.status}`;
+    return { success: false, error: `Falha ao enviar PDF via WhatsApp: ${apiErr}` };
+  }
+
+  // 6. Registra em whatsapp_messages e messages (rastreabilidade)
+  await ctx.supabaseAdmin.from("whatsapp_messages").insert({
+    isp_id: conv.isp_id,
+    wamid,
+    direction: "outbound",
+    message_type: "document",
+    recipient_phone: conv.user_phone,
+    sender_phone: waConfig.phone_number || "",
+    content: `[document] ${filename}`,
+    status: "sent",
+    status_updated_at: new Date().toISOString(),
+    sent_at: new Date().toISOString(),
+  });
+
+  await ctx.supabaseAdmin.from("messages").insert({
+    conversation_id: ctx.conversationId,
+    role: "agent",
+    content: "📎 Boleto enviado em PDF.",
+    wamid,
+  });
+
+  return {
+    success: true,
+    data: { sent: true, fatura_id: faturaId, wamid },
+  };
 };
 
 // ── Handler: erp_boleto_sms ──
@@ -224,6 +370,7 @@ const handlers: Record<string, ToolHandler> = {
   transfer_to_human: transferToHumanHandler,
   erp_pix_lookup: erpPixLookupHandler,
   erp_boleto_lookup: erpBoletoLookupHandler,
+  erp_boleto_send_pdf: erpBoletoSendPdfHandler,
   erp_boleto_sms: erpBoletoSmsHandler,
   erp_linha_digitavel: erpLinhaDigitavelHandler,
   erp_connection_status: erpConnectionStatusHandler,
