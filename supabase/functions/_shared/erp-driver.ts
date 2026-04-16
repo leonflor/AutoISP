@@ -488,29 +488,20 @@ export async function buscarBoleto(
       if (!driver.fetchBoleto) continue;
 
       const creds = await resolveCredentials(config, encryptionKey);
+
+      const t0 = Date.now();
       const raw = await driver.fetchBoleto(creds, faturaId);
+      const latencyMs = Date.now() - t0;
 
-      // raw é base64 do PDF ou objeto com conteúdo
+      // Provider já normaliza: { base64, fatura_id } ou string
       let base64Content: string | null = null;
-
       if (typeof raw === "string") {
         base64Content = raw;
-      } else if (raw?.ContentType?.includes("pdf") || raw?.content) {
-        base64Content = raw.content || raw.base64 || null;
-      } else if (typeof raw === "object") {
-        // IXC pode retornar o base64 diretamente na resposta
-        const str = JSON.stringify(raw);
-        // Se a resposta contiver dados binários codificados
-        if (raw.type === "success" && raw.base64) {
-          base64Content = raw.base64;
-        } else {
-          // Tentar extrair base64 bruto (IXC retorna PDF direto)
-          base64Content = str.length > 1000 ? null : null;
-        }
+      } else if (raw && typeof raw === "object") {
+        base64Content = raw.base64 || raw.content || raw.pdf || null;
       }
 
       if (base64Content) {
-        // Decode e upload para Storage
         try {
           const binaryStr = atob(base64Content);
           const bytes = new Uint8Array(binaryStr.length);
@@ -528,7 +519,15 @@ export async function buscarBoleto(
 
           const { data: signedData } = await supabaseAdmin.storage
             .from("invoices")
-            .createSignedUrl(storagePath, 3600); // 1h
+            .createSignedUrl(storagePath, 86400); // 24h
+
+          console.log("[buscarBoleto]", {
+            ispId,
+            faturaId,
+            provider: providerName,
+            pdfBytes: bytes.length,
+            latencyMs,
+          });
 
           itens.push({
             fatura_id: faturaId,
